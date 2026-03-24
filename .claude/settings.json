@@ -8,7 +8,9 @@
       "Bash(node -e \"import\\(''@react-router/node''\\).then\\(m => console.log\\(''keys:'', Object.keys\\(m\\)\\)\\).catch\\(e => console.log\\(''err:'', e.message\\)\\)\")",
       "Bash(node --input-type=module:*)",
       "Bash(node -e \"const m = require\\(''./node_modules/@react-router/node/dist/index.js''\\); console.log\\(Object.keys\\(m\\)\\)\")",
-      "Bash(node -e \"const m = require\\(''./node_modules/react-router/dist/node/index.cjs''\\); console.log\\(Object.keys\\(m\\).filter\\(k => k.includes\\(''Request''\\) || k.includes\\(''Handler''\\) || k.includes\\(''handler''\\) || k.includes\\(''Listener''\\)\\)\\)\")"
+      "Bash(node -e \"const m = require\\(''./node_modules/react-router/dist/node/index.cjs''\\); console.log\\(Object.keys\\(m\\).filter\\(k => k.includes\\(''Request''\\) || k.includes\\(''Handler''\\) || k.includes\\(''handler''\\) || k.includes\\(''Listener''\\)\\)\\)\")",
+      "Bash(node -e \"const p=require\\(''./node_modules/@shopify/polaris/package.json''\\); console.log\\(p.version\\)\")",
+      "Bash(npm install:*)"
     ]
   }
 }

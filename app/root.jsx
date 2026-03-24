@@ -1,12 +1,9 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
-const appBodyStyle = {
-  margin: 0,
-  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  WebkitFontSmoothing: "antialiased",
-  MozOsxFontSmoothing: "grayscale",
-  textRendering: "optimizeLegibility",
-};
+export function links() {
+  return [{ rel: "stylesheet", href: polarisStyles }];
+}
 
 export default function App() {
   return (
@@ -22,7 +19,7 @@ export default function App() {
         <Meta />
         <Links />
       </head>
-      <body style={appBodyStyle}>
+      <body>
         <Outlet />
         <ScrollRestoration />
         <Scripts />

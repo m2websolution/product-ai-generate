@@ -6,6 +6,29 @@ import {
   useNavigation,
   useRevalidator,
 } from "react-router";
+import {
+  Badge,
+  Banner,
+  BlockStack,
+  Box,
+  Button,
+  ButtonGroup,
+  Card,
+  Divider,
+  EmptyState,
+  IndexTable,
+  InlineStack,
+  Layout,
+  Modal,
+  Page,
+  Pagination,
+  Select,
+  Spinner,
+  Tabs,
+  Text,
+  TextField,
+  Thumbnail,
+} from "@shopify/polaris";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 /* global process */
@@ -198,457 +221,6 @@ const FORMAT_OPTIONS = [
 const KEYWORD_CHIPS = ["[Description]", "[Category]", "[Variant Titles]", "[Vendor]"];
 const DESCRIPTION_STYLE_OPTIONS = ["Normal", "Heading", "Subheading"];
 
-const imageStyle = {
-  width: "52px",
-  height: "52px",
-  objectFit: "cover",
-  borderRadius: "6px",
-  border: "1px solid #e1e6ed",
-  background: "#fff",
-};
-
-const imageFallbackStyle = {
-  width: "52px",
-  height: "52px",
-  borderRadius: "6px",
-  border: "1px dashed #d0d8e2",
-  display: "grid",
-  placeItems: "center",
-  color: "#738194",
-  fontSize: "11px",
-  background: "#f7f9fb",
-};
-
-const tablePanelStyle = {
-  borderRadius: "10px",
-};
-
-const tableShellStyle = {
-  fontSize: "13px",
-  color: "#1f2937",
-};
-
-const tableViewportStyle = {
-  overflowX: "auto",
-  borderRadius: "10px",
-  border: "1px solid #dbe0e7",
-  background: "#ffffff",
-};
-
-const tableElementStyle = {
-  minWidth: "980px",
-};
-
-const tabsWrapStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "6px",
-  marginBottom: "10px",
-};
-
-const tabButtonStyle = {
-  border: "none",
-  background: "transparent",
-  color: "#4a5565",
-  fontSize: "13px",
-  fontWeight: 600,
-  borderRadius: "8px",
-  padding: "7px 14px",
-  cursor: "pointer",
-};
-
-const tabActiveStyle = {
-  background: "#dde1e6",
-  color: "#1f2a39",
-};
-
-const titleTextStyle = {
-  color: "#1b2434",
-  fontSize: "13px",
-  fontWeight: 500,
-  lineHeight: 1.25,
-};
-
-const paginationWrapStyle = {
-  marginTop: "12px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const searchWrapStyle = {
-  marginBottom: "4px",
-};
-
-const searchFieldStyle = {
-  width: "100%",
-};
-
-const checkboxStyle = {
-  width: "20px",
-  height: "20px",
-};
-
-const cellContentStyle = {
-  display: "flex",
-  alignItems: "center",
-  minHeight: "52px",
-};
-
-const emptyStateStyle = {
-  color: "#607080",
-  fontSize: "13px",
-};
-
-const modalBodyStyle = {
-  paddingTop: "4px",
-  fontFamily: '"Segoe UI", Tahoma, Arial, sans-serif',
-};
-
-const modalShellStyle = {
-  borderRadius: "14px",
-  background: "#ececec",
-  border: "1px solid #d7d8da",
-  padding: "12px",
-  fontSize: "13px",
-  color: "#272c33",
-};
-
-const modalGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-  gap: "14px",
-  alignItems: "flex-start",
-};
-
-const modalMainCardStyle = {
-  borderRadius: "12px",
-  border: "1px solid #d2d4d8",
-  background: "#f2f2f2",
-  padding: "14px",
-  boxShadow: "none",
-};
-
-const modalSideCardStyle = {
-  borderRadius: "12px",
-  border: "1px solid #d2d4d8",
-  background: "#f2f2f2",
-  padding: "14px",
-  boxShadow: "none",
-};
-
-const modalSectionSpacingStyle = {
-  marginTop: "12px",
-};
-
-const descriptionHeadingStyle = {
-  marginBottom: "6px",
-  color: "#1f252c",
-  fontSize: "14px",
-  fontWeight: 700,
-};
-
-const fieldLabelStyle = {
-  display: "block",
-  marginBottom: "5px",
-  color: "#343a42",
-  fontSize: "14px",
-  fontWeight: 600,
-};
-
-const productTitleInputStyle = {
-  width: "100%",
-  height: "38px",
-  border: "1px solid #d5d7db",
-  borderRadius: "10px",
-  background: "#dfdfdf",
-  color: "#585d65",
-  fontSize: "15px",
-  fontWeight: 600,
-  padding: "0 12px",
-  boxSizing: "border-box",
-};
-
-const descriptionEditorStyle = {
-  border: "1px solid #c9ccd1",
-  borderRadius: "10px",
-  overflow: "hidden",
-  background: "#ffffff",
-};
-
-const descriptionToolbarStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
-  padding: "6px 8px",
-  borderBottom: "1px solid #d4d7dc",
-  background: "#f7f7f7",
-  flexWrap: "wrap",
-};
-
-const descriptionToneSelectStyle = {
-  width: "124px",
-};
-
-const descriptionToolbarButtonsStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
-  flexWrap: "wrap",
-};
-
-const toolbarIconButtonStyle = {
-  width: "30px",
-};
-
-const descriptionBodyStyle = {
-  position: "relative",
-  background: "#ffffff",
-};
-
-const descriptionEditorContentStyle = {
-  minHeight: "360px",
-  padding: "12px 14px",
-  fontSize: "14px",
-  lineHeight: 1.55,
-  color: "#30363c",
-  outline: "none",
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
-};
-
-const descriptionPlaceholderStyle = {
-  position: "absolute",
-  top: "12px",
-  left: "14px",
-  color: "#8b9098",
-  fontSize: "14px",
-  fontStyle: "normal",
-  pointerEvents: "none",
-};
-
-const badgeRowStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  marginBottom: "6px",
-  fontSize: "14px",
-  fontWeight: 600,
-  color: "#2b3037",
-};
-
-const helperTextStyle = {
-  marginTop: "6px",
-  color: "#60666e",
-  fontSize: "12px",
-  lineHeight: 1.4,
-};
-
-const seoGenerateRowStyle = {
-  marginTop: "10px",
-  display: "flex",
-  justifyContent: "flex-end",
-};
-
-const seoGenerateButtonStyle = {
-  minWidth: "128px",
-  height: "34px",
-  borderRadius: "10px",
-  border: "1px solid #4a4d52",
-  background: "linear-gradient(180deg, #35383d 0%, #222428 100%)",
-  color: "#f5f5f6",
-  fontSize: "14px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const chipWrapStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "6px",
-  marginTop: "10px",
-};
-
-const modalRightActionsStyle = {
-  marginTop: "14px",
-  display: "grid",
-  gap: "10px",
-};
-
-const generateButtonStyle = {
-  width: "100%",
-  height: "36px",
-  borderRadius: "10px",
-  border: "1px solid #4a4d52",
-  background: "linear-gradient(180deg, #35383d 0%, #222428 100%)",
-  color: "#f5f5f6",
-  fontSize: "15px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const modalFooterRowStyle = {
-  marginTop: "2px",
-  display: "grid",
-  gridTemplateColumns: "auto auto auto 1fr",
-  gap: "8px",
-  alignItems: "center",
-};
-
-const modalButtonIconStyle = {
-  width: "36px",
-};
-
-const modalSideFieldStyle = {
-  marginTop: "14px",
-};
-
-const modalMessageWrapStyle = {
-  marginBottom: "10px",
-};
-
-const plainInputWrapStyle = {
-  position: "relative",
-};
-
-const plainInputStyle = {
-  width: "100%",
-  height: "38px",
-  border: "1px solid #a9adb3",
-  borderRadius: "11px",
-  background: "#f4f4f4",
-  padding: "0 68px 0 12px",
-  boxSizing: "border-box",
-  color: "#3a3f45",
-  fontSize: "14px",
-  outline: "none",
-};
-
-const plainTextAreaWrapStyle = {
-  position: "relative",
-};
-
-const plainTextAreaStyle = {
-  width: "100%",
-  minHeight: "112px",
-  border: "1px solid #a9adb3",
-  borderRadius: "11px",
-  background: "#f4f4f4",
-  padding: "8px 12px 30px",
-  boxSizing: "border-box",
-  color: "#3a3f45",
-  fontSize: "14px",
-  lineHeight: 1.5,
-  resize: "vertical",
-  outline: "none",
-};
-
-const inputCounterStyle = {
-  position: "absolute",
-  top: "50%",
-  right: "12px",
-  transform: "translateY(-50%)",
-  color: "#626872",
-  fontSize: "13px",
-  fontWeight: 600,
-  pointerEvents: "none",
-};
-
-const textAreaCounterStyle = {
-  position: "absolute",
-  right: "12px",
-  bottom: "8px",
-  color: "#626872",
-  fontSize: "13px",
-  fontWeight: 600,
-  pointerEvents: "none",
-};
-
-const sideLabelStyle = {
-  display: "block",
-  marginBottom: "5px",
-  color: "#353a42",
-  fontSize: "14px",
-  fontWeight: 600,
-};
-
-const sideSelectStyle = {
-  width: "100%",
-  height: "38px",
-  border: "1px solid #a9adb3",
-  borderRadius: "11px",
-  background: "#f4f4f4",
-  color: "#343941",
-  fontSize: "14px",
-  padding: "0 12px",
-  outline: "none",
-};
-
-const sideTextAreaStyle = {
-  width: "100%",
-  minHeight: "100px",
-  border: "1px solid #a9adb3",
-  borderRadius: "11px",
-  background: "#f4f4f4",
-  color: "#343941",
-  fontSize: "14px",
-  padding: "8px 12px",
-  boxSizing: "border-box",
-  resize: "vertical",
-  outline: "none",
-};
-
-const keywordChipStyle = {
-  border: "none",
-  borderRadius: "8px",
-  background: "#e0e0e0",
-  color: "#4a5058",
-  fontSize: "13px",
-  fontWeight: 700,
-  padding: "5px 9px",
-  cursor: "pointer",
-};
-
-const seoStatusPillStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "6px",
-  borderRadius: "999px",
-  padding: "2px 12px",
-  border: "1px solid",
-  fontSize: "13px",
-  fontWeight: 700,
-};
-
-const seoStatusDotStyle = {
-  width: "9px",
-  height: "9px",
-  borderRadius: "999px",
-  display: "inline-block",
-};
-
-const updateButtonStyle = {
-  width: "100%",
-  height: "38px",
-  border: "1px solid #4a4d52",
-  borderRadius: "10px",
-  background: "linear-gradient(180deg, #35383d 0%, #222428 100%)",
-  color: "#f5f5f6",
-  fontSize: "15px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const updateButtonDisabledStyle = {
-  ...updateButtonStyle,
-  border: "1px solid #d1d3d8",
-  background: "#e6e6e6",
-  color: "#a3a6ab",
-  cursor: "not-allowed",
-};
-
 const editInitialState = {
   title: "",
   description: "",
@@ -718,9 +290,9 @@ function toStatusMeta(status) {
 function toBadgeTone(tone) {
   if (tone === "success") return "success";
   if (tone === "warning") return "warning";
-  if (tone === "caution") return "caution";
+  if (tone === "caution") return "attention";
   if (tone === "critical") return "critical";
-  return "neutral";
+  return undefined;
 }
 
 function toSeoPalette(tone) {
@@ -760,7 +332,7 @@ function toSeoPalette(tone) {
 }
 
 function renderBadge({ label, tone }) {
-  return <s-badge tone={toBadgeTone(tone)}>{label}</s-badge>;
+  return <Badge tone={toBadgeTone(tone)}>{label}</Badge>;
 }
 
 function readFormString(formData, key) {
@@ -1424,11 +996,11 @@ export default function ProductsPage() {
   const revalidator = useRevalidator();
   const generateFetcher = useFetcher();
   const updateFetcher = useFetcher();
-  const editModalRef = useRef(null);
   const descriptionEditorRef = useRef(null);
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackProducts, setFallbackProducts] = useState(products);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editForm, setEditForm] = useState(editInitialState);
   const [modalMessage, setModalMessage] = useState(null);
 
@@ -1480,12 +1052,13 @@ export default function ProductsPage() {
     return () => clearTimeout(timeoutId);
   }, [filters.search, makeUrl, navigate, searchValue]);
 
-  const handleSearchInput = useCallback((event) => {
-    setSearchValue(event.currentTarget.value || "");
+  const handleSearchInput = useCallback((value) => {
+    setSearchValue(value || "");
   }, []);
 
   const resetEditModalState = useCallback(() => {
     setEditingProduct(null);
+    setModalOpen(false);
     setEditForm(editInitialState);
     setModalMessage(null);
   }, []);
@@ -1500,9 +1073,7 @@ export default function ProductsPage() {
       seoTitle: product.seoTitleValue || "",
       seoDescription: product.seoDescriptionValue || "",
     });
-    requestAnimationFrame(() => {
-      editModalRef.current?.showOverlay?.();
-    });
+    setModalOpen(true);
   }, []);
 
   const updateEditField = useCallback((field, value) => {
@@ -1530,9 +1101,8 @@ export default function ProductsPage() {
   );
 
   const handleDescriptionStyleChange = useCallback(
-    (event) => {
-      const styleValue = event.currentTarget.value || "Normal";
-      updateEditField("descriptionStyle", styleValue);
+    (styleValue) => {
+      updateEditField("descriptionStyle", styleValue || "Normal");
 
       if (styleValue === "Heading") {
         applyDescriptionCommand("formatBlock", "H2");
@@ -1687,573 +1257,524 @@ export default function ProductsPage() {
       ? makeUrl({ search: filters.search, after: pageInfo.endCursor })
       : null;
 
+  const statusTabIndex = filters.status === "active" ? 1 : filters.status === "draft" ? 2 : 0;
+  const statusTabs = [
+    { id: "all", content: "All" },
+    { id: "active", content: "Active" },
+    { id: "draft", content: "Draft" },
+  ];
+
+  const handleTabChange = useCallback(
+    (selectedTabIndex) => {
+      const tab = statusTabs[selectedTabIndex];
+      navigate(makeUrl({ status: tab.id }));
+    },
+    [makeUrl, navigate],
+  );
+
+  const resourceName = { singular: "product", plural: "products" };
+
+  const headings = [
+    { title: "Image" },
+    { title: "Title" },
+    { title: "Status" },
+    { title: "Meta Title" },
+    { title: "Meta Description" },
+    { title: "Actions" },
+  ];
+
+  const languageSelectOptions = LANGUAGE_OPTIONS.map((lang) => ({ label: lang, value: lang }));
+  const toneSelectOptions = TONE_OPTIONS.map((t) => ({ label: t, value: t }));
+  const lengthSelectOptions = LENGTH_OPTIONS.map((l) => ({ label: l, value: l }));
+  const formatSelectOptions = FORMAT_OPTIONS.map((f) => ({ label: f, value: f }));
+  const descriptionStyleSelectOptions = DESCRIPTION_STYLE_OPTIONS.map((s) => ({
+    label: s,
+    value: s,
+  }));
+
+  const rowMarkup = filteredProducts.map((product, index) => (
+    <IndexTable.Row id={product.id} key={product.id} position={index}>
+      <IndexTable.Cell>
+        {product.imageUrl ? (
+          <Thumbnail
+            source={product.imageUrl}
+            alt={product.imageAlt}
+            size="small"
+          />
+        ) : (
+          <Thumbnail
+            source=""
+            alt={product.imageAlt}
+            size="small"
+          />
+        )}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="medium" as="span">
+          {product.title}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {renderBadge({ label: product.status.label, tone: product.status.tone })}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {renderBadge({ label: product.seoTitle.label, tone: product.seoTitle.tone })}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {renderBadge({ label: product.seoDescription.label, tone: product.seoDescription.tone })}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Button onClick={() => openEditModal(product)}>Edit Content</Button>
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  ));
+
   return (
-    <s-page heading="Products">
-      <s-section>
-        <s-stack direction="inline" gap="base" alignItems="center">
-          <s-link href="/app">&larr; Back</s-link>
-          <s-button onClick={() => navigate(makeUrl({}))}>Refresh</s-button>
-          <s-button disabled>Upgrade for Bulk Generation</s-button>
-        </s-stack>
-      </s-section>
+    <Page
+      title="Products"
+      primaryAction={
+        <Button disabled>Upgrade for Bulk Generation</Button>
+      }
+      secondaryActions={[
+        {
+          content: "Refresh",
+          onAction: () => navigate(makeUrl({})),
+        },
+        {
+          content: "Back",
+          url: "/app",
+        },
+      ]}
+    >
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <TextField
+                label="Search products"
+                labelHidden
+                placeholder="Search by product title..."
+                value={searchValue}
+                onChange={handleSearchInput}
+                autoComplete="off"
+                prefix={
+                  isSearchLoading ? <Spinner size="small" /> : undefined
+                }
+              />
 
-      <s-section>
-        <div style={searchWrapStyle}>
-          <div style={searchFieldStyle}>
-            <s-text-field
-              name="q"
-              label="Search by product title..."
-              value={searchValue}
-              onInput={handleSearchInput}
-              onChange={handleSearchInput}
-            />
-          </div>
-        </div>
-      </s-section>
+              <Tabs
+                tabs={statusTabs}
+                selected={statusTabIndex}
+                onSelect={handleTabChange}
+              />
 
-      <s-section>
-        <s-box>
-          <div style={tablePanelStyle}>
-            <div style={tableShellStyle}>
-              <div style={tabsWrapStyle}>
-                {[
-                  { value: "all", label: "All" },
-                  { value: "active", label: "Active" },
-                  { value: "draft", label: "Draft" },
-                ].map((tab) => (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    style={{
-                      ...tabButtonStyle,
-                      ...(filters.status === tab.value ? tabActiveStyle : {}),
-                    }}
-                    onClick={() => navigate(makeUrl({ status: tab.value }))}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+              {isSearchLoading ? (
+                <Box padding="400">
+                  <InlineStack align="center">
+                    <Spinner size="small" />
+                  </InlineStack>
+                </Box>
+              ) : filteredProducts.length === 0 ? (
+                <EmptyState
+                  heading="No products found"
+                  image=""
+                >
+                  <Text as="p" tone="subdued">
+                    Try adjusting your search or filter to find what you are looking for.
+                  </Text>
+                </EmptyState>
+              ) : (
+                <IndexTable
+                  resourceName={resourceName}
+                  itemCount={filteredProducts.length}
+                  headings={headings}
+                  selectable={false}
+                >
+                  {rowMarkup}
+                </IndexTable>
+              )}
 
-              <div style={tableViewportStyle}>
-                <s-table variant="auto" loading={isSearchLoading} style={tableElementStyle}>
-                  <s-table-header-row>
-                    <s-table-header>
-                      <input type="checkbox" style={checkboxStyle} />
-                    </s-table-header>
-                    <s-table-header>Image</s-table-header>
-                    <s-table-header>Title</s-table-header>
-                    <s-table-header>Status</s-table-header>
-                    <s-table-header>Meta Title</s-table-header>
-                    <s-table-header>Meta Description</s-table-header>
-                    <s-table-header>Actions</s-table-header>
-                  </s-table-header-row>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="span" tone="subdued">
+                  {filteredProducts.length} results{" "}
+                  {isLoading && !isSearchLoading ? "(Loading...)" : ""}
+                </Text>
+                <Pagination
+                  hasPrevious={Boolean(previousUrl)}
+                  onPrevious={() => previousUrl && navigate(previousUrl)}
+                  hasNext={Boolean(nextUrl)}
+                  onNext={() => nextUrl && navigate(nextUrl)}
+                />
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+      </Layout>
 
-                  <s-table-body>
-                    {filteredProducts.length === 0 ? (
-                      <s-table-row>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle}>
-                            <span style={emptyStateStyle}>No products found.</span>
-                          </div>
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                      </s-table-row>
-                    ) : (
-                      filteredProducts.map((product) => (
-                        <s-table-row key={product.id}>
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              <input type="checkbox" style={checkboxStyle} />
-                            </div>
-                          </s-table-cell>
-
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              {product.imageUrl ? (
-                                <img
-                                  src={product.imageUrl}
-                                  alt={product.imageAlt}
-                                  width={52}
-                                  height={52}
-                                  style={imageStyle}
-                                />
-                              ) : (
-                                <div style={imageFallbackStyle}>No image</div>
-                              )}
-                            </div>
-                          </s-table-cell>
-
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              <span style={titleTextStyle}>{product.title}</span>
-                            </div>
-                          </s-table-cell>
-
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              {renderBadge({
-                                label: product.status.label,
-                                tone: product.status.tone,
-                              })}
-                            </div>
-                          </s-table-cell>
-
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              {renderBadge({
-                                label: product.seoTitle.label,
-                                tone: product.seoTitle.tone,
-                              })}
-                            </div>
-                          </s-table-cell>
-
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              {renderBadge({
-                                label: product.seoDescription.label,
-                                tone: product.seoDescription.tone,
-                              })}
-                            </div>
-                          </s-table-cell>
-
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              <s-button
-                                onClick={() => {
-                                  openEditModal(product);
-                                }}
-                              >
-                                Edit Content
-                              </s-button>
-                            </div>
-                          </s-table-cell>
-                        </s-table-row>
-                      ))
-                    )}
-                  </s-table-body>
-                </s-table>
-              </div>
-            </div>
-          </div>
-
-          <div style={paginationWrapStyle}>
-            <s-text>
-              {filteredProducts.length} results{" "}
-              {isSearchLoading ? "(Searching...)" : isLoading ? "(Loading...)" : ""}
-            </s-text>
-            <s-stack direction="inline" gap="base" alignItems="center">
-              <s-button
-                disabled={!previousUrl}
-                onClick={() => previousUrl && navigate(previousUrl)}
-              >
-                Previous
-              </s-button>
-              <s-button disabled={!nextUrl} onClick={() => nextUrl && navigate(nextUrl)}>
-                Next
-              </s-button>
-            </s-stack>
-          </div>
-        </s-box>
-      </s-section>
-
-      <s-modal
-        id={EDIT_MODAL_ID}
-        ref={editModalRef}
-        size="large"
-        heading="Edit Product Content"
-        onHide={resetEditModalState}
-        onAfterHide={resetEditModalState}
+      <Modal
+        open={modalOpen}
+        onClose={resetEditModalState}
+        title="Edit Product Content"
+        large
+        primaryAction={
+          editingProduct
+            ? {
+                content: isUpdating ? "Updating..." : "Update Product",
+                onAction: handleUpdateProduct,
+                disabled: !canUpdateProduct,
+                loading: isUpdating,
+              }
+            : undefined
+        }
+        secondaryActions={
+          editingProduct
+            ? [
+                {
+                  content: "Close",
+                  onAction: resetEditModalState,
+                },
+              ]
+            : [
+                {
+                  content: "Close",
+                  onAction: resetEditModalState,
+                },
+              ]
+        }
       >
-        <div style={modalBodyStyle}>
+        <Modal.Section>
           {!editingProduct ? (
-            <s-banner tone="info">
+            <Banner tone="info">
               Select a product and click <strong>Edit Content</strong> to open editor.
-            </s-banner>
+            </Banner>
           ) : (
-            <s-box style={modalShellStyle}>
+            <BlockStack gap="400">
               {modalMessage ? (
-                <div style={modalMessageWrapStyle}>
-                  <s-banner tone={modalMessage.tone}>{modalMessage.text}</s-banner>
-                </div>
+                <Banner
+                  tone={modalMessage.tone === "critical" ? "critical" : "success"}
+                  onDismiss={() => setModalMessage(null)}
+                >
+                  {modalMessage.text}
+                </Banner>
               ) : null}
 
-              <div style={modalGridStyle}>
-                <s-box style={modalMainCardStyle}>
-                  <label htmlFor="edit-product-title" style={fieldLabelStyle}>
-                    Product Title
-                  </label>
-                  <input
-                    id="edit-product-title"
-                    type="text"
-                    value={editForm.title}
-                    readOnly
-                    style={productTitleInputStyle}
-                    onInput={(event) => updateEditField("title", event.currentTarget.value || "")}
-                  />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+                  gap: "16px",
+                  alignItems: "flex-start",
+                }}
+              >
+                {/* Left column: description + SEO fields */}
+                <Card>
+                  <BlockStack gap="400">
+                    <TextField
+                      label="Product Title"
+                      value={editForm.title}
+                      readOnly
+                      autoComplete="off"
+                      onChange={(value) => updateEditField("title", value || "")}
+                    />
 
-                  <div style={modalSectionSpacingStyle}>
-                    <div style={descriptionHeadingStyle}>Description</div>
-                    <div style={descriptionEditorStyle}>
-                      <div style={descriptionToolbarStyle}>
-                        <div style={descriptionToneSelectStyle}>
-                          <s-select
-                            label="Description style"
-                            labelAccessibilityVisibility="exclusive"
-                            value={editForm.descriptionStyle}
-                            onInput={handleDescriptionStyleChange}
-                          >
-                            {DESCRIPTION_STYLE_OPTIONS.map((styleOption) => (
-                              <s-option key={styleOption} value={styleOption}>
-                                {styleOption}
-                              </s-option>
-                            ))}
-                          </s-select>
-                        </div>
+                    <BlockStack gap="200">
+                      <Text variant="headingSm" as="h3">
+                        Description
+                      </Text>
 
-                        <div style={descriptionToolbarButtonsStyle}>
-                          <s-button
-                            icon="text-bold"
-                            accessibilityLabel="Bold"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("bold")}
-                          />
-                          <s-button
-                            icon="text-italic"
-                            accessibilityLabel="Italic"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("italic")}
-                          />
-                          <s-button
-                            icon="text-underline"
-                            accessibilityLabel="Underline"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("underline")}
-                          />
-                          <s-button
-                            icon="text-grammar"
-                            accessibilityLabel="Strikethrough"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("strikeThrough")}
-                          />
-                          <s-button
-                            icon="link"
-                            accessibilityLabel="Link"
-                            style={toolbarIconButtonStyle}
-                            onClick={handleDescriptionLink}
-                          />
-                          <s-button
-                            icon="list-bulleted"
-                            accessibilityLabel="Bullet list"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("insertUnorderedList")}
-                          />
-                          <s-button
-                            icon="list-numbered"
-                            accessibilityLabel="Numbered list"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("insertOrderedList")}
-                          />
-                          <s-button
-                            icon="text-font"
-                            accessibilityLabel="Clear formatting"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("removeFormat")}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={descriptionBodyStyle}>
-                        {isDescriptionEmpty ? (
-                          <span style={descriptionPlaceholderStyle}>
-                            Enter product description...
-                          </span>
-                        ) : null}
+                      <Box
+                        borderWidth="025"
+                        borderColor="border"
+                        borderRadius="200"
+                        background="bg-surface"
+                      >
+                        {/* Toolbar */}
                         <div
-                          ref={descriptionEditorRef}
-                          contentEditable
-                          suppressContentEditableWarning
-                          style={descriptionEditorContentStyle}
-                          role="textbox"
-                          aria-label="Description body"
-                          onInput={(event) =>
-                            updateEditField("description", event.currentTarget.innerHTML || "")
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "6px 10px",
+                            borderBottom: "1px solid var(--p-color-border)",
+                            background: "var(--p-color-bg-surface-secondary)",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ width: "130px" }}>
+                            <Select
+                              label="Description style"
+                              labelHidden
+                              options={descriptionStyleSelectOptions}
+                              value={editForm.descriptionStyle}
+                              onChange={handleDescriptionStyleChange}
+                            />
+                          </div>
+                          <ButtonGroup>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("bold")}
+                              accessibilityLabel="Bold"
+                            >
+                              <strong>B</strong>
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("italic")}
+                              accessibilityLabel="Italic"
+                            >
+                              <em>I</em>
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("underline")}
+                              accessibilityLabel="Underline"
+                            >
+                              <span style={{ textDecoration: "underline" }}>U</span>
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("strikeThrough")}
+                              accessibilityLabel="Strikethrough"
+                            >
+                              <span style={{ textDecoration: "line-through" }}>S</span>
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={handleDescriptionLink}
+                              accessibilityLabel="Link"
+                            >
+                              Link
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("insertUnorderedList")}
+                              accessibilityLabel="Bullet list"
+                            >
+                              UL
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("insertOrderedList")}
+                              accessibilityLabel="Numbered list"
+                            >
+                              OL
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("removeFormat")}
+                              accessibilityLabel="Clear formatting"
+                            >
+                              Clear
+                            </Button>
+                          </ButtonGroup>
+                        </div>
+
+                        {/* Editor body */}
+                        <div style={{ position: "relative", background: "#ffffff" }}>
+                          {isDescriptionEmpty ? (
+                            <span
+                              style={{
+                                position: "absolute",
+                                top: "12px",
+                                left: "14px",
+                                color: "#8b9098",
+                                fontSize: "14px",
+                                pointerEvents: "none",
+                              }}
+                            >
+                              Enter product description...
+                            </span>
+                          ) : null}
+                          <div
+                            ref={descriptionEditorRef}
+                            contentEditable
+                            suppressContentEditableWarning
+                            style={{
+                              minHeight: "360px",
+                              padding: "12px 14px",
+                              fontSize: "14px",
+                              lineHeight: 1.55,
+                              color: "#30363c",
+                              outline: "none",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                            }}
+                            role="textbox"
+                            aria-label="Description body"
+                            onInput={(event) =>
+                              updateEditField("description", event.currentTarget.innerHTML || "")
+                            }
+                          />
+                        </div>
+                      </Box>
+                    </BlockStack>
+
+                    <Divider />
+
+                    {/* SEO Title */}
+                    <BlockStack gap="200">
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text variant="headingSm" as="h3">
+                          Meta Title
+                        </Text>
+                        <Badge tone={toBadgeTone(seoTitleStatus.tone)}>
+                          {seoTitleStatus.label}
+                        </Badge>
+                      </InlineStack>
+
+                      <div style={{ position: "relative" }}>
+                        <TextField
+                          label="Meta Title"
+                          labelHidden
+                          value={editForm.seoTitle}
+                          maxLength={70}
+                          placeholder="Enter meta title..."
+                          autoComplete="off"
+                          onChange={(value) => updateEditField("seoTitle", value || "")}
+                          suffix={
+                            <Text as="span" tone="subdued" variant="bodySm">
+                              {seoTitleLength}/70
+                            </Text>
                           }
                         />
                       </div>
-                    </div>
-                  </div>
 
-                  <div style={modalSectionSpacingStyle}>
-                    <s-divider />
-                  </div>
+                      <Text as="p" tone="subdued" variant="bodySm">
+                        Optimal Meta Title length: 40 to 70 characters. (Too short: less than
+                        40, Too long: more than 70)
+                      </Text>
 
-                  <div style={modalSectionSpacingStyle}>
-                    <div style={badgeRowStyle}>
-                      <span>Meta Title</span>
-                      <span
-                        style={{
-                          ...seoStatusPillStyle,
-                          background: seoTitlePalette.background,
-                          borderColor: seoTitlePalette.border,
-                          color: seoTitlePalette.text,
-                        }}
-                      >
-                        <span
-                          style={{
-                            ...seoStatusDotStyle,
-                            background: seoTitlePalette.dot,
-                          }}
+                      <InlineStack align="end">
+                        <Button
+                          onClick={handleGenerateSeoTitle}
+                          loading={isGenerating}
+                          disabled={isGenerating || isUpdating}
+                        >
+                          {isGenerating ? "Generating..." : "Generate"}
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+
+                    <Divider />
+
+                    {/* SEO Description */}
+                    <BlockStack gap="200">
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text variant="headingSm" as="h3">
+                          Meta Description
+                        </Text>
+                        <Badge tone={toBadgeTone(seoDescriptionStatus.tone)}>
+                          {seoDescriptionStatus.label}
+                        </Badge>
+                      </InlineStack>
+
+                      <div style={{ position: "relative" }}>
+                        <TextField
+                          label="Meta Description"
+                          labelHidden
+                          value={editForm.seoDescription}
+                          maxLength={160}
+                          placeholder="Enter meta description..."
+                          multiline={4}
+                          autoComplete="off"
+                          onChange={(value) => updateEditField("seoDescription", value || "")}
+                          suffix={
+                            <Text as="span" tone="subdued" variant="bodySm">
+                              {seoDescriptionLength}/160
+                            </Text>
+                          }
                         />
-                        {seoTitleStatus.label}
-                      </span>
-                    </div>
-                    <div style={plainInputWrapStyle}>
-                      <input
-                        type="text"
-                        value={editForm.seoTitle}
-                        maxLength={70}
-                        placeholder="Enter meta title..."
-                        style={plainInputStyle}
-                        onInput={(event) =>
-                          updateEditField("seoTitle", event.currentTarget.value || "")
-                        }
-                      />
-                      <span style={inputCounterStyle}>{seoTitleLength}/70</span>
-                    </div>
-                    <div style={helperTextStyle}>
-                      Optimal Meta Title length: 40 to 70 characters. (Too short: less than
-                      40, Too long: more than 70)
-                    </div>
-                    <div style={seoGenerateRowStyle}>
-                      <button
-                        type="button"
-                        style={seoGenerateButtonStyle}
-                        disabled={isGenerating || isUpdating}
-                        onClick={handleGenerateSeoTitle}
-                      >
-                        {isGenerating ? "Generating..." : "Generate"}
-                      </button>
-                    </div>
-                  </div>
+                      </div>
 
-                  <div style={modalSectionSpacingStyle}>
-                    <s-divider />
-                  </div>
+                      <Text as="p" tone="subdued" variant="bodySm">
+                        Optimal Meta Description length: 140 to 160 characters. (Too short: less
+                        than 140, Too long: more than 160)
+                      </Text>
 
-                  <div style={modalSectionSpacingStyle}>
-                    <div style={badgeRowStyle}>
-                      <span>Meta Description</span>
-                      <span
-                        style={{
-                          ...seoStatusPillStyle,
-                          background: seoDescriptionPalette.background,
-                          borderColor: seoDescriptionPalette.border,
-                          color: seoDescriptionPalette.text,
-                        }}
-                      >
-                        <span
-                          style={{
-                            ...seoStatusDotStyle,
-                            background: seoDescriptionPalette.dot,
-                          }}
-                        />
-                        {seoDescriptionStatus.label}
-                      </span>
-                    </div>
-                    <div style={plainTextAreaWrapStyle}>
-                      <textarea
-                        rows={4}
-                        maxLength={160}
-                        value={editForm.seoDescription}
-                        placeholder="Enter meta description..."
-                        style={plainTextAreaStyle}
-                        onInput={(event) =>
-                          updateEditField("seoDescription", event.currentTarget.value || "")
-                        }
-                      />
-                      <span style={textAreaCounterStyle}>{seoDescriptionLength}/160</span>
-                    </div>
-                    <div style={helperTextStyle}>
-                      Optimal Meta Description length: 140 to 160 characters. (Too short: less
-                      than 140, Too long: more than 160)
-                    </div>
-                    <div style={seoGenerateRowStyle}>
-                      <button
-                        type="button"
-                        style={seoGenerateButtonStyle}
-                        disabled={isGenerating || isUpdating}
-                        onClick={handleGenerateSeoDescription}
-                      >
-                        {isGenerating ? "Generating..." : "Generate"}
-                      </button>
-                    </div>
-                  </div>
-                </s-box>
+                      <InlineStack align="end">
+                        <Button
+                          onClick={handleGenerateSeoDescription}
+                          loading={isGenerating}
+                          disabled={isGenerating || isUpdating}
+                        >
+                          {isGenerating ? "Generating..." : "Generate"}
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+                  </BlockStack>
+                </Card>
 
-                <s-box style={modalSideCardStyle}>
-                  <label htmlFor="edit-language" style={sideLabelStyle}>
-                    Language
-                  </label>
-                  <select
-                    id="edit-language"
-                    value={editForm.language}
-                    style={sideSelectStyle}
-                    onChange={(event) => updateEditField("language", event.currentTarget.value || "")}
-                  >
-                    {LANGUAGE_OPTIONS.map((language) => (
-                      <option key={language} value={language}>
-                        {language}
-                      </option>
-                    ))}
-                  </select>
-
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-tone" style={sideLabelStyle}>
-                      Tone
-                    </label>
-                    <select
-                      id="edit-tone"
-                      value={editForm.tone}
-                      style={sideSelectStyle}
-                      onChange={(event) => updateEditField("tone", event.currentTarget.value || "")}
-                    >
-                      {TONE_OPTIONS.map((toneOption) => (
-                        <option key={toneOption} value={toneOption}>
-                          {toneOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-length" style={sideLabelStyle}>
-                      Length (Words)
-                    </label>
-                    <select
-                      id="edit-length"
-                      value={editForm.length}
-                      style={sideSelectStyle}
-                      onChange={(event) => updateEditField("length", event.currentTarget.value || "")}
-                    >
-                      {LENGTH_OPTIONS.map((lengthOption) => (
-                        <option key={lengthOption} value={lengthOption}>
-                          {lengthOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-format" style={sideLabelStyle}>
-                      Description Format
-                    </label>
-                    <select
-                      id="edit-format"
-                      value={editForm.format}
-                      style={sideSelectStyle}
-                      onChange={(event) => updateEditField("format", event.currentTarget.value || "")}
-                    >
-                      {FORMAT_OPTIONS.map((formatOption) => (
-                        <option key={formatOption} value={formatOption}>
-                          {formatOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-context-keywords" style={sideLabelStyle}>
-                      AI Context & Keywords
-                    </label>
-                    <textarea
-                      id="edit-context-keywords"
-                      rows={5}
-                      value={editForm.contextKeywords}
-                      placeholder="List product features or keywords"
-                      style={sideTextAreaStyle}
-                      onInput={(event) =>
-                        updateEditField("contextKeywords", event.currentTarget.value || "")
-                      }
+                {/* Right column: AI settings + generate */}
+                <Card>
+                  <BlockStack gap="400">
+                    <Select
+                      label="Language"
+                      options={languageSelectOptions}
+                      value={editForm.language}
+                      onChange={(value) => updateEditField("language", value || "")}
                     />
 
-                    <div style={chipWrapStyle}>
-                      {KEYWORD_CHIPS.map((chip) => (
-                        <button
-                          key={chip}
-                          type="button"
-                          style={keywordChipStyle}
-                          onClick={() => appendKeywordChip(chip)}
-                        >
-                          {chip}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    <Select
+                      label="Tone"
+                      options={toneSelectOptions}
+                      value={editForm.tone}
+                      onChange={(value) => updateEditField("tone", value || "")}
+                    />
 
-                  <div style={modalRightActionsStyle}>
-                    <button
-                      type="button"
-                      style={generateButtonStyle}
-                      disabled={isGenerating || isUpdating}
+                    <Select
+                      label="Length (Words)"
+                      options={lengthSelectOptions}
+                      value={editForm.length}
+                      onChange={(value) => updateEditField("length", value || "")}
+                    />
+
+                    <Select
+                      label="Description Format"
+                      options={formatSelectOptions}
+                      value={editForm.format}
+                      onChange={(value) => updateEditField("format", value || "")}
+                    />
+
+                    <BlockStack gap="200">
+                      <TextField
+                        label="AI Context & Keywords"
+                        value={editForm.contextKeywords}
+                        placeholder="List product features or keywords"
+                        multiline={5}
+                        autoComplete="off"
+                        onChange={(value) =>
+                          updateEditField("contextKeywords", value || "")
+                        }
+                      />
+                      <InlineStack gap="200" wrap>
+                        {KEYWORD_CHIPS.map((chip) => (
+                          <Button
+                            key={chip}
+                            size="slim"
+                            onClick={() => appendKeywordChip(chip)}
+                          >
+                            {chip}
+                          </Button>
+                        ))}
+                      </InlineStack>
+                    </BlockStack>
+
+                    <Button
+                      variant="primary"
+                      fullWidth
                       onClick={handleGenerate}
+                      loading={isGenerating}
+                      disabled={isGenerating || isUpdating}
                     >
                       {isGenerating ? "Generating..." : "Generate"}
-                    </button>
-
-                    <div style={modalFooterRowStyle}>
-                      <s-button
-                        icon="view"
-                        accessibilityLabel="Preview"
-                        style={modalButtonIconStyle}
-                      />
-                      <s-button
-                        icon="undo"
-                        accessibilityLabel="Undo"
-                        style={modalButtonIconStyle}
-                      />
-                      <s-button
-                        icon="x-circle"
-                        accessibilityLabel="Close modal"
-                        command="--hide"
-                        commandFor={EDIT_MODAL_ID}
-                        style={modalButtonIconStyle}
-                        onClick={resetEditModalState}
-                      />
-                      <button
-                        type="button"
-                        disabled={!canUpdateProduct}
-                        style={canUpdateProduct ? updateButtonStyle : updateButtonDisabledStyle}
-                        onClick={handleUpdateProduct}
-                      >
-                        {isUpdating ? "Updating..." : "Update Product"}
-                      </button>
-                    </div>
-                  </div>
-                </s-box>
+                    </Button>
+                  </BlockStack>
+                </Card>
               </div>
-            </s-box>
+            </BlockStack>
           )}
-        </div>
-      </s-modal>
-    </s-page>
+        </Modal.Section>
+      </Modal>
+    </Page>
   );
 }
-

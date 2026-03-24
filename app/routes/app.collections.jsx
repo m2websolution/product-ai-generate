@@ -6,6 +6,28 @@ import {
   useNavigation,
   useRevalidator,
 } from "react-router";
+import {
+  Badge,
+  Banner,
+  BlockStack,
+  Box,
+  Button,
+  ButtonGroup,
+  Card,
+  Divider,
+  EmptyState,
+  IndexTable,
+  InlineStack,
+  Layout,
+  Modal,
+  Page,
+  Pagination,
+  Select,
+  Spinner,
+  Text,
+  TextField,
+  Thumbnail,
+} from "@shopify/polaris";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 /* global process */
@@ -217,448 +239,6 @@ const FORMAT_OPTIONS = [
 const KEYWORD_CHIPS = ["[Description]"];
 const DESCRIPTION_STYLE_OPTIONS = ["Normal", "Heading", "Subheading"];
 
-const imageStyle = {
-  width: "52px",
-  height: "52px",
-  objectFit: "cover",
-  borderRadius: "6px",
-  border: "1px solid #e1e6ed",
-  background: "#fff",
-};
-
-const imageFallbackStyle = {
-  width: "52px",
-  height: "52px",
-  borderRadius: "6px",
-  border: "1px dashed #d0d8e2",
-  display: "grid",
-  placeItems: "center",
-  color: "#738194",
-  fontSize: "11px",
-  background: "#f7f9fb",
-};
-
-const tablePanelStyle = {
-  borderRadius: "10px",
-};
-
-const tableShellStyle = {
-  fontSize: "13px",
-  color: "#1f2937",
-};
-
-const tableViewportStyle = {
-  overflowX: "auto",
-  borderRadius: "10px",
-  border: "1px solid #dbe0e7",
-  background: "#ffffff",
-};
-
-const tableElementStyle = {
-  minWidth: "980px",
-};
-
-const titleTextStyle = {
-  color: "#1b2434",
-  fontSize: "13px",
-  fontWeight: 500,
-  lineHeight: 1.25,
-};
-
-const checkboxStyle = {
-  width: "20px",
-  height: "20px",
-};
-
-const paginationWrapStyle = {
-  marginTop: "12px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const searchWrapStyle = {
-  marginBottom: "4px",
-};
-
-const searchFieldStyle = {
-  width: "100%",
-};
-
-const cellContentStyle = {
-  display: "flex",
-  alignItems: "center",
-  minHeight: "52px",
-};
-
-const emptyStateStyle = {
-  color: "#607080",
-  fontSize: "13px",
-};
-
-const modalBodyStyle = {
-  paddingTop: "4px",
-  fontFamily: '"Segoe UI", Tahoma, Arial, sans-serif',
-};
-
-const modalShellStyle = {
-  borderRadius: "14px",
-  background: "#e9e9eb",
-  border: "1px solid #cfcfd2",
-  padding: "10px",
-  fontSize: "13px",
-  color: "#2f343c",
-  boxShadow: "none",
-};
-
-const modalGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "58% 42%",
-  gridTemplateAreas: '"left right"',
-  gap: "10px",
-  alignItems: "flex-start",
-  width: "100%",
-};
-
-const modalMainCardStyle = {
-  gridArea: "left",
-  borderRadius: "14px",
-  border: "1px solid #c8c9cc",
-  background: "#ececef",
-  padding: "12px",
-  boxShadow: "none",
-};
-
-const modalSideCardStyle = {
-  gridArea: "right",
-  borderRadius: "14px",
-  border: "1px solid #c8c9cc",
-  background: "#ececef",
-  padding: "12px",
-  boxShadow: "none",
-};
-
-const modalSectionSpacingStyle = {
-  marginTop: "12px",
-};
-
-const descriptionToSeoSpacerStyle = {
-  height: "120px",
-};
-
-const descriptionHeadingStyle = {
-  marginBottom: "6px",
-  color: "#1f252c",
-  fontSize: "14px",
-  fontWeight: 700,
-};
-
-const fieldLabelStyle = {
-  display: "block",
-  marginBottom: "6px",
-  color: "#3d434b",
-  fontSize: "14px",
-  fontWeight: 600,
-};
-
-const collectionTitleInputStyle = {
-  width: "100%",
-  height: "40px",
-  border: "1px solid #dadbdf",
-  borderRadius: "10px",
-  background: "#dedfe2",
-  color: "#90959d",
-  fontSize: "15px",
-  fontWeight: 600,
-  padding: "0 12px",
-  boxSizing: "border-box",
-};
-
-const descriptionEditorStyle = {
-  border: "1px solid #c5c6ca",
-  borderRadius: "0px",
-  overflow: "hidden",
-  background: "#efeff1",
-};
-
-const descriptionToolbarStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  padding: "7px 10px",
-  borderBottom: "1px solid #c5c6ca",
-  background: "#f0f0f2",
-  flexWrap: "wrap",
-};
-
-const descriptionToneSelectStyle = {
-  width: "124px",
-};
-
-const descriptionToolbarButtonsStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
-  flexWrap: "wrap",
-};
-
-const toolbarIconButtonStyle = {
-  width: "30px",
-};
-
-const descriptionBodyStyle = {
-  position: "relative",
-  background: "#efeff1",
-};
-
-const descriptionEditorContentStyle = {
-  minHeight: "52px",
-  padding: "9px 12px",
-  fontSize: "14px",
-  lineHeight: 1.55,
-  color: "#3e444d",
-  outline: "none",
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
-};
-
-const descriptionPlaceholderStyle = {
-  position: "absolute",
-  top: "12px",
-  left: "16px",
-  color: "#7b8087",
-  fontSize: "14px",
-  fontStyle: "italic",
-  pointerEvents: "none",
-};
-
-const badgeRowStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  marginBottom: "6px",
-  fontSize: "14px",
-  fontWeight: 600,
-  color: "#2b3037",
-};
-
-const helperTextStyle = {
-  marginTop: "6px",
-  color: "#676c73",
-  fontSize: "13px",
-  lineHeight: 1.4,
-};
-
-const seoGenerateRowStyle = {
-  marginTop: "10px",
-  display: "flex",
-  justifyContent: "flex-end",
-};
-
-const seoGenerateButtonStyle = {
-  minWidth: "132px",
-  height: "36px",
-  borderRadius: "11px",
-  border: "1px solid #4b4b4f",
-  background: "linear-gradient(180deg, #3a3b3e 0%, #1f2022 100%)",
-  color: "#f1f3f5",
-  fontSize: "14px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const chipWrapStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "6px",
-  marginTop: "10px",
-};
-
-const modalRightActionsStyle = {
-  marginTop: "12px",
-  display: "grid",
-  gap: "10px",
-  borderTop: "none",
-  paddingTop: "0",
-};
-
-const generateButtonStyle = {
-  width: "100%",
-  height: "36px",
-  borderRadius: "11px",
-  border: "1px solid #4b4b4f",
-  background: "linear-gradient(180deg, #3a3b3e 0%, #1f2022 100%)",
-  color: "#f1f3f5",
-  fontSize: "15px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const modalFooterRowStyle = {
-  marginTop: "4px",
-  display: "grid",
-  gridTemplateColumns: "auto auto auto 1fr",
-  gap: "6px",
-  alignItems: "center",
-};
-
-const modalButtonIconStyle = {
-  width: "34px",
-  borderRadius: "10px",
-  border: "1px solid #cfd0d4",
-  background: "#f3f3f4",
-};
-
-const modalSideFieldStyle = {
-  marginTop: "14px",
-};
-
-const modalMessageWrapStyle = {
-  marginBottom: "10px",
-};
-
-const plainInputWrapStyle = {
-  position: "relative",
-};
-
-const plainInputStyle = {
-  width: "100%",
-  height: "38px",
-  border: "1px solid #a9adb3",
-  borderRadius: "11px",
-  background: "#f4f4f4",
-  padding: "0 68px 0 12px",
-  boxSizing: "border-box",
-  color: "#3a3f45",
-  fontSize: "14px",
-  outline: "none",
-};
-
-const plainTextAreaWrapStyle = {
-  position: "relative",
-};
-
-const plainTextAreaStyle = {
-  width: "100%",
-  minHeight: "112px",
-  border: "1px solid #a9adb3",
-  borderRadius: "11px",
-  background: "#f4f4f4",
-  padding: "8px 12px 30px",
-  boxSizing: "border-box",
-  color: "#3a3f45",
-  fontSize: "14px",
-  lineHeight: 1.5,
-  resize: "vertical",
-  outline: "none",
-};
-
-const inputCounterStyle = {
-  position: "absolute",
-  top: "50%",
-  right: "12px",
-  transform: "translateY(-50%)",
-  color: "#626872",
-  fontSize: "13px",
-  fontWeight: 600,
-  pointerEvents: "none",
-};
-
-const textAreaCounterStyle = {
-  position: "absolute",
-  right: "12px",
-  bottom: "8px",
-  color: "#626872",
-  fontSize: "13px",
-  fontWeight: 600,
-  pointerEvents: "none",
-};
-
-const sideLabelStyle = {
-  display: "block",
-  marginBottom: "6px",
-  color: "#3d434b",
-  fontSize: "14px",
-  fontWeight: 500,
-};
-
-const sideSelectStyle = {
-  width: "100%",
-  height: "40px",
-  border: "1px solid #9fa2a8",
-  borderRadius: "11px",
-  background: "#ececef",
-  color: "#343941",
-  fontSize: "13px",
-  padding: "0 12px",
-  outline: "none",
-};
-
-const sideTextAreaStyle = {
-  width: "100%",
-  minHeight: "90px",
-  border: "1px solid #9fa2a8",
-  borderRadius: "11px",
-  background: "#ececef",
-  color: "#535961",
-  fontSize: "14px",
-  padding: "8px 12px",
-  boxSizing: "border-box",
-  resize: "vertical",
-  outline: "none",
-};
-
-const keywordChipStyle = {
-  border: "none",
-  borderRadius: "6px",
-  background: "#d8d8db",
-  color: "#4d5259",
-  fontSize: "13px",
-  fontWeight: 600,
-  padding: "5px 9px",
-  cursor: "pointer",
-};
-
-const seoStatusPillStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "6px",
-  borderRadius: "999px",
-  padding: "3px 11px",
-  border: "1px solid",
-  fontSize: "13px",
-  fontWeight: 600,
-};
-
-const seoStatusDotStyle = {
-  width: "9px",
-  height: "9px",
-  borderRadius: "999px",
-  display: "inline-block",
-};
-
-const updateButtonStyle = {
-  width: "100%",
-  height: "36px",
-  border: "1px solid #4b4b4f",
-  borderRadius: "11px",
-  background: "linear-gradient(180deg, #3a3b3e 0%, #1f2022 100%)",
-  color: "#f1f3f5",
-  fontSize: "14px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const updateButtonDisabledStyle = {
-  ...updateButtonStyle,
-  border: "1px solid #c7c8cc",
-  background: "#cdced2",
-  color: "#f2f2f3",
-  cursor: "not-allowed",
-};
-
 const editInitialState = {
   title: "",
   description: "",
@@ -724,7 +304,7 @@ function toBadgeTone(tone) {
   if (tone === "warning") return "warning";
   if (tone === "caution") return "caution";
   if (tone === "critical") return "critical";
-  return "neutral";
+  return "info";
 }
 
 function toSeoPalette(tone) {
@@ -764,7 +344,7 @@ function toSeoPalette(tone) {
 }
 
 function renderBadge({ label, tone }) {
-  return <s-badge tone={toBadgeTone(tone)}>{label}</s-badge>;
+  return <Badge tone={toBadgeTone(tone)}>{label}</Badge>;
 }
 
 function formatDate(dateValue) {
@@ -1581,13 +1161,13 @@ export default function CollectionsPage() {
   const revalidator = useRevalidator();
   const generateFetcher = useFetcher();
   const updateFetcher = useFetcher();
-  const editModalRef = useRef(null);
   const descriptionEditorRef = useRef(null);
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackCollections, setFallbackCollections] = useState(collections);
   const [editingCollection, setEditingCollection] = useState(null);
   const [editForm, setEditForm] = useState(editInitialState);
   const [modalMessage, setModalMessage] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     setSearchValue(filters.search);
@@ -1636,14 +1216,15 @@ export default function CollectionsPage() {
     return () => clearTimeout(timeoutId);
   }, [filters.search, makeUrl, navigate, searchValue]);
 
-  const handleSearchInput = useCallback((event) => {
-    setSearchValue(event.currentTarget.value || "");
+  const handleSearchInput = useCallback((value) => {
+    setSearchValue(value || "");
   }, []);
 
   const resetEditModalState = useCallback(() => {
     setEditingCollection(null);
     setEditForm(editInitialState);
     setModalMessage(null);
+    setModalOpen(false);
   }, []);
 
   const openEditModal = useCallback((collection) => {
@@ -1656,9 +1237,7 @@ export default function CollectionsPage() {
       seoTitle: collection.seoTitleValue || "",
       seoDescription: collection.seoDescriptionValue || "",
     });
-    requestAnimationFrame(() => {
-      editModalRef.current?.showOverlay?.();
-    });
+    setModalOpen(true);
   }, []);
 
   const updateEditField = useCallback((field, value) => {
@@ -1686,9 +1265,8 @@ export default function CollectionsPage() {
   );
 
   const handleDescriptionStyleChange = useCallback(
-    (event) => {
-      const styleValue = event.currentTarget.value || "Normal";
-      updateEditField("descriptionStyle", styleValue);
+    (styleValue) => {
+      updateEditField("descriptionStyle", styleValue || "Normal");
 
       if (styleValue === "Heading") {
         applyDescriptionCommand("formatBlock", "H2");
@@ -1843,521 +1421,536 @@ export default function CollectionsPage() {
       ? makeUrl({ search: filters.search, after: pageInfo.endCursor })
       : null;
 
+  const tableHeadings = [
+    { title: "Image" },
+    { title: "Title" },
+    { title: "SEO Title" },
+    { title: "SEO Description" },
+    { title: "Actions" },
+  ];
+
+  const languageSelectOptions = LANGUAGE_OPTIONS.map((lang) => ({ label: lang, value: lang }));
+  const toneSelectOptions = TONE_OPTIONS.map((t) => ({ label: t, value: t }));
+  const lengthSelectOptions = LENGTH_OPTIONS.map((l) => ({ label: l, value: l }));
+  const formatSelectOptions = FORMAT_OPTIONS.map((f) => ({ label: f, value: f }));
+  const descriptionStyleSelectOptions = DESCRIPTION_STYLE_OPTIONS.map((s) => ({
+    label: s,
+    value: s,
+  }));
+
   return (
-    <s-page heading="Collections">
-      <s-section>
-        <s-stack direction="inline" gap="base" alignItems="center">
-          <s-link href="/app">&larr; Back</s-link>
-          <s-button onClick={() => navigate(makeUrl({}))}>Refresh</s-button>
-          <s-button disabled>Upgrade for Bulk Generation</s-button>
-        </s-stack>
-      </s-section>
+    <Page title="Collections">
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack gap="300" align="start" blockAlign="center">
+                <Button url="/app" variant="plain">
+                  &larr; Back
+                </Button>
+                <Button onClick={() => navigate(makeUrl({}))}>Refresh</Button>
+                <Button disabled>Upgrade for Bulk Generation</Button>
+              </InlineStack>
 
-      <s-section>
-        <div style={searchWrapStyle}>
-          <div style={searchFieldStyle}>
-            <s-text-field
-              name="q"
-              label="Search by collection title..."
-              value={searchValue}
-              onInput={handleSearchInput}
-              onChange={handleSearchInput}
-            />
-          </div>
-        </div>
-      </s-section>
+              <TextField
+                label="Search collections"
+                labelHidden
+                placeholder="Search by collection title..."
+                value={searchValue}
+                onChange={handleSearchInput}
+                autoComplete="off"
+                prefix={isSearchLoading ? <Spinner size="small" /> : undefined}
+              />
 
-      <s-section>
-        <s-box>
-          <div style={tablePanelStyle}>
-            <div style={tableShellStyle}>
-              <div style={tableViewportStyle}>
-                <s-table variant="auto" loading={isSearchLoading} style={tableElementStyle}>
-                  <s-table-header-row>
-                    <s-table-header>
-                      <input type="checkbox" style={checkboxStyle} />
-                    </s-table-header>
-                    <s-table-header>Image</s-table-header>
-                    <s-table-header>Title</s-table-header>
-                    <s-table-header>SEO Title</s-table-header>
-                    <s-table-header>SEO Description</s-table-header>
-                    <s-table-header>Actions</s-table-header>
-                  </s-table-header-row>
+              {filteredCollections.length === 0 ? (
+                <EmptyState
+                  heading="No collections found"
+                  image=""
+                >
+                  <Text as="p" tone="subdued">
+                    {normalizedSearch
+                      ? `No collections match "${normalizedSearch}". Try a different search.`
+                      : "No collections are available in your store."}
+                  </Text>
+                </EmptyState>
+              ) : (
+                <IndexTable
+                  resourceName={{ singular: "collection", plural: "collections" }}
+                  itemCount={filteredCollections.length}
+                  headings={tableHeadings}
+                  selectable={false}
+                  loading={isSearchLoading}
+                >
+                  {filteredCollections.map((collection, index) => (
+                    <IndexTable.Row
+                      id={collection.id}
+                      key={collection.id}
+                      position={index}
+                    >
+                      <IndexTable.Cell>
+                        {collection.imageUrl ? (
+                          <Thumbnail
+                            source={collection.imageUrl}
+                            alt={collection.imageAlt}
+                            size="small"
+                          />
+                        ) : (
+                          <Box
+                            width="52px"
+                            minHeight="52px"
+                            borderRadius="200"
+                            borderWidth="025"
+                            borderColor="border-secondary"
+                            background="bg-surface-secondary"
+                          >
+                            <InlineStack align="center" blockAlign="center">
+                              <Text as="span" variant="bodySm" tone="subdued">
+                                No img
+                              </Text>
+                            </InlineStack>
+                          </Box>
+                        )}
+                      </IndexTable.Cell>
 
-                  <s-table-body>
-                    {filteredCollections.length === 0 ? (
-                      <s-table-row>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle}>
-                            <span style={emptyStateStyle}>No collections found.</span>
-                          </div>
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                        <s-table-cell>
-                          <div style={cellContentStyle} />
-                        </s-table-cell>
-                      </s-table-row>
-                    ) : (
-                      filteredCollections.map((collection) => (
-                        <s-table-row key={collection.id}>
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              <input type="checkbox" style={checkboxStyle} />
-                            </div>
-                          </s-table-cell>
+                      <IndexTable.Cell>
+                        <Text as="span" variant="bodyMd" fontWeight="medium">
+                          {collection.title}
+                        </Text>
+                      </IndexTable.Cell>
 
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              {collection.imageUrl ? (
-                                <img
-                                  src={collection.imageUrl}
-                                  alt={collection.imageAlt}
-                                  width={52}
-                                  height={52}
-                                  style={imageStyle}
-                                />
-                              ) : (
-                                <div style={imageFallbackStyle}>No image</div>
-                              )}
-                            </div>
-                          </s-table-cell>
+                      <IndexTable.Cell>
+                        {renderBadge(collection.seoTitle)}
+                      </IndexTable.Cell>
 
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              <span style={titleTextStyle}>{collection.title}</span>
-                            </div>
-                          </s-table-cell>
+                      <IndexTable.Cell>
+                        {renderBadge(collection.seoDescription)}
+                      </IndexTable.Cell>
 
-                          <s-table-cell>
-                            <div style={cellContentStyle}>{renderBadge(collection.seoTitle)}</div>
-                          </s-table-cell>
+                      <IndexTable.Cell>
+                        <Button
+                          size="slim"
+                          onClick={() => openEditModal(collection)}
+                        >
+                          Edit Content
+                        </Button>
+                      </IndexTable.Cell>
+                    </IndexTable.Row>
+                  ))}
+                </IndexTable>
+              )}
 
-                          <s-table-cell>
-                            <div style={cellContentStyle}>{renderBadge(collection.seoDescription)}</div>
-                          </s-table-cell>
+              <InlineStack align="space-between" blockAlign="center" gap="300">
+                <Text as="span" variant="bodySm" tone="subdued">
+                  {filteredCollections.length} result{filteredCollections.length !== 1 ? "s" : ""}
+                  {isSearchLoading ? " (Searching...)" : isLoading ? " (Loading...)" : ""}
+                </Text>
+                <Pagination
+                  hasPrevious={Boolean(previousUrl)}
+                  onPrevious={() => previousUrl && navigate(previousUrl)}
+                  hasNext={Boolean(nextUrl)}
+                  onNext={() => nextUrl && navigate(nextUrl)}
+                />
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+      </Layout>
 
-                          <s-table-cell>
-                            <div style={cellContentStyle}>
-                              <s-button onClick={() => openEditModal(collection)}>Edit Content</s-button>
-                            </div>
-                          </s-table-cell>
-                        </s-table-row>
-                      ))
-                    )}
-                  </s-table-body>
-                </s-table>
-              </div>
-            </div>
-          </div>
-
-          <div style={paginationWrapStyle}>
-            <s-text>
-              {filteredCollections.length} results{" "}
-              {isSearchLoading ? "(Searching...)" : isLoading ? "(Loading...)" : ""}
-            </s-text>
-            <s-stack direction="inline" gap="base" alignItems="center">
-              <s-button
-                disabled={!previousUrl}
-                onClick={() => previousUrl && navigate(previousUrl)}
-              >
-                Previous
-              </s-button>
-              <s-button disabled={!nextUrl} onClick={() => nextUrl && navigate(nextUrl)}>
-                Next
-              </s-button>
-            </s-stack>
-          </div>
-        </s-box>
-      </s-section>
-
-      <s-modal
-        id={EDIT_MODAL_ID}
-        ref={editModalRef}
+      <Modal
+        open={modalOpen}
+        onClose={resetEditModalState}
+        title="Edit Collection Content"
         size="large"
-        heading="Edit Collection Content"
-        onHide={resetEditModalState}
-        onAfterHide={resetEditModalState}
       >
-        <div style={modalBodyStyle}>
+        <Modal.Section>
           {!editingCollection ? (
-            <s-banner tone="info">
+            <Banner tone="info">
               Select a collection and click <strong>Edit Content</strong> to open editor.
-            </s-banner>
+            </Banner>
           ) : (
-            <s-box style={modalShellStyle}>
+            <BlockStack gap="400">
               {modalMessage ? (
-                <div style={modalMessageWrapStyle}>
-                  <s-banner tone={modalMessage.tone}>{modalMessage.text}</s-banner>
-                </div>
+                <Banner
+                  tone={modalMessage.tone === "critical" ? "critical" : "success"}
+                  onDismiss={() => setModalMessage(null)}
+                >
+                  {modalMessage.text}
+                </Banner>
               ) : null}
 
-              <div style={modalGridStyle}>
-                <s-box style={modalMainCardStyle}>
-                  <label htmlFor="edit-collection-title" style={fieldLabelStyle}>
-                    Collection Title
-                  </label>
-                  <input
-                    id="edit-collection-title"
-                    type="text"
+              <div style={{ display: "grid", gridTemplateColumns: "58% 42%", gap: "16px", alignItems: "flex-start" }}>
+                {/* Left column - main content */}
+                <BlockStack gap="400">
+                  <TextField
+                    label="Collection Title"
                     value={editForm.title}
                     readOnly
-                    style={collectionTitleInputStyle}
-                    onInput={(event) => updateEditField("title", event.currentTarget.value || "")}
+                    autoComplete="off"
                   />
 
-                  <div style={modalSectionSpacingStyle}>
-                    <div style={descriptionHeadingStyle}>Description</div>
-                    <div style={descriptionEditorStyle}>
-                      <div style={descriptionToolbarStyle}>
-                        <div style={descriptionToneSelectStyle}>
-                          <s-select
-                            label="Description style"
-                            labelAccessibilityVisibility="exclusive"
-                            value={editForm.descriptionStyle}
-                            onInput={handleDescriptionStyleChange}
-                          >
-                            {DESCRIPTION_STYLE_OPTIONS.map((styleOption) => (
-                              <s-option key={styleOption} value={styleOption}>
-                                {styleOption}
-                              </s-option>
-                            ))}
-                          </s-select>
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd" fontWeight="bold">
+                      Description
+                    </Text>
+                    <Box
+                      borderWidth="025"
+                      borderColor="border"
+                      borderRadius="200"
+                      overflow="hidden"
+                    >
+                      {/* Toolbar */}
+                      <Box
+                        padding="200"
+                        background="bg-surface-secondary"
+                        borderBlockEndWidth="025"
+                        borderColor="border"
+                      >
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <div style={{ width: "124px" }}>
+                            <Select
+                              label="Description style"
+                              labelHidden
+                              options={descriptionStyleSelectOptions}
+                              value={editForm.descriptionStyle}
+                              onChange={handleDescriptionStyleChange}
+                            />
+                          </div>
+                          <ButtonGroup>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("bold")}
+                              accessibilityLabel="Bold"
+                            >
+                              B
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("italic")}
+                              accessibilityLabel="Italic"
+                            >
+                              I
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("underline")}
+                              accessibilityLabel="Underline"
+                            >
+                              U
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("strikeThrough")}
+                              accessibilityLabel="Strikethrough"
+                            >
+                              S
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={handleDescriptionLink}
+                              accessibilityLabel="Link"
+                            >
+                              Link
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("insertUnorderedList")}
+                              accessibilityLabel="Bullet list"
+                            >
+                              &bull; List
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("insertOrderedList")}
+                              accessibilityLabel="Numbered list"
+                            >
+                              1. List
+                            </Button>
+                            <Button
+                              size="slim"
+                              onClick={() => applyDescriptionCommand("removeFormat")}
+                              accessibilityLabel="Clear formatting"
+                            >
+                              Clear
+                            </Button>
+                          </ButtonGroup>
+                        </InlineStack>
+                      </Box>
+
+                      {/* Editor body */}
+                      <Box padding="200" background="bg-surface">
+                        <div style={{ position: "relative", minHeight: "80px" }}>
+                          {isDescriptionEmpty ? (
+                            <span
+                              style={{
+                                position: "absolute",
+                                top: "8px",
+                                left: "4px",
+                                color: "#7b8087",
+                                fontSize: "14px",
+                                fontStyle: "italic",
+                                pointerEvents: "none",
+                              }}
+                            >
+                              Enter collection description...
+                            </span>
+                          ) : null}
+                          <div
+                            ref={descriptionEditorRef}
+                            contentEditable
+                            suppressContentEditableWarning
+                            style={{
+                              minHeight: "52px",
+                              padding: "8px 4px",
+                              fontSize: "14px",
+                              lineHeight: 1.55,
+                              color: "#3e444d",
+                              outline: "none",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                            }}
+                            role="textbox"
+                            aria-label="Description body"
+                            onInput={(event) =>
+                              updateEditField("description", event.currentTarget.innerHTML || "")
+                            }
+                          />
                         </div>
+                      </Box>
+                    </Box>
+                  </BlockStack>
 
-                        <div style={descriptionToolbarButtonsStyle}>
-                          <s-button
-                            icon="text-bold"
-                            accessibilityLabel="Bold"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("bold")}
-                          />
-                          <s-button
-                            icon="text-italic"
-                            accessibilityLabel="Italic"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("italic")}
-                          />
-                          <s-button
-                            icon="text-underline"
-                            accessibilityLabel="Underline"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("underline")}
-                          />
-                          <s-button
-                            icon="text-grammar"
-                            accessibilityLabel="Strikethrough"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("strikeThrough")}
-                          />
-                          <s-button
-                            icon="link"
-                            accessibilityLabel="Link"
-                            style={toolbarIconButtonStyle}
-                            onClick={handleDescriptionLink}
-                          />
-                          <s-button
-                            icon="list-bulleted"
-                            accessibilityLabel="Bullet list"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("insertUnorderedList")}
-                          />
-                          <s-button
-                            icon="list-numbered"
-                            accessibilityLabel="Numbered list"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("insertOrderedList")}
-                          />
-                          <s-button
-                            icon="text-font"
-                            accessibilityLabel="Clear formatting"
-                            style={toolbarIconButtonStyle}
-                            onClick={() => applyDescriptionCommand("removeFormat")}
-                          />
-                        </div>
-                      </div>
+                  <Box minHeight="80px" />
 
-                      <div style={descriptionBodyStyle}>
-                        {isDescriptionEmpty ? (
-                          <span style={descriptionPlaceholderStyle}>
-                            Enter collection description...
-                          </span>
-                        ) : null}
-                        <div
-                          ref={descriptionEditorRef}
-                          contentEditable
-                          suppressContentEditableWarning
-                          style={descriptionEditorContentStyle}
-                          role="textbox"
-                          aria-label="Description body"
-                          onInput={(event) =>
-                            updateEditField("description", event.currentTarget.innerHTML || "")
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={descriptionToSeoSpacerStyle} />
-
-                  <div style={modalSectionSpacingStyle}>
-                    <div style={badgeRowStyle}>
-                      <span>SEO Title</span>
+                  <BlockStack gap="200">
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodyMd" fontWeight="bold">
+                        SEO Title
+                      </Text>
                       <span
                         style={{
-                          ...seoStatusPillStyle,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          borderRadius: "999px",
+                          padding: "3px 11px",
+                          border: `1px solid ${metaTitlePalette.border}`,
                           background: metaTitlePalette.background,
-                          borderColor: metaTitlePalette.border,
                           color: metaTitlePalette.text,
+                          fontSize: "13px",
+                          fontWeight: 600,
                         }}
                       >
                         <span
                           style={{
-                            ...seoStatusDotStyle,
+                            width: "9px",
+                            height: "9px",
+                            borderRadius: "999px",
                             background: metaTitlePalette.dot,
+                            display: "inline-block",
                           }}
                         />
                         {metaTitleStatus.label}
                       </span>
-                    </div>
-                    <div style={plainInputWrapStyle}>
-                      <input
-                        type="text"
-                        value={editForm.seoTitle}
-                        maxLength={70}
-                        placeholder="Enter SEO title..."
-                        style={plainInputStyle}
-                        onInput={(event) =>
-                          updateEditField("seoTitle", event.currentTarget.value || "")
-                        }
-                      />
-                      <span style={inputCounterStyle}>{metaTitleLength}/70</span>
-                    </div>
-                    <div style={helperTextStyle}>
-                      Optimal SEO Title length: 40 to 70 characters. (Too short: less than
-                      40, Too long: more than 70)
-                    </div>
-                    <div style={seoGenerateRowStyle}>
-                      <button
-                        type="button"
-                        style={seoGenerateButtonStyle}
+                    </InlineStack>
+                    <TextField
+                      label="SEO Title"
+                      labelHidden
+                      value={editForm.seoTitle}
+                      onChange={(value) => updateEditField("seoTitle", value || "")}
+                      maxLength={70}
+                      showCharacterCount
+                      placeholder="Enter SEO title..."
+                      autoComplete="off"
+                    />
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Optimal SEO Title length: 40 to 70 characters. (Too short: less than 40, Too long: more than 70)
+                    </Text>
+                    <InlineStack align="end">
+                      <Button
+                        variant="primary"
+                        tone="success"
                         disabled={isGenerating || isUpdating}
                         onClick={handleGenerateMetaTitle}
+                        loading={isGenerating}
                       >
                         {isGenerating ? "Generating..." : "Generate"}
-                      </button>
-                    </div>
-                  </div>
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
 
-                  <div style={modalSectionSpacingStyle}>
-                    <s-divider />
-                  </div>
+                  <Divider />
 
-                  <div style={modalSectionSpacingStyle}>
-                    <div style={badgeRowStyle}>
-                      <span>SEO Description</span>
+                  <BlockStack gap="200">
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodyMd" fontWeight="bold">
+                        SEO Description
+                      </Text>
                       <span
                         style={{
-                          ...seoStatusPillStyle,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          borderRadius: "999px",
+                          padding: "3px 11px",
+                          border: `1px solid ${metaDescriptionPalette.border}`,
                           background: metaDescriptionPalette.background,
-                          borderColor: metaDescriptionPalette.border,
                           color: metaDescriptionPalette.text,
+                          fontSize: "13px",
+                          fontWeight: 600,
                         }}
                       >
                         <span
                           style={{
-                            ...seoStatusDotStyle,
+                            width: "9px",
+                            height: "9px",
+                            borderRadius: "999px",
                             background: metaDescriptionPalette.dot,
+                            display: "inline-block",
                           }}
                         />
                         {metaDescriptionStatus.label}
                       </span>
-                    </div>
-                    <div style={plainTextAreaWrapStyle}>
-                      <textarea
-                        rows={4}
-                        maxLength={160}
-                        value={editForm.seoDescription}
-                        placeholder="Enter SEO description..."
-                        style={plainTextAreaStyle}
-                        onInput={(event) =>
-                          updateEditField("seoDescription", event.currentTarget.value || "")
-                        }
-                      />
-                      <span style={textAreaCounterStyle}>{metaDescriptionLength}/160</span>
-                    </div>
-                    <div style={helperTextStyle}>
-                      Optimal SEO Description length: 140 to 160 characters. (Too short: less
-                      than 140, Too long: more than 160)
-                    </div>
-                    <div style={seoGenerateRowStyle}>
-                      <button
-                        type="button"
-                        style={seoGenerateButtonStyle}
+                    </InlineStack>
+                    <TextField
+                      label="SEO Description"
+                      labelHidden
+                      value={editForm.seoDescription}
+                      onChange={(value) => updateEditField("seoDescription", value || "")}
+                      maxLength={160}
+                      showCharacterCount
+                      multiline={4}
+                      placeholder="Enter SEO description..."
+                      autoComplete="off"
+                    />
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Optimal SEO Description length: 140 to 160 characters. (Too short: less than 140, Too long: more than 160)
+                    </Text>
+                    <InlineStack align="end">
+                      <Button
+                        variant="primary"
+                        tone="success"
                         disabled={isGenerating || isUpdating}
                         onClick={handleGenerateMetaDescription}
+                        loading={isGenerating}
                       >
                         {isGenerating ? "Generating..." : "Generate"}
-                      </button>
-                    </div>
-                  </div>
-                </s-box>
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </BlockStack>
 
-                <s-box style={modalSideCardStyle}>
-                  <label htmlFor="edit-language" style={sideLabelStyle}>
-                    Language
-                  </label>
-                  <select
-                    id="edit-language"
+                {/* Right column - settings */}
+                <BlockStack gap="300">
+                  <Select
+                    label="Language"
+                    options={languageSelectOptions}
                     value={editForm.language}
-                    style={sideSelectStyle}
-                    onChange={(event) => updateEditField("language", event.currentTarget.value || "")}
-                  >
-                    {LANGUAGE_OPTIONS.map((language) => (
-                      <option key={language} value={language}>
-                        {language}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => updateEditField("language", value || "")}
+                  />
 
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-tone" style={sideLabelStyle}>
-                      Tone
-                    </label>
-                    <select
-                      id="edit-tone"
-                      value={editForm.tone}
-                      style={sideSelectStyle}
-                      onChange={(event) => updateEditField("tone", event.currentTarget.value || "")}
-                    >
-                      {TONE_OPTIONS.map((toneOption) => (
-                        <option key={toneOption} value={toneOption}>
-                          {toneOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    label="Tone"
+                    options={toneSelectOptions}
+                    value={editForm.tone}
+                    onChange={(value) => updateEditField("tone", value || "")}
+                  />
 
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-length" style={sideLabelStyle}>
-                      Length (Words)
-                    </label>
-                    <select
-                      id="edit-length"
-                      value={editForm.length}
-                      style={sideSelectStyle}
-                      onChange={(event) => updateEditField("length", event.currentTarget.value || "")}
-                    >
-                      {LENGTH_OPTIONS.map((lengthOption) => (
-                        <option key={lengthOption} value={lengthOption}>
-                          {lengthOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    label="Length (Words)"
+                    options={lengthSelectOptions}
+                    value={editForm.length}
+                    onChange={(value) => updateEditField("length", value || "")}
+                  />
 
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-format" style={sideLabelStyle}>
-                      Description Format
-                    </label>
-                    <select
-                      id="edit-format"
-                      value={editForm.format}
-                      style={sideSelectStyle}
-                      onChange={(event) => updateEditField("format", event.currentTarget.value || "")}
-                    >
-                      {FORMAT_OPTIONS.map((formatOption) => (
-                        <option key={formatOption} value={formatOption}>
-                          {formatOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    label="Description Format"
+                    options={formatSelectOptions}
+                    value={editForm.format}
+                    onChange={(value) => updateEditField("format", value || "")}
+                  />
 
-                  <div style={modalSideFieldStyle}>
-                    <label htmlFor="edit-context-keywords" style={sideLabelStyle}>
-                      AI Context & Keywords
-                    </label>
-                    <textarea
-                      id="edit-context-keywords"
-                      rows={5}
+                  <BlockStack gap="200">
+                    <TextField
+                      label="AI Context & Keywords"
                       value={editForm.contextKeywords}
+                      onChange={(value) => updateEditField("contextKeywords", value || "")}
+                      multiline={5}
                       placeholder="List collection features or keywords"
-                      style={sideTextAreaStyle}
-                      onInput={(event) =>
-                        updateEditField("contextKeywords", event.currentTarget.value || "")
-                      }
+                      autoComplete="off"
                     />
-
-                    <div style={chipWrapStyle}>
+                    <InlineStack gap="200" wrap>
                       {KEYWORD_CHIPS.map((chip) => (
-                        <button
+                        <Button
                           key={chip}
-                          type="button"
-                          style={keywordChipStyle}
+                          size="slim"
                           onClick={() => appendKeywordChip(chip)}
                         >
                           {chip}
-                        </button>
+                        </Button>
                       ))}
-                    </div>
-                  </div>
+                    </InlineStack>
+                  </BlockStack>
 
-                  <div style={modalRightActionsStyle}>
-                    <button
-                      type="button"
-                      style={generateButtonStyle}
+                  <BlockStack gap="300">
+                    <Button
+                      variant="primary"
+                      fullWidth
                       disabled={isGenerating || isUpdating}
                       onClick={handleGenerate}
+                      loading={isGenerating}
+                      size="large"
                     >
                       {isGenerating ? "Generating..." : "Generate"}
-                    </button>
+                    </Button>
 
-                    <div style={modalFooterRowStyle}>
-                      <s-button
-                        icon="view"
+                    <InlineStack gap="200" blockAlign="center">
+                      <Button
+                        size="slim"
                         accessibilityLabel="Preview"
-                        style={modalButtonIconStyle}
+                        icon={
+                          <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
+                            <path d="M10 4C5.5 4 2 10 2 10s3.5 6 8 6 8-6 8-6-3.5-6-8-6zm0 10a4 4 0 110-8 4 4 0 010 8zm0-6a2 2 0 100 4 2 2 0 000-4z" />
+                          </svg>
+                        }
                       />
-                      <s-button
-                        icon="undo"
+                      <Button
+                        size="slim"
                         accessibilityLabel="Undo"
-                        style={modalButtonIconStyle}
+                        icon={
+                          <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
+                            <path d="M7.667 3.167L3.5 7.333l4.167 4.167V8.833c3.307 0 5.833 1.054 7.5 3.167-.667-3.5-2.833-7-7.5-7.5V3.167z" />
+                          </svg>
+                        }
                       />
-                      <s-button
-                        icon="x-circle"
+                      <Button
+                        size="slim"
                         accessibilityLabel="Close modal"
-                        command="--hide"
-                        commandFor={EDIT_MODAL_ID}
-                        style={modalButtonIconStyle}
                         onClick={resetEditModalState}
+                        icon={
+                          <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
+                            <path d="M11.414 10l4.293-4.293a1 1 0 00-1.414-1.414L10 8.586 5.707 4.293a1 1 0 00-1.414 1.414L8.586 10l-4.293 4.293a1 1 0 101.414 1.414L10 11.414l4.293 4.293a1 1 0 001.414-1.414L11.414 10z" />
+                          </svg>
+                        }
                       />
-                      <button
-                        type="button"
-                        disabled={!canUpdateCollection}
-                        style={canUpdateCollection ? updateButtonStyle : updateButtonDisabledStyle}
-                        onClick={handleUpdateCollection}
-                      >
-                        {isUpdating ? "Updating..." : "Update Collection"}
-                      </button>
-                    </div>
-                  </div>
-                </s-box>
+                      <div style={{ flex: 1 }}>
+                        <Button
+                          variant="primary"
+                          fullWidth
+                          disabled={!canUpdateCollection}
+                          onClick={handleUpdateCollection}
+                          loading={isUpdating}
+                        >
+                          {isUpdating ? "Updating..." : "Update Collection"}
+                        </Button>
+                      </div>
+                    </InlineStack>
+                  </BlockStack>
+                </BlockStack>
               </div>
-            </s-box>
+            </BlockStack>
           )}
-        </div>
-      </s-modal>
-    </s-page>
+        </Modal.Section>
+      </Modal>
+    </Page>
   );
 }
