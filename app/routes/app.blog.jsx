@@ -686,7 +686,7 @@ export default function BlogPage() {
 
           <Grid>
             {/* Left 40% — content editor */}
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 5, lg: 5, xl: 5 }}>
+            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 8, lg: 8, xl: 8 }}>
               <BlockStack gap="400">
                 {isCreateMode && blogSelectOptions.length > 0 && (
                   <Select
@@ -758,7 +758,7 @@ export default function BlogPage() {
             </Grid.Cell>
 
             {/* Right 60% — AI settings */}
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 7, lg: 7, xl: 7 }}>
+            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
               <BlockStack gap="400">
                 <Text variant="headingSm" as="h3">AI Content Generation</Text>
 
