@@ -4,77 +4,44 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import {
-  Page,
-  Card,
-  BlockStack,
-  InlineStack,
-  Text,
-  Badge,
-  Divider,
-  Box,
-  Grid,
-  Button,
-  Layout,
+  Page, Card, BlockStack, InlineStack, Text, Badge, Divider, Box, Grid, Button, Layout,
 } from "@shopify/polaris";
 
-// ─── GraphQL ─────────────────────────────────────────────────────────────────
+// ─── GraphQL ──────────────────────────────────────────────────────────────────
 
 const PRODUCTS_SEO_QUERY = `#graphql
   query ProductsSEO($first: Int!) {
-    products(first: $first) {
-      edges { node { id title seo { title description } } }
-    }
-  }
-`;
+    products(first: $first) { edges { node { id title seo { title description } } } }
+  }`;
 
 const COLLECTIONS_SEO_QUERY = `#graphql
   query CollectionsSEO($first: Int!) {
-    collections(first: $first) {
-      edges { node { id title description seo { title description } } }
-    }
-  }
-`;
+    collections(first: $first) { edges { node { id title description seo { title description } } } }
+  }`;
 
 const PAGES_SEO_QUERY = `#graphql
   query PagesSEO($first: Int!) {
     pages(first: $first) {
-      edges {
-        node {
-          id title
-          metafields(first: 2, namespace: "global") { edges { node { key value } } }
-        }
-      }
+      edges { node { id title metafields(first: 2, namespace: "global") { edges { node { key value } } } } }
     }
-  }
-`;
+  }`;
 
 const ARTICLES_SEO_QUERY = `#graphql
   query ArticlesSEO($first: Int!) {
     articles(first: $first) {
-      edges {
-        node {
-          id title
-          metafields(first: 2, namespace: "global") { edges { node { key value } } }
-        }
-      }
+      edges { node { id title metafields(first: 2, namespace: "global") { edges { node { key value } } } } }
     }
-  }
-`;
+  }`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toDateStr(d) {
-  return d.toISOString().split("T")[0];
-}
+function toDateStr(d) { return d.toISOString().split("T")[0]; }
 
 function buildDailyMap(startDate, endDate) {
   const map = {};
   const cur = new Date(startDate + "T12:00:00");
   const end = new Date(endDate + "T12:00:00");
-  while (cur <= end) {
-    map[toDateStr(cur)] = 0;
-    cur.setDate(cur.getDate() + 1);
-  }
+  while (cur <= end) { map[toDateStr(cur)] = 0; cur.setDate(cur.getDate() + 1); }
   return map;
 }
 
@@ -84,75 +51,63 @@ export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const url = new URL(request.url);
 
-  // Parse date range from search params
   const rangeParam = url.searchParams.get("range") || "7";
   const customStart = url.searchParams.get("startDate");
   const customEnd = url.searchParams.get("endDate");
 
   let startDate, endDate, rangeLabel;
-  const today = new Date();
-
   if (rangeParam === "custom" && customStart && customEnd) {
-    startDate = customStart;
-    endDate = customEnd;
-    rangeLabel = "Custom Range";
+    startDate = customStart; endDate = customEnd; rangeLabel = "Custom Range";
   } else {
     const days = parseInt(rangeParam, 10) || 7;
+    const today = new Date();
     const start = new Date(today);
     start.setDate(today.getDate() - (days - 1));
-    startDate = toDateStr(start);
-    endDate = toDateStr(today);
+    startDate = toDateStr(start); endDate = toDateStr(today);
     rangeLabel = `Last ${days} days`;
   }
 
   const startDateObj = new Date(startDate + "T00:00:00");
-  const endDateObj = new Date(endDate + "T23:59:59");
+  const endDateObj   = new Date(endDate   + "T23:59:59");
 
-  // Shopify GraphQL
   const [productsRes, collectionsRes, pagesRes, articlesRes] = await Promise.all([
-    admin.graphql(PRODUCTS_SEO_QUERY, { variables: { first: 100 } }),
-    admin.graphql(COLLECTIONS_SEO_QUERY, { variables: { first: 50 } }),
-    admin.graphql(PAGES_SEO_QUERY, { variables: { first: 50 } }),
-    admin.graphql(ARTICLES_SEO_QUERY, { variables: { first: 50 } }),
+    admin.graphql(PRODUCTS_SEO_QUERY,    { variables: { first: 100 } }),
+    admin.graphql(COLLECTIONS_SEO_QUERY, { variables: { first: 50  } }),
+    admin.graphql(PAGES_SEO_QUERY,       { variables: { first: 50  } }),
+    admin.graphql(ARTICLES_SEO_QUERY,    { variables: { first: 50  } }),
   ]);
-
-  const [productsJson, collectionsJson, pagesJson, articlesJson] = await Promise.all([
+  const [pj, cj, pgj, aj] = await Promise.all([
     productsRes.json(), collectionsRes.json(), pagesRes.json(), articlesRes.json(),
   ]);
 
-  const products = (productsJson.data?.products?.edges || []).map((e) => e.node);
-  const productsWithSeoTitle = products.filter((p) => !!p.seo?.title).length;
-  const productsWithSeoDesc = products.filter((p) => !!p.seo?.description).length;
-
-  const collections = (collectionsJson.data?.collections?.edges || []).map((e) => e.node);
-  const collectionsWithSeoTitle = collections.filter((c) => !!c.seo?.title).length;
-  const collectionsWithSeoDesc = collections.filter((c) => !!c.seo?.description).length;
-  const collectionsWithDesc = collections.filter((c) => !!c.description).length;
-
-  const pages = (pagesJson.data?.pages?.edges || []).map((e) => {
-    const mfs = (e.node.metafields?.edges || []).map((me) => me.node);
+  const products    = (pj.data?.products?.edges    || []).map(e => e.node);
+  const collections = (cj.data?.collections?.edges || []).map(e => e.node);
+  const pages = (pgj.data?.pages?.edges || []).map(e => {
+    const mfs = (e.node.metafields?.edges || []).map(me => me.node);
     return { id: e.node.id, title: e.node.title,
-      hasSeoTitle: !!mfs.find((m) => m.key === "title_tag")?.value,
-      hasSeoDesc: !!mfs.find((m) => m.key === "description_tag")?.value };
+      hasSeoTitle: !!mfs.find(m => m.key === "title_tag")?.value,
+      hasSeoDesc:  !!mfs.find(m => m.key === "description_tag")?.value };
   });
-  const pagesWithSeoTitle = pages.filter((p) => p.hasSeoTitle).length;
-  const pagesWithSeoDesc = pages.filter((p) => p.hasSeoDesc).length;
-
-  const articles = (articlesJson.data?.articles?.edges || []).map((e) => {
-    const mfs = (e.node.metafields?.edges || []).map((me) => me.node);
+  const articles = (aj.data?.articles?.edges || []).map(e => {
+    const mfs = (e.node.metafields?.edges || []).map(me => me.node);
     return { id: e.node.id, title: e.node.title,
-      hasSeoTitle: !!mfs.find((m) => m.key === "title_tag")?.value,
-      hasSeoDesc: !!mfs.find((m) => m.key === "description_tag")?.value };
+      hasSeoTitle: !!mfs.find(m => m.key === "title_tag")?.value,
+      hasSeoDesc:  !!mfs.find(m => m.key === "description_tag")?.value };
   });
-  const articlesWithSeoTitle = articles.filter((a) => a.hasSeoTitle).length;
-  const articlesWithSeoDesc = articles.filter((a) => a.hasSeoDesc).length;
+
+  const pw  = products.filter(p => !!p.seo?.title).length;
+  const pwd = products.filter(p => !!p.seo?.description).length;
+  const cw  = collections.filter(c => !!c.seo?.title).length;
+  const cwd = collections.filter(c => !!c.seo?.description).length;
+  const pgw = pages.filter(p => p.hasSeoTitle).length;
+  const pgwd= pages.filter(p => p.hasSeoDesc).length;
+  const aw  = articles.filter(a => a.hasSeoTitle).length;
+  const awd = articles.filter(a => a.hasSeoDesc).length;
 
   const totalItems = products.length + collections.length + pages.length + articles.length;
-  const totalWithSeo = productsWithSeoTitle + productsWithSeoDesc + collectionsWithSeoTitle +
-    collectionsWithSeoDesc + pagesWithSeoTitle + pagesWithSeoDesc + articlesWithSeoTitle + articlesWithSeoDesc;
+  const totalWithSeo = pw + pwd + cw + cwd + pgw + pgwd + aw + awd;
   const seoScore = totalItems > 0 ? Math.round((totalWithSeo / (totalItems * 2)) * 100) : 0;
 
-  // DB logs
   const collectionLogCount = await db.collectionGeneratedContent
     .count({ where: { shop: session.shop } }).catch(() => 0);
 
@@ -160,363 +115,441 @@ export const loader = async ({ request }) => {
     db.generatedContentLog.count({ where: { shop: session.shop } }).catch(() => 0),
     db.generatedContentLog.findMany({
       where: { shop: session.shop, createdAt: { gte: startDateObj, lte: endDateObj } },
-      select: { createdAt: true, intent: true, aiModel: true },
+      select: { createdAt: true, appliedToProduct: true },
     }).catch(() => []),
     db.generatedContentLog.findMany({
       where: { shop: session.shop, createdAt: { gte: startDateObj, lte: endDateObj } },
-      orderBy: { createdAt: "desc" },
-      take: 10,
+      orderBy: { createdAt: "desc" }, take: 10,
       select: { id: true, productTitle: true, intent: true, aiModel: true, createdAt: true, appliedToProduct: true, language: true },
     }).catch(() => []),
   ]);
 
-  // Build daily activity
-  const dailyCounts = buildDailyMap(startDate, endDate);
+  const dailyCounts  = buildDailyMap(startDate, endDate);
+  const dailyApplied = buildDailyMap(startDate, endDate);
   for (const log of rangeLogs) {
     const key = toDateStr(new Date(log.createdAt));
-    if (key in dailyCounts) dailyCounts[key]++;
+    if (key in dailyCounts) {
+      dailyCounts[key]++;
+      if (log.appliedToProduct) dailyApplied[key]++;
+    }
   }
 
   const dailyActivity = Object.entries(dailyCounts).map(([date, count]) => ({
-    date,
-    label: new Date(date + "T12:00:00").toLocaleDateString("en", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "/"),
-    shortLabel: new Date(date + "T12:00:00").toLocaleDateString("en", { month: "short", day: "numeric" }),
-    count,
+    date, count, applied: dailyApplied[date] || 0,
+    label: new Date(date + "T12:00:00").toLocaleDateString("en-GB"),
   }));
 
   return {
-    products: { total: products.length, withSeoTitle: productsWithSeoTitle, withSeoDesc: productsWithSeoDesc },
-    collections: { total: collections.length, withSeoTitle: collectionsWithSeoTitle, withSeoDesc: collectionsWithSeoDesc, withDesc: collectionsWithDesc },
-    pages: { total: pages.length, withSeoTitle: pagesWithSeoTitle, withSeoDesc: pagesWithSeoDesc },
-    articles: { total: articles.length, withSeoTitle: articlesWithSeoTitle, withSeoDesc: articlesWithSeoDesc },
+    products:    { total: products.length,    withSeoTitle: pw,  withSeoDesc: pwd },
+    collections: { total: collections.length, withSeoTitle: cw,  withSeoDesc: cwd },
+    pages:       { total: pages.length,       withSeoTitle: pgw, withSeoDesc: pgwd },
+    articles:    { total: articles.length,    withSeoTitle: aw,  withSeoDesc: awd },
     seoScore,
     totalGenerations: totalProductLogs + collectionLogCount,
     rangeGenerations: rangeLogs.length,
-    recentLogs: recentLogs.map((l) => ({ ...l, id: l.id.toString(), createdAt: l.createdAt.toISOString() })),
+    recentLogs: recentLogs.map(l => ({ ...l, id: l.id.toString(), createdAt: l.createdAt.toISOString() })),
     dailyActivity,
-    rangeParam,
-    startDate,
-    endDate,
-    rangeLabel,
+    rangeParam, startDate, endDate, rangeLabel,
   };
 };
 
-// ─── SVG Area/Line Chart ──────────────────────────────────────────────────────
-
-const CHART_H = 160;
-const CHART_PAD_L = 44;
-const CHART_PAD_R = 16;
-const CHART_PAD_T = 28;
-const CHART_PAD_B = 48;
-const LINE_COLOR = "#2C6ECB";
-const FILL_COLOR = "rgba(44,110,203,0.12)";
-
-function AreaLineChart({ data, selectedDate, onDayClick }) {
-  const n = data.length;
-  if (n === 0) return null;
-
-  const maxCount = Math.max(...data.map((d) => d.count), 1);
-  // Chart inner area width is dynamic; we compute per-point x based on index
-  // We'll use viewBox 0 0 600 (CHART_PAD_T + CHART_H + CHART_PAD_B)
-  const VW = 600;
-  const VH = CHART_PAD_T + CHART_H + CHART_PAD_B;
-  const plotW = VW - CHART_PAD_L - CHART_PAD_R;
-  const plotH = CHART_H;
-
-  const px = (i) => CHART_PAD_L + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
-  const py = (count) => CHART_PAD_T + plotH - (maxCount > 0 ? (count / maxCount) * plotH : 0);
-
-  // Build path strings
-  const linePoints = data.map((d, i) => `${px(i)},${py(d.count)}`).join(" ");
-  const areaPoints = [
-    `${px(0)},${CHART_PAD_T + plotH}`,
-    ...data.map((d, i) => `${px(i)},${py(d.count)}`),
-    `${px(n - 1)},${CHART_PAD_T + plotH}`,
-  ].join(" ");
-
-  // Y-axis ticks
-  const yTicks = [];
-  const tickCount = Math.min(maxCount, 5);
-  for (let t = 0; t <= tickCount; t++) {
-    const val = Math.round((t / tickCount) * maxCount);
-    const y = py(val);
-    yTicks.push({ val, y });
-  }
-
-  // X-axis: show every Nth label so they don't overlap
-  const maxLabels = Math.min(n, 8);
-  const step = Math.max(1, Math.round(n / maxLabels));
-
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <svg
-        viewBox={`0 0 ${VW} ${VH}`}
-        style={{ width: "100%", minWidth: Math.max(VW, n * 48), height: VH }}
-        preserveAspectRatio="none"
-      >
-        {/* Grid lines */}
-        {yTicks.map(({ val, y }) => (
-          <g key={val}>
-            <line
-              x1={CHART_PAD_L} y1={y}
-              x2={VW - CHART_PAD_R} y2={y}
-              stroke="#E4E5E7" strokeWidth="1" strokeDasharray={val === 0 ? "0" : "4 3"}
-            />
-            <text
-              x={CHART_PAD_L - 6} y={y + 4}
-              textAnchor="end" fontSize="10" fill="#6D7175"
-            >{val}</text>
-          </g>
-        ))}
-
-        {/* Area fill */}
-        <polygon points={areaPoints} fill={FILL_COLOR} />
-
-        {/* Line */}
-        <polyline
-          points={linePoints}
-          fill="none"
-          stroke={LINE_COLOR}
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-
-        {/* Data points + click targets */}
-        {data.map((d, i) => {
-          const x = px(i);
-          const y = py(d.count);
-          const isSelected = d.date === selectedDate;
-          return (
-            <g key={d.date} style={{ cursor: "pointer" }} onClick={() => onDayClick(d.date)}>
-              {/* invisible wide click area */}
-              <rect
-                x={x - 18} y={CHART_PAD_T}
-                width={36} height={plotH}
-                fill={isSelected ? "rgba(44,110,203,0.08)" : "transparent"}
-              />
-              {/* dot */}
-              <circle
-                cx={x} cy={y} r={isSelected ? 6 : 4}
-                fill={d.count > 0 ? LINE_COLOR : "#C4C4C4"}
-                stroke="white" strokeWidth="2"
-              />
-              {/* count label above dot */}
-              {d.count > 0 && (
-                <text x={x} y={y - 10} textAnchor="middle" fontSize="10" fill={LINE_COLOR} fontWeight="600">
-                  {d.count}
-                </text>
-              )}
-            </g>
-          );
-        })}
-
-        {/* X-axis labels */}
-        {data.map((d, i) => {
-          if (i % step !== 0 && i !== n - 1) return null;
-          return (
-            <text
-              key={d.date}
-              x={px(i)} y={CHART_PAD_T + plotH + 18}
-              textAnchor="middle" fontSize="10" fill="#6D7175"
-            >
-              {d.label}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-// ─── Date Range Picker ────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const RANGE_OPTIONS = [
-  { label: "Last 7 days", value: "7" },
-  { label: "Last 14 days", value: "14" },
-  { label: "Last 30 days", value: "30" },
+  { label: "Last 7 days",  value: "7"      },
+  { label: "Last 14 days", value: "14"     },
+  { label: "Last 30 days", value: "30"     },
   { label: "Custom range", value: "custom" },
 ];
 
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY_NAMES   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const RANGE_BG    = "#EEF2F8";
+
+const S1_COLOR = "#2C6ECB";
+const S1_FILL  = "rgba(44,110,203,0.13)";
+const S2_COLOR = "#5C37A8";
+
+// ─── CalendarMonth ────────────────────────────────────────────────────────────
+
+function CalendarMonth({ year, month, rangeStart, rangeEnd, hoverEnd, onDayClick, onDayHover, showLeft, onLeft, showRight, onRight }) {
+  const firstDow = new Date(year, month, 1).getDay();
+  const dim = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= dim; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const pad = n => String(n).padStart(2, "0");
+  const ds = d => !d ? null : `${year}-${pad(month + 1)}-${pad(d)}`;
+
+  const effectiveEnd = rangeEnd || hoverEnd;
+  const lo = rangeStart && effectiveEnd ? (rangeStart <= effectiveEnd ? rangeStart : effectiveEnd) : rangeStart;
+  const hi = rangeStart && effectiveEnd ? (rangeStart <= effectiveEnd ? effectiveEnd : rangeStart) : null;
+
+  return (
+    <div style={{ flex: 1, minWidth: 220 }}>
+      {/* Month header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        {showLeft ? (
+          <button onClick={onLeft} style={arrowBtn}>‹</button>
+        ) : <div style={{ width: 28 }} />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#202223" }}>
+          {MONTH_NAMES[month]} {year}
+        </span>
+        {showRight ? (
+          <button onClick={onRight} style={arrowBtn}>›</button>
+        ) : <div style={{ width: 28 }} />}
+      </div>
+
+      {/* Day-of-week headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
+        {DAY_NAMES.map(d => (
+          <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#8C9196", padding: "3px 0" }}>{d}</div>
+        ))}
+
+        {/* Day cells */}
+        {cells.map((day, idx) => {
+          const dateStr = ds(day);
+          const isStart  = !!(dateStr && dateStr === rangeStart);
+          const isEnd    = !!(dateStr && dateStr === rangeEnd);
+          const inRange  = !!(dateStr && lo && hi && dateStr > lo && dateStr < hi);
+          const isToday  = dateStr === toDateStr(new Date());
+
+          let cellBg = "transparent";
+          if (day) {
+            if      (isStart && rangeEnd) cellBg = `linear-gradient(to right, transparent 50%, ${RANGE_BG} 50%)`;
+            else if (isEnd   && rangeStart) cellBg = `linear-gradient(to left, transparent 50%, ${RANGE_BG} 50%)`;
+            else if (inRange)             cellBg = RANGE_BG;
+          }
+
+          const showCircle   = isStart || isEnd;
+          const textColor    = showCircle ? "white" : day ? "#202223" : "transparent";
+
+          return (
+            <div
+              key={idx}
+              style={{ background: cellBg, position: "relative", height: 34, cursor: day ? "pointer" : "default" }}
+              onClick={() => day && onDayClick(dateStr)}
+              onMouseEnter={() => day && onDayHover(dateStr)}
+            >
+              {day && (
+                <div style={{
+                  position: "absolute", top: "50%", left: "50%",
+                  transform: "translate(-50%,-50%)",
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: showCircle ? "#1A1A1A" : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 13, color: textColor,
+                  fontWeight: showCircle ? 700 : 400,
+                  ...(isToday && !showCircle ? { border: "1px solid #C9CCCF" } : {}),
+                }}>{day}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const arrowBtn = {
+  width: 28, height: 28, border: "1px solid #C9CCCF", borderRadius: 6,
+  background: "white", cursor: "pointer", fontSize: 17, color: "#202223",
+  display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0,
+};
+
+// ─── DateRangePicker ──────────────────────────────────────────────────────────
+
 function DateRangePicker({ rangeParam, startDate, endDate }) {
   const [, setSearchParams] = useSearchParams();
-  const [customStart, setCustomStart] = useState(startDate);
-  const [customEnd, setCustomEnd] = useState(endDate);
-  const [showCalendar, setShowCalendar] = useState(false);
+  const [show, setShow] = useState(false);
 
-  const currentLabel = RANGE_OPTIONS.find((o) => o.value === rangeParam)?.label || `Last ${rangeParam} days`;
+  const [calYear,  setCalYear]  = useState(() => new Date(startDate + "T12:00:00").getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date(startDate + "T12:00:00").getMonth());
+  const [pickerStart, setPickerStart] = useState(startDate);
+  const [pickerEnd,   setPickerEnd]   = useState(endDate);
+  const [selecting,   setSelecting]   = useState(false);
+  const [hoverDate,   setHoverDate]   = useState(null);
+  const [preset, setPreset] = useState(rangeParam);
 
-  const applyRange = useCallback(
-    (r, s, e) => {
-      const params = new URLSearchParams();
-      if (r === "custom") {
-        params.set("range", "custom");
-        params.set("startDate", s);
-        params.set("endDate", e);
-      } else {
-        params.set("range", r);
-      }
-      setSearchParams(params);
-      setShowCalendar(false);
-    },
-    [setSearchParams]
-  );
+  const rightMonth = calMonth === 11 ? 0  : calMonth + 1;
+  const rightYear  = calMonth === 11 ? calYear + 1 : calYear;
+
+  const goPrev = () => { if (calMonth === 0) { setCalYear(y => y-1); setCalMonth(11); } else setCalMonth(m => m-1); };
+  const goNext = () => { if (calMonth === 11) { setCalYear(y => y+1); setCalMonth(0);  } else setCalMonth(m => m+1); };
+
+  const handlePreset = (e) => {
+    const val = e.target.value;
+    setPreset(val);
+    if (val !== "custom") {
+      const days = parseInt(val);
+      const en = new Date(); const st = new Date();
+      st.setDate(en.getDate() - (days - 1));
+      setPickerStart(toDateStr(st)); setPickerEnd(toDateStr(en));
+      setCalYear(st.getFullYear()); setCalMonth(st.getMonth());
+      setSelecting(false);
+    }
+  };
+
+  const handleDayClick = (ds) => {
+    if (!selecting || !pickerStart) {
+      setPickerStart(ds); setPickerEnd(null); setSelecting(true); setPreset("custom");
+    } else {
+      if (ds < pickerStart) { setPickerEnd(pickerStart); setPickerStart(ds); }
+      else                  { setPickerEnd(ds); }
+      setSelecting(false);
+    }
+  };
+
+  const handleApply = () => {
+    if (preset !== "custom") {
+      setSearchParams({ range: preset });
+    } else {
+      const p = new URLSearchParams();
+      p.set("range", "custom");
+      p.set("startDate", pickerStart);
+      p.set("endDate", pickerEnd || pickerStart);
+      setSearchParams(p);
+    }
+    setShow(false);
+  };
+
+  const label = RANGE_OPTIONS.find(o => o.value === rangeParam)?.label || `Last ${rangeParam} days`;
 
   return (
     <div style={{ position: "relative", display: "inline-block" }}>
-      {/* Trigger button */}
+      {/* Trigger */}
       <button
         type="button"
-        onClick={() => setShowCalendar((v) => !v)}
+        onClick={() => setShow(v => !v)}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 14px",
-          border: "1px solid #C9CCCF",
-          borderRadius: 8,
-          background: "white",
-          cursor: "pointer",
-          fontSize: 14,
-          fontWeight: 500,
-          color: "#202223",
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "7px 14px", border: "1px solid #C9CCCF", borderRadius: 8,
+          background: "white", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#202223",
           whiteSpace: "nowrap",
         }}
       >
-        <span>{currentLabel}</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M2 4l4 4 4-4" stroke="#6D7175" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        {label}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6l4 4 4-4" stroke="#6D7175" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
-      {/* Dropdown panel */}
-      {showCalendar && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 999,
-            background: "white",
-            border: "1px solid #C9CCCF",
-            borderRadius: 10,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            minWidth: 300,
-            padding: "12px 16px 16px",
-          }}
-        >
-          {/* Preset list */}
-          <BlockStack gap="100">
-            {RANGE_OPTIONS.filter((o) => o.value !== "custom").map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => applyRange(opt.value, customStart, customEnd)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "8px 10px",
-                  border: "none",
-                  borderRadius: 6,
-                  background: rangeParam === opt.value ? "#F2F7FE" : "transparent",
-                  color: rangeParam === opt.value ? LINE_COLOR : "#202223",
-                  fontWeight: rangeParam === opt.value ? 600 : 400,
-                  fontSize: 14,
-                  cursor: "pointer",
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
+      {show && (
+        <>
+          {/* Click-away */}
+          <div style={{ position: "fixed", inset: 0, zIndex: 998 }} onClick={() => setShow(false)} />
 
-            <div style={{ borderTop: "1px solid #E4E5E7", marginTop: 4, paddingTop: 10 }}>
-              <Text variant="bodySm" tone="subdued" as="p">Custom range</Text>
-              <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                <input
-                  type="date"
-                  value={customStart}
-                  max={customEnd}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  style={{
-                    flex: 1, padding: "6px 8px", border: "1px solid #C9CCCF",
-                    borderRadius: 6, fontSize: 13, color: "#202223", background: "white",
-                  }}
-                />
-                <span style={{ color: "#6D7175" }}>→</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  min={customStart}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  style={{
-                    flex: 1, padding: "6px 8px", border: "1px solid #C9CCCF",
-                    borderRadius: 6, fontSize: 13, color: "#202223", background: "white",
-                  }}
-                />
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCalendar(false)}
-                  style={{
-                    padding: "6px 14px", border: "1px solid #C9CCCF", borderRadius: 6,
-                    background: "white", fontSize: 13, cursor: "pointer", color: "#202223",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyRange("custom", customStart, customEnd)}
-                  disabled={!customStart || !customEnd}
-                  style={{
-                    padding: "6px 14px", border: "none", borderRadius: 6,
-                    background: LINE_COLOR, color: "white", fontSize: 13,
-                    cursor: !customStart || !customEnd ? "not-allowed" : "pointer",
-                    fontWeight: 600, opacity: !customStart || !customEnd ? 0.5 : 1,
-                  }}
-                >
-                  Apply
-                </button>
-              </div>
+          {/* Dropdown panel */}
+          <div
+            style={{
+              position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 999,
+              background: "white", border: "1px solid #C9CCCF", borderRadius: 12,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.15)", padding: 16, minWidth: 540,
+            }}
+            onMouseLeave={() => setHoverDate(null)}
+          >
+            {/* Preset select */}
+            <select
+              value={preset}
+              onChange={handlePreset}
+              style={{
+                width: "100%", padding: "8px 12px", marginBottom: 12,
+                border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 14,
+                color: "#202223", background: "white",
+              }}
+            >
+              {RANGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+
+            {/* Date inputs row */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+              <input
+                type="date" value={pickerStart}
+                onChange={e => { setPickerStart(e.target.value); setPreset("custom"); }}
+                style={{ flex: 1, padding: "8px 10px", border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 13, color: "#202223" }}
+              />
+              <span style={{ color: "#6D7175", fontSize: 18 }}>→</span>
+              <input
+                type="date" value={pickerEnd || ""}
+                onChange={e => { setPickerEnd(e.target.value); setPreset("custom"); }}
+                style={{ flex: 1, padding: "8px 10px", border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 13, color: "#202223" }}
+              />
             </div>
-          </BlockStack>
-        </div>
-      )}
 
-      {/* Click-away overlay */}
-      {showCalendar && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 998 }}
-          onClick={() => setShowCalendar(false)}
-        />
+            {/* Two-month calendar */}
+            <div style={{ display: "flex", gap: 0, borderTop: "1px solid #E4E5E7", paddingTop: 14 }}>
+              <CalendarMonth
+                year={calYear} month={calMonth}
+                rangeStart={pickerStart} rangeEnd={pickerEnd}
+                hoverEnd={selecting ? hoverDate : null}
+                onDayClick={handleDayClick} onDayHover={setHoverDate}
+                showLeft onLeft={goPrev} showRight={false}
+              />
+              <div style={{ width: 1, background: "#E4E5E7", margin: "0 16px" }} />
+              <CalendarMonth
+                year={rightYear} month={rightMonth}
+                rangeStart={pickerStart} rangeEnd={pickerEnd}
+                hoverEnd={selecting ? hoverDate : null}
+                onDayClick={handleDayClick} onDayHover={setHoverDate}
+                showLeft={false} showRight onRight={goNext}
+              />
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14, borderTop: "1px solid #E4E5E7", paddingTop: 12 }}>
+              <button
+                type="button" onClick={() => setShow(false)}
+                style={{ padding: "7px 18px", border: "1px solid #C9CCCF", borderRadius: 8, background: "white", fontSize: 14, cursor: "pointer", color: "#202223", fontWeight: 500 }}
+              >Cancel</button>
+              <button
+                type="button" onClick={handleApply} disabled={!pickerStart}
+                style={{ padding: "7px 18px", border: "none", borderRadius: 8, background: "#1A1A1A", color: "white", fontSize: 14, cursor: "pointer", fontWeight: 600, opacity: !pickerStart ? 0.5 : 1 }}
+              >Apply</button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-// ─── Other chart components ───────────────────────────────────────────────────
+// ─── Area / Line Chart ────────────────────────────────────────────────────────
+
+const CH = { vw: 800, vh: 220, pL: 44, pR: 20, pT: 20, pB: 50 };
+
+function AreaLineChart({ data, selectedDate, onDayClick }) {
+  const n = data.length;
+  if (!n) return null;
+
+  const maxY   = Math.max(...data.map(d => d.count), 1);
+  const plotW  = CH.vw - CH.pL - CH.pR;
+  const plotH  = CH.vh - CH.pT - CH.pB;
+  const baseY  = CH.pT + plotH;
+
+  const px = i => CH.pL + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+  const py = v => CH.pT + plotH - (maxY > 0 ? (v / maxY) * plotH : 0);
+
+  // Y-axis ticks — deduplicated integers
+  const rawStep = Math.max(1, Math.ceil(maxY / 4));
+  const yTickSet = new Set();
+  for (let v = 0; v <= maxY; v += rawStep) yTickSet.add(v);
+  yTickSet.add(maxY);
+  const yTicks = [...yTickSet].sort((a, b) => a - b);
+
+  // X-axis — show up to 8 labels
+  const xStep = Math.max(1, Math.ceil(n / 8));
+
+  const pts1 = data.map((d, i) => `${px(i).toFixed(1)},${py(d.count).toFixed(1)}`).join(" ");
+  const pts2 = data.map((d, i) => `${px(i).toFixed(1)},${py(d.applied).toFixed(1)}`).join(" ");
+  const area = [
+    `${px(0).toFixed(1)},${baseY}`,
+    ...data.map((d, i) => `${px(i).toFixed(1)},${py(d.count).toFixed(1)}`),
+    `${px(n - 1).toFixed(1)},${baseY}`,
+  ].join(" ");
+
+  return (
+    <div>
+      <div style={{ overflowX: "auto" }}>
+        <svg
+          viewBox={`0 0 ${CH.vw} ${CH.vh}`}
+          style={{ width: "100%", height: "auto", display: "block" }}
+        >
+          {/* Y-axis grid + labels */}
+          {yTicks.map(v => {
+            const y = py(v);
+            return (
+              <g key={v}>
+                <line x1={CH.pL} y1={y} x2={CH.vw - CH.pR} y2={y} stroke="#E9EBEC" strokeWidth="1" />
+                <text x={CH.pL - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#8C9196">{v}</text>
+              </g>
+            );
+          })}
+
+          {/* Area fill (series 1) */}
+          <polygon points={area} fill={S1_FILL} />
+
+          {/* Line series 1 — blue */}
+          <polyline points={pts1} fill="none" stroke={S1_COLOR} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+          {/* Line series 2 — purple */}
+          <polyline points={pts2} fill="none" stroke={S2_COLOR} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+
+          {/* Interactive day overlays + dots */}
+          {data.map((d, i) => {
+            const x  = px(i);
+            const y1 = py(d.count);
+            const y2 = py(d.applied);
+            const isSel = d.date === selectedDate;
+            return (
+              <g key={d.date} style={{ cursor: "pointer" }} onClick={() => onDayClick(d.date)}>
+                {/* Vertical hover line */}
+                {isSel && (
+                  <line x1={x} y1={CH.pT} x2={x} y2={baseY} stroke="#C9CCCF" strokeWidth="1" strokeDasharray="4 3" />
+                )}
+                {/* Invisible wide click area */}
+                <rect x={x - 22} y={CH.pT} width={44} height={plotH} fill="transparent" />
+                {/* Series 1 dot */}
+                <circle cx={x} cy={y1} r={isSel ? 5.5 : 4} fill={S1_COLOR} stroke="white" strokeWidth="2" />
+                {/* Series 2 dot (only if > 0) */}
+                {d.applied > 0 && (
+                  <circle cx={x} cy={y2} r={isSel ? 4.5 : 3} fill={S2_COLOR} stroke="white" strokeWidth="2" />
+                )}
+                {/* Count label above dot on hover/select */}
+                {(isSel || d.count > 0) && (
+                  <text x={x} y={y1 - 10} textAnchor="middle" fontSize="11" fill={S1_COLOR} fontWeight="600">{d.count}</text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Baseline */}
+          <line x1={CH.pL} y1={baseY} x2={CH.vw - CH.pR} y2={baseY} stroke="#E4E5E7" strokeWidth="1" />
+
+          {/* X-axis labels */}
+          {data.map((d, i) => {
+            if (i % xStep !== 0 && i !== n - 1) return null;
+            return (
+              <text key={d.date} x={px(i)} y={baseY + 18} textAnchor="middle" fontSize="10.5" fill="#8C9196">
+                {d.label}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 20, marginTop: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 26, height: 2, background: S1_COLOR, borderRadius: 2 }} />
+          <span style={{ fontSize: 12, color: "#6D7175" }}>AI Generations</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 26, height: 2, background: S2_COLOR, borderRadius: 2 }} />
+          <span style={{ fontSize: 12, color: "#6D7175" }}>Applied to Product</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DonutScore ───────────────────────────────────────────────────────────────
 
 function DonutScore({ score }) {
-  const r = 65;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (score / 100) * circ;
+  const r = 65; const circ = 2 * Math.PI * r;
   const color = score >= 70 ? "#008060" : score >= 40 ? "#B98900" : "#C9201F";
   const label = score >= 70 ? "Good" : score >= 40 ? "Fair" : "Needs Work";
-  const tone = score >= 70 ? "success" : score >= 40 ? "warning" : "critical";
-
+  const tone  = score >= 70 ? "success" : score >= 40 ? "warning" : "critical";
   return (
     <BlockStack gap="300">
       <InlineStack align="center">
         <div style={{ position: "relative", width: 160, height: 160 }}>
           <svg viewBox="0 0 160 160" width="160" height="160">
             <circle cx="80" cy="80" r={r} fill="none" stroke="#E4E5E7" strokeWidth="16" />
-            <circle
-              cx="80" cy="80" r={r} fill="none" stroke={color} strokeWidth="16"
-              strokeDasharray={circ} strokeDashoffset={offset}
-              strokeLinecap="round" transform="rotate(-90 80 80)"
-            />
+            <circle cx="80" cy="80" r={r} fill="none" stroke={color} strokeWidth="16"
+              strokeDasharray={circ} strokeDashoffset={circ - (score / 100) * circ}
+              strokeLinecap="round" transform="rotate(-90 80 80)" />
           </svg>
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
             <div style={{ fontSize: 34, fontWeight: 700, color, lineHeight: 1 }}>{score}</div>
@@ -524,9 +557,7 @@ function DonutScore({ score }) {
           </div>
         </div>
       </InlineStack>
-      <InlineStack align="center">
-        <Badge tone={tone}>{label}</Badge>
-      </InlineStack>
+      <InlineStack align="center"><Badge tone={tone}>{label}</Badge></InlineStack>
     </BlockStack>
   );
 }
@@ -547,7 +578,7 @@ function HBar({ label, value, total, color = "#008060" }) {
 }
 
 function StatTile({ title, total, withSeoTitle, withSeoDesc, url, color, icon }) {
-  const pct = total > 0 ? Math.round(((withSeoTitle + withSeoDesc) / (total * 2)) * 100) : 0;
+  const pct  = total > 0 ? Math.round(((withSeoTitle + withSeoDesc) / (total * 2)) * 100) : 0;
   const tone = pct >= 70 ? "success" : pct >= 40 ? "warning" : total === 0 ? "info" : "critical";
   return (
     <Card>
@@ -566,8 +597,8 @@ function StatTile({ title, total, withSeoTitle, withSeoDesc, url, color, icon })
           </InlineStack>
           <Divider />
           <BlockStack gap="300">
-            <HBar label="SEO Title" value={withSeoTitle} total={total} color={color} />
-            <HBar label="SEO Description" value={withSeoDesc} total={total} color={color} />
+            <HBar label="SEO Title"       value={withSeoTitle} total={total} color={color} />
+            <HBar label="SEO Description" value={withSeoDesc}  total={total} color={color} />
           </BlockStack>
           <Button url={url} size="slim" variant="secondary">Manage</Button>
         </BlockStack>
@@ -576,16 +607,11 @@ function StatTile({ title, total, withSeoTitle, withSeoDesc, url, color, icon })
   );
 }
 
-// ─── Day Detail Panel ─────────────────────────────────────────────────────────
-
 function DayDetailPanel({ date, recentLogs }) {
-  const logsForDay = recentLogs.filter(
-    (l) => new Date(l.createdAt).toISOString().split("T")[0] === date
-  );
+  const logsForDay = recentLogs.filter(l => new Date(l.createdAt).toISOString().split("T")[0] === date);
   const displayDate = new Date(date + "T12:00:00").toLocaleDateString("en", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
-
   return (
     <Card>
       <BlockStack gap="300">
@@ -600,17 +626,8 @@ function DayDetailPanel({ date, recentLogs }) {
         ) : (
           <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #E4E5E7" }}>
             {logsForDay.map((log, i) => (
-              <div
-                key={log.id}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 12px", background: i % 2 === 0 ? "#FAFAFA" : "white",
-                  gap: 10, flexWrap: "wrap",
-                }}
-              >
-                <Text variant="bodySm" fontWeight="semibold" as="span">
-                  {log.productTitle || "Untitled"}
-                </Text>
+              <div key={log.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: i % 2 === 0 ? "#FAFAFA" : "white", gap: 10, flexWrap: "wrap" }}>
+                <Text variant="bodySm" fontWeight="semibold" as="span">{log.productTitle || "Untitled"}</Text>
                 <InlineStack gap="100" blockAlign="center">
                   <Badge>{log.intent?.replace(/_/g, " ")}</Badge>
                   {log.appliedToProduct && <Badge tone="success">Applied</Badge>}
@@ -627,7 +644,7 @@ function DayDetailPanel({ date, recentLogs }) {
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 const INTENT_LABEL = {
   generate_description: "Product Description",
@@ -645,23 +662,20 @@ export default function AnalyticsPage() {
   } = useLoaderData();
 
   const [selectedDate, setSelectedDate] = useState(null);
-
-  const handleDayClick = useCallback((date) => {
-    setSelectedDate((prev) => (prev === date ? null : date));
-  }, []);
+  const handleDayClick = useCallback(date => setSelectedDate(p => p === date ? null : date), []);
 
   const actions = [
-    products.total - products.withSeoTitle > 0 && { label: `${products.total - products.withSeoTitle} products missing SEO title`, url: "/app/products" },
-    products.total - products.withSeoDesc > 0 && { label: `${products.total - products.withSeoDesc} products missing SEO description`, url: "/app/products" },
+    products.total    - products.withSeoTitle    > 0 && { label: `${products.total    - products.withSeoTitle} products missing SEO title`,    url: "/app/products"    },
+    products.total    - products.withSeoDesc     > 0 && { label: `${products.total    - products.withSeoDesc} products missing SEO description`, url: "/app/products"    },
     collections.total - collections.withSeoTitle > 0 && { label: `${collections.total - collections.withSeoTitle} collections missing SEO title`, url: "/app/collections" },
-    pages.total - pages.withSeoTitle > 0 && { label: `${pages.total - pages.withSeoTitle} pages missing SEO title`, url: "/app/pages" },
-    articles.total - articles.withSeoTitle > 0 && { label: `${articles.total - articles.withSeoTitle} articles missing SEO title`, url: "/app/blog" },
+    pages.total       - pages.withSeoTitle       > 0 && { label: `${pages.total       - pages.withSeoTitle} pages missing SEO title`,            url: "/app/pages"       },
+    articles.total    - articles.withSeoTitle    > 0 && { label: `${articles.total    - articles.withSeoTitle} articles missing SEO title`,       url: "/app/blog"        },
   ].filter(Boolean);
 
-  const storeTotal = products.total + collections.total + pages.total + articles.total;
+  const storeTotal   = products.total + collections.total + pages.total + articles.total;
   const coverageColor = seoScore >= 70 ? "#008060" : seoScore >= 40 ? "#B98900" : "#C9201F";
-  const bestDay = Math.max(...dailyActivity.map((d) => d.count), 0);
-  const activeDays = dailyActivity.filter((d) => d.count > 0).length;
+  const bestDay      = Math.max(...dailyActivity.map(d => d.count), 0);
+  const activeDays   = dailyActivity.filter(d => d.count > 0).length;
 
   return (
     <Page
@@ -671,166 +685,101 @@ export default function AnalyticsPage() {
     >
       <BlockStack gap="600">
 
-        {/* Section 1 — KPI Summary Row */}
+        {/* KPI Row */}
         <Grid>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <Card>
-              <BlockStack gap="200">
-                <InlineStack align="space-between" blockAlign="start">
-                  <Text variant="bodySm" tone="subdued">Items across store</Text>
-                  <div style={{ fontSize: 20 }}>📁</div>
-                </InlineStack>
-                <Text variant="heading2xl" as="p">{storeTotal}</Text>
-                <Text variant="bodySm" as="p">Total Content</Text>
-              </BlockStack>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <Card>
-              <BlockStack gap="200">
-                <InlineStack align="space-between" blockAlign="start">
-                  <Text variant="bodySm" tone="subdued">Average coverage</Text>
-                  <div style={{ fontSize: 20 }}>🎯</div>
-                </InlineStack>
-                <Text variant="heading2xl" as="p">
-                  <span style={{ color: coverageColor }}>{seoScore}%</span>
-                </Text>
-                <Text variant="bodySm" as="p">SEO Coverage</Text>
-              </BlockStack>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <Card>
-              <BlockStack gap="200">
-                <InlineStack align="space-between" blockAlign="start">
-                  <Text variant="bodySm" tone="subdued">All-time total</Text>
-                  <div style={{ fontSize: 20 }}>⚡</div>
-                </InlineStack>
-                <Text variant="heading2xl" as="p">{totalGenerations}</Text>
-                <Text variant="bodySm" as="p">AI Generations</Text>
-              </BlockStack>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <Card>
-              <BlockStack gap="200">
-                <InlineStack align="space-between" blockAlign="start">
-                  <Text variant="bodySm" tone="subdued">{rangeLabel}</Text>
-                  <div style={{ fontSize: 20 }}>📅</div>
-                </InlineStack>
-                <Text variant="heading2xl" as="p">{rangeGenerations}</Text>
-                <Text variant="bodySm" as="p">In Range</Text>
-              </BlockStack>
-            </Card>
-          </Grid.Cell>
+          {[
+            { icon: "📁", sub: "Items across store",     val: storeTotal,        label: "Total Content"  },
+            { icon: "🎯", sub: "Average coverage",       val: seoScore + "%",    label: "SEO Coverage", color: coverageColor },
+            { icon: "⚡", sub: "All-time total",         val: totalGenerations,  label: "AI Generations" },
+            { icon: "📅", sub: rangeLabel,               val: rangeGenerations,  label: "In Range"       },
+          ].map(({ icon, sub, val, label, color }) => (
+            <Grid.Cell key={label} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
+              <Card>
+                <BlockStack gap="200">
+                  <InlineStack align="space-between" blockAlign="start">
+                    <Text variant="bodySm" tone="subdued">{sub}</Text>
+                    <div style={{ fontSize: 20 }}>{icon}</div>
+                  </InlineStack>
+                  <Text variant="heading2xl" as="p">
+                    {color ? <span style={{ color }}>{val}</span> : val}
+                  </Text>
+                  <Text variant="bodySm" as="p">{label}</Text>
+                </BlockStack>
+              </Card>
+            </Grid.Cell>
+          ))}
         </Grid>
 
-        {/* Section 2 — Generation Activity Chart */}
+        {/* Generation Activity Chart */}
         <Card>
           <BlockStack gap="400">
-            {/* Header row */}
+            {/* Header */}
             <InlineStack align="space-between" blockAlign="center" wrap={false} gap="300">
               <BlockStack gap="100">
                 <Text variant="headingMd" as="h2">Generation Activity</Text>
-                <Text variant="bodySm" tone="subdued">
-                  Click on any point to see day details
-                </Text>
+                <Text variant="bodySm" tone="subdued">Click a data point to see day details</Text>
               </BlockStack>
               <DateRangePicker rangeParam={rangeParam} startDate={startDate} endDate={endDate} />
             </InlineStack>
 
-            {/* Quick day-range buttons */}
+            {/* Quick day buttons */}
             <InlineStack gap="200" wrap>
-              {["7", "14", "30"].map((days) => {
-                const isActive = rangeParam === days;
-                return (
-                  <a
-                    key={days}
-                    href={`?range=${days}`}
-                    style={{
-                      display: "inline-block",
-                      padding: "4px 12px",
-                      borderRadius: 20,
-                      border: `1px solid ${isActive ? LINE_COLOR : "#C9CCCF"}`,
-                      background: isActive ? LINE_COLOR : "white",
-                      color: isActive ? "white" : "#202223",
-                      fontSize: 13,
-                      fontWeight: isActive ? 600 : 400,
-                      textDecoration: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {days}d
-                  </a>
-                );
-              })}
+              {["7", "14", "30"].map(days => (
+                <a
+                  key={days}
+                  href={`?range=${days}`}
+                  style={{
+                    display: "inline-block", padding: "4px 14px",
+                    borderRadius: 20, textDecoration: "none",
+                    border: `1px solid ${rangeParam === days ? S1_COLOR : "#C9CCCF"}`,
+                    background: rangeParam === days ? S1_COLOR : "white",
+                    color: rangeParam === days ? "white" : "#202223",
+                    fontSize: 13, fontWeight: rangeParam === days ? 600 : 400,
+                  }}
+                >
+                  {days}d
+                </a>
+              ))}
             </InlineStack>
 
-            {/* Chart */}
+            {/* Chart area */}
             {rangeGenerations === 0 ? (
               <Box paddingBlockStart="600" paddingBlockEnd="600">
                 <InlineStack align="center">
                   <BlockStack gap="200">
-                    <InlineStack align="center">
-                      <div style={{ fontSize: 36 }}>📭</div>
-                    </InlineStack>
+                    <InlineStack align="center"><div style={{ fontSize: 36 }}>📭</div></InlineStack>
                     <Text variant="bodyMd" tone="subdued">No generation activity in this date range.</Text>
                   </BlockStack>
                 </InlineStack>
               </Box>
             ) : (
-              <BlockStack gap="300">
-                <AreaLineChart
-                  data={dailyActivity}
-                  selectedDate={selectedDate}
-                  onDayClick={handleDayClick}
-                />
-                {/* Legend */}
-                <InlineStack gap="400" blockAlign="center">
-                  <InlineStack gap="100" blockAlign="center">
-                    <div style={{ width: 28, height: 3, background: LINE_COLOR, borderRadius: 2 }} />
-                    <Text variant="bodySm" tone="subdued">AI Generations</Text>
-                  </InlineStack>
-                  <InlineStack gap="100" blockAlign="center">
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: LINE_COLOR, border: "2px solid white", boxShadow: "0 0 0 1px " + LINE_COLOR }} />
-                    <Text variant="bodySm" tone="subdued">Click a point for details</Text>
-                  </InlineStack>
-                </InlineStack>
-              </BlockStack>
+              <AreaLineChart data={dailyActivity} selectedDate={selectedDate} onDayClick={handleDayClick} />
             )}
 
-            {/* Day detail panel */}
-            {selectedDate && (
-              <DayDetailPanel date={selectedDate} recentLogs={recentLogs} />
-            )}
+            {/* Day detail */}
+            {selectedDate && <DayDetailPanel date={selectedDate} recentLogs={recentLogs} />}
           </BlockStack>
         </Card>
 
-        {/* Section 3 — SEO Score + Coverage */}
+        {/* SEO Score + Coverage */}
         <Layout>
           <Layout.Section variant="oneThird">
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">Overall SEO Score</Text>
-                <Text variant="bodySm" tone="subdued">
-                  Based on SEO title &amp; description coverage across all content types.
-                </Text>
-                <InlineStack align="center">
-                  <DonutScore score={seoScore} />
-                </InlineStack>
+                <Text variant="bodySm" tone="subdued">Based on SEO title &amp; description coverage across all content types.</Text>
+                <InlineStack align="center"><DonutScore score={seoScore} /></InlineStack>
                 <Divider />
                 <BlockStack gap="200">
                   <Text variant="headingSm" as="h3">Fix Missing SEO</Text>
                   {actions.length === 0 ? (
                     <Text variant="bodySm" tone="success">All content has SEO data!</Text>
-                  ) : (
-                    actions.slice(0, 4).map((item, i) => (
-                      <InlineStack key={i} gap="200" blockAlign="center" wrap={false}>
-                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#C9201F", flexShrink: 0 }} />
-                        <Button variant="plain" url={item.url} size="slim">{item.label}</Button>
-                      </InlineStack>
-                    ))
-                  )}
+                  ) : actions.slice(0, 4).map((item, i) => (
+                    <InlineStack key={i} gap="200" blockAlign="center" wrap={false}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#C9201F", flexShrink: 0 }} />
+                      <Button variant="plain" url={item.url} size="slim">{item.label}</Button>
+                    </InlineStack>
+                  ))}
                 </BlockStack>
               </BlockStack>
             </Card>
@@ -840,64 +789,44 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="500">
                 <Text variant="headingMd" as="h2">SEO Coverage by Content Type</Text>
-
-                <BlockStack gap="300">
-                  <InlineStack gap="200" blockAlign="center">
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: "#008060" }} />
-                    <Text variant="headingSm" as="h3">Products ({products.total})</Text>
-                  </InlineStack>
-                  <HBar label="SEO Title" value={products.withSeoTitle} total={products.total} color="#008060" />
-                  <HBar label="SEO Description" value={products.withSeoDesc} total={products.total} color="#006E52" />
-                </BlockStack>
-                <Divider />
-                <BlockStack gap="300">
-                  <InlineStack gap="200" blockAlign="center">
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: "#2C6ECB" }} />
-                    <Text variant="headingSm" as="h3">Collections ({collections.total})</Text>
-                  </InlineStack>
-                  <HBar label="SEO Title" value={collections.withSeoTitle} total={collections.total} color="#2C6ECB" />
-                  <HBar label="SEO Description" value={collections.withSeoDesc} total={collections.total} color="#1A4FA0" />
-                </BlockStack>
-                <Divider />
-                <BlockStack gap="300">
-                  <InlineStack gap="200" blockAlign="center">
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: "#8456CD" }} />
-                    <Text variant="headingSm" as="h3">Pages ({pages.total})</Text>
-                  </InlineStack>
-                  <HBar label="SEO Title" value={pages.withSeoTitle} total={pages.total} color="#8456CD" />
-                  <HBar label="SEO Description" value={pages.withSeoDesc} total={pages.total} color="#6E42B8" />
-                </BlockStack>
-                <Divider />
-                <BlockStack gap="300">
-                  <InlineStack gap="200" blockAlign="center">
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: "#E07D10" }} />
-                    <Text variant="headingSm" as="h3">Blog Articles ({articles.total})</Text>
-                  </InlineStack>
-                  <HBar label="SEO Title" value={articles.withSeoTitle} total={articles.total} color="#E07D10" />
-                  <HBar label="SEO Description" value={articles.withSeoDesc} total={articles.total} color="#B06200" />
-                </BlockStack>
+                {[
+                  { label: "Products",      total: products.total,    st: products.withSeoTitle,    sd: products.withSeoDesc,    c1: "#008060", c2: "#006E52" },
+                  { label: "Collections",   total: collections.total, st: collections.withSeoTitle, sd: collections.withSeoDesc, c1: "#2C6ECB", c2: "#1A4FA0" },
+                  { label: "Pages",         total: pages.total,       st: pages.withSeoTitle,       sd: pages.withSeoDesc,       c1: "#8456CD", c2: "#6E42B8" },
+                  { label: "Blog Articles", total: articles.total,    st: articles.withSeoTitle,    sd: articles.withSeoDesc,    c1: "#E07D10", c2: "#B06200" },
+                ].map(({ label, total, st, sd, c1, c2 }, i) => (
+                  <div key={label}>
+                    {i > 0 && <Divider />}
+                    <BlockStack gap="300">
+                      <InlineStack gap="200" blockAlign="center">
+                        <div style={{ width: 12, height: 12, borderRadius: 3, background: c1 }} />
+                        <Text variant="headingSm" as="h3">{label} ({total})</Text>
+                      </InlineStack>
+                      <HBar label="SEO Title"       value={st} total={total} color={c1} />
+                      <HBar label="SEO Description" value={sd} total={total} color={c2} />
+                    </BlockStack>
+                  </div>
+                ))}
               </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>
 
-        {/* Section 4 — Per-type StatTiles */}
+        {/* Per-type StatTiles */}
         <Grid>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <StatTile title="Products" total={products.total} withSeoTitle={products.withSeoTitle} withSeoDesc={products.withSeoDesc} url="/app/products" color="#008060" icon="📦" />
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <StatTile title="Collections" total={collections.total} withSeoTitle={collections.withSeoTitle} withSeoDesc={collections.withSeoDesc} url="/app/collections" color="#2C6ECB" icon="🗂️" />
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <StatTile title="Pages" total={pages.total} withSeoTitle={pages.withSeoTitle} withSeoDesc={pages.withSeoDesc} url="/app/pages" color="#8456CD" icon="📄" />
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-            <StatTile title="Blog Articles" total={articles.total} withSeoTitle={articles.withSeoTitle} withSeoDesc={articles.withSeoDesc} url="/app/blog" color="#E07D10" icon="✍️" />
-          </Grid.Cell>
+          {[
+            { title: "Products",      total: products.total,    wt: products.withSeoTitle,    wd: products.withSeoDesc,    url: "/app/products",    color: "#008060", icon: "📦" },
+            { title: "Collections",   total: collections.total, wt: collections.withSeoTitle, wd: collections.withSeoDesc, url: "/app/collections", color: "#2C6ECB", icon: "🗂️" },
+            { title: "Pages",         total: pages.total,       wt: pages.withSeoTitle,       wd: pages.withSeoDesc,       url: "/app/pages",       color: "#8456CD", icon: "📄" },
+            { title: "Blog Articles", total: articles.total,    wt: articles.withSeoTitle,    wd: articles.withSeoDesc,    url: "/app/blog",        color: "#E07D10", icon: "✍️" },
+          ].map(({ title, total, wt, wd, url, color, icon }) => (
+            <Grid.Cell key={title} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
+              <StatTile title={title} total={total} withSeoTitle={wt} withSeoDesc={wd} url={url} color={color} icon={icon} />
+            </Grid.Cell>
+          ))}
         </Grid>
 
-        {/* Section 5 — AI Generation Stats */}
+        {/* AI Generation Stats + Recent */}
         <Layout>
           <Layout.Section variant="oneThird">
             <Card>
@@ -909,23 +838,21 @@ export default function AnalyticsPage() {
                 </BlockStack>
                 <Divider />
                 <BlockStack gap="300">
-                  <InlineStack align="space-between">
-                    <Text variant="bodySm" as="span">{rangeLabel}</Text>
-                    <Text variant="bodyMd" fontWeight="semibold" as="span">{rangeGenerations}</Text>
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text variant="bodySm" as="span">Best single day</Text>
-                    <Text variant="bodyMd" fontWeight="semibold" as="span">{bestDay}</Text>
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text variant="bodySm" as="span">Active days</Text>
-                    <Text variant="bodyMd" fontWeight="semibold" as="span">{activeDays} / {dailyActivity.length}</Text>
-                  </InlineStack>
+                  {[
+                    { label: rangeLabel,         val: rangeGenerations },
+                    { label: "Best single day",  val: bestDay },
+                    { label: "Active days",      val: `${activeDays} / ${dailyActivity.length}` },
+                  ].map(({ label, val }) => (
+                    <InlineStack key={label} align="space-between">
+                      <Text variant="bodySm" as="span">{label}</Text>
+                      <Text variant="bodyMd" fontWeight="semibold" as="span">{val}</Text>
+                    </InlineStack>
+                  ))}
                 </BlockStack>
                 <Divider />
                 <BlockStack gap="200">
                   <Button url="/app/products" size="slim" variant="secondary">Generate Products</Button>
-                  <Button url="/app/blog" size="slim" variant="secondary">Generate Blog</Button>
+                  <Button url="/app/blog"     size="slim" variant="secondary">Generate Blog</Button>
                 </BlockStack>
               </BlockStack>
             </Card>
@@ -938,18 +865,9 @@ export default function AnalyticsPage() {
                   <Text variant="headingMd" as="h2">Recent AI Generations</Text>
                   <div style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #E4E5E7" }}>
                     {recentLogs.map((log, i) => (
-                      <div
-                        key={log.id}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "10px 14px", background: i % 2 === 0 ? "#FAFAFA" : "white",
-                          gap: 12, flexWrap: "wrap",
-                        }}
-                      >
+                      <div key={log.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: i % 2 === 0 ? "#FAFAFA" : "white", gap: 12, flexWrap: "wrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                          <Text variant="bodyMd" fontWeight="semibold" as="span">
-                            {log.productTitle || "Untitled"}
-                          </Text>
+                          <Text variant="bodyMd" fontWeight="semibold" as="span">{log.productTitle || "Untitled"}</Text>
                           <Badge>{INTENT_LABEL[log.intent] || log.intent}</Badge>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -973,6 +891,4 @@ export default function AnalyticsPage() {
   );
 }
 
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};
+export const headers = (headersArgs) => boundary.headers(headersArgs);
