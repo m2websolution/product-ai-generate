@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useLoaderData, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -264,6 +264,8 @@ const arrowBtn = {
 function DateRangePicker({ rangeParam, startDate, endDate }) {
   const [, setSearchParams] = useSearchParams();
   const [show, setShow] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef(null);
 
   const [calYear,  setCalYear]  = useState(() => new Date(startDate + "T12:00:00").getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date(startDate + "T12:00:00").getMonth());
@@ -317,12 +319,21 @@ function DateRangePicker({ rangeParam, startDate, endDate }) {
 
   const label = RANGE_OPTIONS.find(o => o.value === rangeParam)?.label || `Last ${rangeParam} days`;
 
+  const openToggle = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    }
+    setShow(v => !v);
+  };
+
   return (
-    <div style={{ position: "relative", display: "inline-block" }}>
+    <div style={{ display: "inline-block" }}>
       {/* Trigger */}
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setShow(v => !v)}
+        onClick={openToggle}
         style={{
           display: "inline-flex", alignItems: "center", gap: 8,
           padding: "7px 14px", border: "1px solid #C9CCCF", borderRadius: 8,
@@ -341,12 +352,13 @@ function DateRangePicker({ rangeParam, startDate, endDate }) {
           {/* Click-away */}
           <div style={{ position: "fixed", inset: 0, zIndex: 998 }} onClick={() => setShow(false)} />
 
-          {/* Dropdown panel */}
+          {/* Dropdown panel — position: fixed so it escapes all overflow clipping */}
           <div
             style={{
-              position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 999,
+              position: "fixed", top: dropPos.top, right: dropPos.right, zIndex: 9999,
               background: "white", border: "1px solid #C9CCCF", borderRadius: 12,
               boxShadow: "0 12px 40px rgba(0,0,0,0.15)", padding: 16, minWidth: 540,
+              maxHeight: "calc(100vh - 80px)", overflowY: "auto",
             }}
             onMouseLeave={() => setHoverDate(null)}
           >
