@@ -25,7 +25,6 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://product-ai-generate.vercel.app/api/auth",
   "https://product-ai-generate.vercel.app/auth/callback",
   "https://product-ai-generate.vercel.app/shopify/callback",
   "https://product-ai-generate.vercel.app/api/auth/callback"

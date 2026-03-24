@@ -1,5 +1,15 @@
 {
   "buildCommand": "npm run vercel-build",
+  "outputDirectory": "build/client",
   "installCommand": "npm install",
-  "framework": null
+  "framework": null,
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/server"
+    }
+  ]
 }
