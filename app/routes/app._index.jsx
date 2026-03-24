@@ -21,7 +21,6 @@ import {
 } from "@shopify/polaris";
 
 const AI_PROVIDER_OPTIONS = [
-  { label: "Auto (use first available key)", value: "auto" },
   { label: "ChatGPT / OpenAI", value: "openai" },
   { label: "Claude AI / Anthropic", value: "anthropic" },
 ];
@@ -123,15 +122,22 @@ export default function Index() {
                     title: "Page Content",
                     description: "Generate and optimize storefront page content for About, FAQ, and more.",
                     url: "/app/pages",
+                    action: "Generate",
                   },
-                ].map(({ title, description, url }) => (
+                  {
+                    title: "SEO Analytics",
+                    description: "Track SEO health scores, coverage charts, and AI generation activity across your store.",
+                    url: "/app/analytics",
+                    action: "View",
+                  },
+                ].map(({ title, description, url, action }) => (
                   <Grid.Cell key={title} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
                     <Card>
                       <BlockStack gap="400">
                         <Text variant="headingSm" as="h3">{title}</Text>
                         <Text variant="bodyMd" tone="subdued">{description}</Text>
                         <InlineStack align="start">
-                          <Button url={url} variant="secondary" size="slim">Generate</Button>
+                          <Button url={url} variant="secondary" size="slim">{action || "Generate"}</Button>
                         </InlineStack>
                       </BlockStack>
                     </Card>
