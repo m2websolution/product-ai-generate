@@ -192,87 +192,92 @@ export default function Index() {
 
                     <Divider />
 
-                    {/* OpenAI / ChatGPT */}
-                    <BlockStack gap="300">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text variant="headingSm" as="h3">ChatGPT / OpenAI</Text>
-                          {hasOpenaiKey && <Badge tone="success">Configured</Badge>}
-                        </InlineStack>
-                        {hasOpenaiKey && (
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="clear_openai_key" />
-                            <Button variant="plain" tone="critical" submit size="slim">
-                              Remove key
-                            </Button>
-                          </Form>
-                        )}
-                      </InlineStack>
-                      <Text variant="bodySm" tone="subdued">
-                        Used for GPT-4o-mini. Get your key from{" "}
-                        <a
-                          href="https://platform.openai.com/api-keys"
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "var(--p-color-text-emphasis)" }}
-                        >
-                          platform.openai.com
-                        </a>
-                      </Text>
-                      <TextField
-                        label="OpenAI API Key"
-                        labelHidden
-                        type="password"
-                        name="openaiApiKey"
-                        value={openaiKey}
-                        onChange={setOpenaiKey}
-                        placeholder={hasOpenaiKey ? "••••••••••••  (saved)" : "sk-proj-..."}
-                        autoComplete="off"
-                        prefix="sk-"
-                      />
-                    </BlockStack>
+                    {/* OpenAI / ChatGPT — visible when Auto or OpenAI selected */}
+                    {(selectedProvider === "auto" || selectedProvider === "openai") && (
+                      <>
+                        <BlockStack gap="300">
+                          <InlineStack align="space-between" blockAlign="center">
+                            <InlineStack gap="200" blockAlign="center">
+                              <Text variant="headingSm" as="h3">ChatGPT / OpenAI</Text>
+                              {hasOpenaiKey && <Badge tone="success">Configured</Badge>}
+                            </InlineStack>
+                            {hasOpenaiKey && (
+                              <Form method="post">
+                                <input type="hidden" name="intent" value="clear_openai_key" />
+                                <Button variant="plain" tone="critical" submit size="slim">
+                                  Remove key
+                                </Button>
+                              </Form>
+                            )}
+                          </InlineStack>
+                          <Text variant="bodySm" tone="subdued">
+                            Used for GPT-4o-mini. Get your key from{" "}
+                            <a
+                              href="https://platform.openai.com/api-keys"
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: "var(--p-color-text-emphasis)" }}
+                            >
+                              platform.openai.com
+                            </a>
+                          </Text>
+                          <TextField
+                            label="OpenAI API Key"
+                            labelHidden
+                            type="password"
+                            name="openaiApiKey"
+                            value={openaiKey}
+                            onChange={setOpenaiKey}
+                            placeholder={hasOpenaiKey ? "••••••••••••  (saved)" : "sk-proj-..."}
+                            autoComplete="off"
+                            prefix="sk-"
+                          />
+                        </BlockStack>
+                        {selectedProvider === "auto" && <Divider />}
+                      </>
+                    )}
 
-                    <Divider />
-
-                    {/* Anthropic / Claude */}
-                    <BlockStack gap="300">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text variant="headingSm" as="h3">Claude AI / Anthropic</Text>
-                          {hasAnthropicKey && <Badge tone="success">Configured</Badge>}
+                    {/* Anthropic / Claude — visible when Auto or Anthropic selected */}
+                    {(selectedProvider === "auto" || selectedProvider === "anthropic") && (
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text variant="headingSm" as="h3">Claude AI / Anthropic</Text>
+                            {hasAnthropicKey && <Badge tone="success">Configured</Badge>}
+                          </InlineStack>
+                          {hasAnthropicKey && (
+                            <Form method="post">
+                              <input type="hidden" name="intent" value="clear_anthropic_key" />
+                              <Button variant="plain" tone="critical" submit size="slim">
+                                Remove key
+                              </Button>
+                            </Form>
+                          )}
                         </InlineStack>
-                        {hasAnthropicKey && (
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="clear_anthropic_key" />
-                            <Button variant="plain" tone="critical" submit size="slim">
-                              Remove key
-                            </Button>
-                          </Form>
-                        )}
-                      </InlineStack>
-                      <Text variant="bodySm" tone="subdued">
-                        Used for Claude Haiku and newer models. Get your key from{" "}
-                        <a
-                          href="https://console.anthropic.com/settings/keys"
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "var(--p-color-text-emphasis)" }}
-                        >
-                          console.anthropic.com
-                        </a>
-                      </Text>
-                      <TextField
-                        label="Anthropic API Key"
-                        labelHidden
-                        type="password"
-                        name="anthropicApiKey"
-                        value={anthropicKey}
-                        onChange={setAnthropicKey}
-                        placeholder={hasAnthropicKey ? "••••••••••••  (saved)" : "sk-ant-..."}
-                        autoComplete="off"
-                        prefix="sk-ant-"
-                      />
-                    </BlockStack>
+                        <Text variant="bodySm" tone="subdued">
+                          Used for Claude Haiku and newer models. Get your key from{" "}
+                          <a
+                            href="https://console.anthropic.com/settings/keys"
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "var(--p-color-text-emphasis)" }}
+                          >
+                            console.anthropic.com
+                          </a>
+                        </Text>
+                        <TextField
+                          label="Anthropic API Key"
+                          labelHidden
+                          type="password"
+                          name="anthropicApiKey"
+                          value={anthropicKey}
+                          onChange={setAnthropicKey}
+                          placeholder={hasAnthropicKey ? "••••••••••••  (saved)" : "sk-ant-..."}
+                          autoComplete="off"
+                          prefix="sk-ant-"
+                        />
+                      </BlockStack>
+                    )}
 
                     <InlineStack align="end">
                       <Button
