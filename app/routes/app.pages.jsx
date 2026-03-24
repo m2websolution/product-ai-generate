@@ -35,9 +35,13 @@ const PAGES_QUERY = `#graphql
           handle
           bodySummary
           body
-          seo {
-            title
-            description
+          metafields(first: 2, namespace: "global") {
+            edges {
+              node {
+                key
+                value
+              }
+            }
           }
         }
         cursor
@@ -57,7 +61,6 @@ const PAGE_UPDATE_MUTATION = `#graphql
         id
         title
         body
-        seo { title description }
       }
       userErrors { field message }
     }
@@ -159,7 +162,17 @@ export const loader = async ({ request }) => {
     variables: { first: 50 },
   });
   const json = await response.json();
-  const pages = (json.data?.pages?.edges || []).map((e) => e.node);
+  const pages = (json.data?.pages?.edges || []).map((e) => {
+    const node = e.node;
+    const mfs = (node.metafields?.edges || []).map((me) => me.node);
+    return {
+      ...node,
+      seo: {
+        title: mfs.find((m) => m.key === "title_tag")?.value || "",
+        description: mfs.find((m) => m.key === "description_tag")?.value || "",
+      },
+    };
+  });
 
   // Fetch shop API keys
   const shopData = await db.shop.findUnique({
@@ -231,7 +244,10 @@ export const action = async ({ request }) => {
           id: pageId,
           page: {
             body,
-            seo: { title: seoTitle, description: seoDescription },
+            metafields: [
+              { namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" },
+              { namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" },
+            ],
           },
         },
       });
