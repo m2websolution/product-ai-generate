@@ -10,7 +10,6 @@ import {
 import {
   FolderIcon, TargetIcon, AutomationIcon, CalendarIcon,
   ProductIcon, CollectionIcon, PageIcon, BlogIcon,
-  ChartLineIcon,
 } from "@shopify/polaris-icons";
 
 // ─── GraphQL ──────────────────────────────────────────────────────────────────
@@ -773,21 +772,8 @@ export default function AnalyticsPage() {
               ))}
             </InlineStack>
 
-            {/* Chart area */}
-            {rangeGenerations === 0 ? (
-              <Box paddingBlockStart="600" paddingBlockEnd="600">
-                <InlineStack align="center">
-                  <BlockStack gap="200">
-                    <InlineStack align="center">
-                      <Icon source={ChartLineIcon} tone="subdued" />
-                    </InlineStack>
-                    <Text variant="bodyMd" tone="subdued">No generation activity in this date range.</Text>
-                  </BlockStack>
-                </InlineStack>
-              </Box>
-            ) : (
-              <AreaLineChart data={dailyActivity} selectedDate={selectedDate} onDayClick={handleDayClick} />
-            )}
+            {/* Chart — always shown with dates, flat line when no activity */}
+            <AreaLineChart data={dailyActivity} selectedDate={selectedDate} onDayClick={handleDayClick} />
 
             {/* Day detail */}
             {selectedDate && <DayDetailPanel date={selectedDate} recentLogs={recentLogs} />}
