@@ -445,30 +445,29 @@ function DateRangePicker({ rangeParam, startDate, endDate, containerRef }) {
 
 // ─── Area / Line Chart ────────────────────────────────────────────────────────
 
-const CH = { vw: 800, vh: 220, pL: 44, pR: 20, pT: 20, pB: 50 };
+const CH = { vw: 800, vh: 240, pL: 44, pR: 20, pT: 20, pB: 44 };
+const Y_TICKS = 5; // always 5 horizontal grid lines like reference
 
 function AreaLineChart({ data, selectedDate, onDayClick }) {
   const n = data.length;
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const svgRef = useRef(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0, flipLeft: false });
 
   if (!n) return null;
 
-  const maxY   = Math.max(...data.map(d => d.count), 1);
-  const plotW  = CH.vw - CH.pL - CH.pR;
-  const plotH  = CH.vh - CH.pT - CH.pB;
-  const baseY  = CH.pT + plotH;
+  const maxY  = Math.max(...data.map(d => d.count), 1);
+  const plotW = CH.vw - CH.pL - CH.pR;
+  const plotH = CH.vh - CH.pT - CH.pB;
+  const baseY = CH.pT + plotH;
 
   const px = i => CH.pL + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
   const py = v => CH.pT + plotH - (maxY > 0 ? (v / maxY) * plotH : 0);
 
-  // Y-axis ticks — deduplicated integers
-  const rawStep = Math.max(1, Math.ceil(maxY / 4));
-  const yTickSet = new Set();
-  for (let v = 0; v <= maxY; v += rawStep) yTickSet.add(v);
-  yTickSet.add(maxY);
-  const yTicks = [...yTickSet].sort((a, b) => a - b);
+  // 5 evenly-spaced grid lines (matches reference design)
+  const yTicks = Array.from({ length: Y_TICKS }, (_, k) =>
+    Math.round((k / (Y_TICKS - 1)) * maxY)
+  );
 
   // X-axis — show up to 8 labels
   const xStep = Math.max(1, Math.ceil(n / 8));
@@ -481,19 +480,15 @@ function AreaLineChart({ data, selectedDate, onDayClick }) {
     `${px(n - 1).toFixed(1)},${baseY}`,
   ].join(" ");
 
-  const handleMouseEnter = (i, e) => {
+  const handleMouseEnter = (i) => {
     setHoveredIdx(i);
     if (svgRef.current) {
-      const svgRect = svgRef.current.getBoundingClientRect();
-      const svgWidth = svgRect.width;
-      const svgHeight = svgRect.height;
-      const scaleX = svgWidth / CH.vw;
-      const scaleY = svgHeight / CH.vh;
-      const dotX = px(i) * scaleX;
-      const dotY = py(data[i].count) * scaleY;
-      // flip tooltip to left if near right edge
-      const flipLeft = dotX > svgWidth * 0.65;
-      setTooltipPos({ x: dotX, y: dotY, flipLeft });
+      const rect  = svgRef.current.getBoundingClientRect();
+      const scaleX = rect.width  / CH.vw;
+      const scaleY = rect.height / CH.vh;
+      const dotX   = px(i) * scaleX;
+      const dotY   = py(data[i].count) * scaleY;
+      setTooltipPos({ x: dotX, y: dotY, flipLeft: dotX > rect.width * 0.62 });
     }
   };
 
@@ -501,135 +496,171 @@ function AreaLineChart({ data, selectedDate, onDayClick }) {
 
   return (
     <div style={{ position: "relative" }}>
-      <div style={{ overflowX: "auto" }}>
+      {/* Chart wrapper — light background like reference */}
+      <div
+        style={{
+          background: "#F9FAFB",
+          border: "1px solid #E4E5E7",
+          borderRadius: 10,
+          padding: "0 0 0 0",
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
         <svg
           ref={svgRef}
           viewBox={`0 0 ${CH.vw} ${CH.vh}`}
           style={{ width: "100%", height: "auto", display: "block" }}
           onMouseLeave={() => setHoveredIdx(null)}
         >
-          {/* Y-axis grid + labels */}
-          {yTicks.map(v => {
+          {/* Y-axis grid lines + labels */}
+          {yTicks.map((v, ki) => {
             const y = py(v);
             return (
-              <g key={v}>
-                <line x1={CH.pL} y1={y} x2={CH.vw - CH.pR} y2={y} stroke="#E9EBEC" strokeWidth="1" />
-                <text x={CH.pL - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#8C9196">{v}</text>
+              <g key={ki}>
+                <line x1={CH.pL} y1={y} x2={CH.vw - CH.pR} y2={y}
+                  stroke={ki === 0 ? "#D1D5DB" : "#E9EBEC"} strokeWidth="1" />
+                <text x={CH.pL - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#9CA3AF">
+                  {v}
+                </text>
               </g>
             );
           })}
 
-          {/* Area fill (series 1) */}
+          {/* Area fill (series 1 — blue) */}
           <polygon points={area} fill={S1_FILL} />
 
           {/* Line series 1 — blue */}
-          <polyline points={pts1} fill="none" stroke={S1_COLOR} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+          <polyline points={pts1} fill="none" stroke={S1_COLOR} strokeWidth="2.5"
+            strokeLinejoin="round" strokeLinecap="round" />
 
-          {/* Line series 2 — purple */}
-          <polyline points={pts2} fill="none" stroke={S2_COLOR} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {/* Line series 2 — purple (flat at 0 when no applied data) */}
+          <polyline points={pts2} fill="none" stroke={S2_COLOR} strokeWidth="2"
+            strokeLinejoin="round" strokeLinecap="round" />
 
-          {/* Interactive day overlays + dots */}
+          {/* Interactive hit areas + dots (dots only on hover/select) */}
           {data.map((d, i) => {
-            const x  = px(i);
-            const y1 = py(d.count);
-            const y2 = py(d.applied);
-            const isSel  = d.date === selectedDate;
-            const isHov  = i === hoveredIdx;
+            const x     = px(i);
+            const y1    = py(d.count);
+            const y2    = py(d.applied);
+            const isSel = d.date === selectedDate;
+            const isHov = i === hoveredIdx;
+            const active = isSel || isHov;
             return (
               <g
                 key={d.date}
                 style={{ cursor: "pointer" }}
                 onClick={() => onDayClick(d.date)}
-                onMouseEnter={e => handleMouseEnter(i, e)}
+                onMouseEnter={() => handleMouseEnter(i)}
               >
-                {/* Vertical dashed line on hover or select */}
-                {(isSel || isHov) && (
-                  <line x1={x} y1={CH.pT} x2={x} y2={baseY} stroke="#C9CCCF" strokeWidth="1" strokeDasharray="4 3" />
+                {/* Vertical dashed guideline */}
+                {active && (
+                  <line x1={x} y1={CH.pT} x2={x} y2={baseY}
+                    stroke="#C9CCCF" strokeWidth="1" strokeDasharray="4 3" />
                 )}
-                {/* Invisible wide hover/click area */}
+                {/* Wide invisible hover/click target */}
                 <rect x={x - 22} y={CH.pT} width={44} height={plotH} fill="transparent" />
-                {/* Series 1 dot */}
-                <circle cx={x} cy={y1} r={(isSel || isHov) ? 5.5 : 4} fill={S1_COLOR} stroke="white" strokeWidth="2" />
-                {/* Series 2 dot */}
-                <circle cx={x} cy={y2} r={(isSel || isHov) ? 4.5 : (d.applied > 0 ? 3 : 0)} fill={S2_COLOR} stroke="white" strokeWidth={d.applied > 0 ? 2 : 0} />
+                {/* Series 1 dot — always visible, larger on active */}
+                <circle cx={x} cy={y1} r={active ? 6 : 4}
+                  fill={S1_COLOR} stroke="white" strokeWidth="2" />
+                {/* Series 2 dot — visible on hover or when applied > 0 */}
+                {(active || d.applied > 0) && (
+                  <circle cx={x} cy={y2} r={active ? 5 : 3.5}
+                    fill={S2_COLOR} stroke="white" strokeWidth="2" />
+                )}
               </g>
             );
           })}
 
-          {/* Baseline */}
-          <line x1={CH.pL} y1={baseY} x2={CH.vw - CH.pR} y2={baseY} stroke="#E4E5E7" strokeWidth="1" />
+          {/* X-axis baseline */}
+          <line x1={CH.pL} y1={baseY} x2={CH.vw - CH.pR} y2={baseY}
+            stroke="#D1D5DB" strokeWidth="1" />
 
-          {/* X-axis labels */}
+          {/* X-axis date labels */}
           {data.map((d, i) => {
             if (i % xStep !== 0 && i !== n - 1) return null;
             return (
-              <text key={d.date} x={px(i)} y={baseY + 18} textAnchor="middle" fontSize="10.5" fill="#8C9196">
+              <text key={d.date} x={px(i)} y={baseY + 16}
+                textAnchor="middle" fontSize="10.5" fill="#9CA3AF">
                 {d.label}
               </text>
             );
           })}
         </svg>
 
-        {/* Hover Tooltip */}
+        {/* Hover tooltip — styled exactly like reference */}
         {hoveredDay && (
           <div
             style={{
               position: "absolute",
-              top: Math.max(0, tooltipPos.y - 10),
+              top: Math.max(4, tooltipPos.y - 8),
               ...(tooltipPos.flipLeft
-                ? { right: `calc(100% - ${tooltipPos.x}px + 14px)` }
-                : { left: tooltipPos.x + 14 }),
+                ? { right: `calc(100% - ${tooltipPos.x}px + 16px)` }
+                : { left: tooltipPos.x + 16 }),
               pointerEvents: "none",
               zIndex: 20,
               background: "white",
               border: "1px solid #E4E5E7",
-              borderRadius: 10,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+              borderRadius: 8,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
               padding: "12px 16px",
-              minWidth: 200,
+              minWidth: 220,
             }}
           >
-            {/* Date */}
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#202223", marginBottom: 8 }}>
+            {/* Date header */}
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#202223", marginBottom: 4 }}>
               {new Date(hoveredDay.date + "T12:00:00").toLocaleDateString("en-GB", {
                 day: "2-digit", month: "2-digit", year: "numeric",
               })}
             </div>
+            {/* Divider */}
+            <div style={{ height: 1, background: "#F1F1F1", margin: "8px 0" }} />
             {/* Series rows */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <div style={{ width: 18, height: 2.5, background: S1_COLOR, borderRadius: 2, flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 20, height: 2.5, background: S1_COLOR, borderRadius: 2, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: "#6D7175" }}>AI Generations</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#202223" }}>{hoveredDay.count}</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <div style={{ width: 18, height: 2.5, background: S2_COLOR, borderRadius: 2, flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 20, height: 2.5, background: S2_COLOR, borderRadius: 2, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: "#6D7175" }}>Applied to Product</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#202223" }}>{hoveredDay.applied}</span>
               </div>
             </div>
             {/* Click hint */}
-            <div style={{ fontSize: 11, color: "#8C9196", borderTop: "1px solid #F1F1F1", paddingTop: 7 }}>
-              Click to see day details
+            <div style={{ fontSize: 11, color: "#B5B9BD", marginTop: 10 }}>
+              Click to see day details ↓
             </div>
           </div>
         )}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 20, marginTop: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 26, height: 2, background: S1_COLOR, borderRadius: 2 }} />
-          <span style={{ fontSize: 12, color: "#6D7175" }}>AI Generations</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 26, height: 2, background: S2_COLOR, borderRadius: 2 }} />
-          <span style={{ fontSize: 12, color: "#6D7175" }}>Applied to Product</span>
-        </div>
+      {/* Legend — bottom-right, bordered pill style matching reference */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+        {[
+          { color: S1_COLOR, label: "AI Generations" },
+          { color: S2_COLOR, label: "Applied to Product" },
+        ].map(({ color, label }) => (
+          <div
+            key={label}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "5px 12px",
+              border: "1px solid #E4E5E7",
+              borderRadius: 20,
+              background: "white",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+            }}
+          >
+            <div style={{ width: 20, height: 2.5, background: color, borderRadius: 2, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: "#6D7175", whiteSpace: "nowrap" }}>{label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
