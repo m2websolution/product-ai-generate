@@ -49,6 +49,8 @@ model shop {
   currency                String?   @db.VarChar(10)
   phone                   String?   @db.VarChar(50)
   primaryDomain           String?   @db.VarChar(255)
+  openaiApiKey            String?   @db.VarChar(255)
+  anthropicApiKey         String?   @db.VarChar(255)
 }
 
 model GeneratedContentLog {
