@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLoaderData, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -255,13 +256,25 @@ function CalendarMonth({ year, month, rangeStart, rangeEnd, hoverEnd, onDayClick
 function DateRangePicker({ rangeParam, startDate, endDate }) {
   const [, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef(null);
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
+  const btnRef  = useRef(null);
+  const dropRef = useRef(null);
 
-  // Close on outside click — no fixed overlay needed
+  // Recalculate position whenever dropdown opens
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setDropPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+  }, [open]);
+
+  // Close on outside click — no fixed backdrop overlay needed
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (
+        btnRef.current  && !btnRef.current.contains(e.target) &&
+        dropRef.current && !dropRef.current.contains(e.target)
+      ) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -319,10 +332,89 @@ function DateRangePicker({ rangeParam, startDate, endDate }) {
 
   const label = RANGE_OPTIONS.find(o => o.value === rangeParam)?.label || `Last ${rangeParam} days`;
 
+  const dropdown = open ? (
+    <div
+      ref={dropRef}
+      style={{
+        position: "fixed",
+        top: dropPos.top,
+        right: dropPos.right,
+        zIndex: 9999,
+        background: "white",
+        border: "1px solid #C9CCCF",
+        borderRadius: 12,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
+        padding: 16,
+        minWidth: 580,
+      }}
+      onMouseLeave={() => setHoverDate(null)}
+    >
+      {/* Preset select */}
+      <select
+        value={preset}
+        onChange={handlePreset}
+        style={{
+          width: "100%", padding: "9px 12px", marginBottom: 10,
+          border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 14,
+          color: "#202223", background: "white",
+        }}
+      >
+        {RANGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+
+      {/* Date inputs */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+        <input
+          type="date" value={pickerStart}
+          onChange={e => { setPickerStart(e.target.value); setPreset("custom"); }}
+          style={{ flex: 1, padding: "8px 10px", border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 13, color: "#202223", background: "white" }}
+        />
+        <span style={{ color: "#6D7175", fontSize: 18, flexShrink: 0 }}>→</span>
+        <input
+          type="date" value={pickerEnd || ""}
+          onChange={e => { setPickerEnd(e.target.value); setPreset("custom"); }}
+          style={{ flex: 1, padding: "8px 10px", border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 13, color: "#202223", background: "white" }}
+        />
+      </div>
+
+      {/* Two-month calendars */}
+      <div style={{ display: "flex", borderTop: "1px solid #E4E5E7", paddingTop: 14 }}>
+        <CalendarMonth
+          year={calYear} month={calMonth}
+          rangeStart={pickerStart} rangeEnd={pickerEnd}
+          hoverEnd={selecting ? hoverDate : null}
+          onDayClick={handleDayClick} onDayHover={setHoverDate}
+          showLeft onLeft={goPrev} showRight={false}
+        />
+        <div style={{ width: 1, background: "#E4E5E7", margin: "0 16px", flexShrink: 0 }} />
+        <CalendarMonth
+          year={rightYear} month={rightMonth}
+          rangeStart={pickerStart} rangeEnd={pickerEnd}
+          hoverEnd={selecting ? hoverDate : null}
+          onDayClick={handleDayClick} onDayHover={setHoverDate}
+          showLeft={false} showRight onRight={goNext}
+        />
+      </div>
+
+      {/* Cancel / Apply */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14, borderTop: "1px solid #E4E5E7", paddingTop: 12 }}>
+        <button
+          type="button" onClick={() => setOpen(false)}
+          style={{ padding: "7px 20px", border: "1px solid #C9CCCF", borderRadius: 8, background: "white", fontSize: 14, cursor: "pointer", color: "#202223", fontWeight: 500 }}
+        >Cancel</button>
+        <button
+          type="button" onClick={handleApply} disabled={!pickerStart}
+          style={{ padding: "7px 20px", border: "none", borderRadius: 8, background: "#1A1A1A", color: "white", fontSize: 14, cursor: "pointer", fontWeight: 700, opacity: !pickerStart ? 0.5 : 1 }}
+        >Apply</button>
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
-      {/* Trigger */}
+    <>
+      {/* Trigger button */}
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(v => !v)}
         style={{
@@ -338,82 +430,11 @@ function DateRangePicker({ rangeParam, startDate, endDate }) {
         </svg>
       </button>
 
-      {/* Dropdown — position: absolute, no fixed overlay */}
-      {open && (
-        <div
-          style={{
-            position: "absolute", top: "calc(100% + 6px)", right: 0,
-            zIndex: 400,
-            background: "white",
-            border: "1px solid #C9CCCF",
-            borderRadius: 12,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
-            padding: 16,
-            minWidth: 580,
-          }}
-          onMouseLeave={() => setHoverDate(null)}
-        >
-          {/* Preset select */}
-          <select
-            value={preset}
-            onChange={handlePreset}
-            style={{
-              width: "100%", padding: "9px 12px", marginBottom: 10,
-              border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 14,
-              color: "#202223", background: "white",
-            }}
-          >
-            {RANGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-
-          {/* Date inputs */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-            <input
-              type="date" value={pickerStart}
-              onChange={e => { setPickerStart(e.target.value); setPreset("custom"); }}
-              style={{ flex: 1, padding: "8px 10px", border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 13, color: "#202223", background: "white" }}
-            />
-            <span style={{ color: "#6D7175", fontSize: 18, flexShrink: 0 }}>→</span>
-            <input
-              type="date" value={pickerEnd || ""}
-              onChange={e => { setPickerEnd(e.target.value); setPreset("custom"); }}
-              style={{ flex: 1, padding: "8px 10px", border: "1px solid #C9CCCF", borderRadius: 8, fontSize: 13, color: "#202223", background: "white" }}
-            />
-          </div>
-
-          {/* Two-month calendars */}
-          <div style={{ display: "flex", borderTop: "1px solid #E4E5E7", paddingTop: 14 }}>
-            <CalendarMonth
-              year={calYear} month={calMonth}
-              rangeStart={pickerStart} rangeEnd={pickerEnd}
-              hoverEnd={selecting ? hoverDate : null}
-              onDayClick={handleDayClick} onDayHover={setHoverDate}
-              showLeft onLeft={goPrev} showRight={false}
-            />
-            <div style={{ width: 1, background: "#E4E5E7", margin: "0 16px", flexShrink: 0 }} />
-            <CalendarMonth
-              year={rightYear} month={rightMonth}
-              rangeStart={pickerStart} rangeEnd={pickerEnd}
-              hoverEnd={selecting ? hoverDate : null}
-              onDayClick={handleDayClick} onDayHover={setHoverDate}
-              showLeft={false} showRight onRight={goNext}
-            />
-          </div>
-
-          {/* Cancel / Apply */}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14, borderTop: "1px solid #E4E5E7", paddingTop: 12 }}>
-            <button
-              type="button" onClick={() => setOpen(false)}
-              style={{ padding: "7px 20px", border: "1px solid #C9CCCF", borderRadius: 8, background: "white", fontSize: 14, cursor: "pointer", color: "#202223", fontWeight: 500 }}
-            >Cancel</button>
-            <button
-              type="button" onClick={handleApply} disabled={!pickerStart}
-              style={{ padding: "7px 20px", border: "none", borderRadius: 8, background: "#1A1A1A", color: "white", fontSize: 14, cursor: "pointer", fontWeight: 700, opacity: !pickerStart ? 0.5 : 1 }}
-            >Apply</button>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Portal — renders into document.body, escapes Card overflow:hidden */}
+      {typeof document !== "undefined" && dropdown
+        ? createPortal(dropdown, document.body)
+        : null}
+    </>
   );
 }
 
@@ -713,7 +734,6 @@ export default function AnalyticsPage() {
         </Grid>
 
         {/* Generation Activity Chart */}
-        <div style={{ position: "relative", zIndex: 10 }}>
         <Card>
           <BlockStack gap="400">
             {/* Header */}
@@ -765,7 +785,6 @@ export default function AnalyticsPage() {
             {selectedDate && <DayDetailPanel date={selectedDate} recentLogs={recentLogs} />}
           </BlockStack>
         </Card>
-        </div>
 
         {/* SEO Score + Coverage */}
         <Layout>
