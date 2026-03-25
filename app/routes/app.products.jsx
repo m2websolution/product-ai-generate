@@ -1390,22 +1390,45 @@ export default function ProductsPage() {
   ));
 
   return (
-    <Page
-      title="Products"
-      primaryAction={
-        <Button disabled>Upgrade for Bulk Generation</Button>
-      }
-      secondaryActions={[
-        {
-          content: "Refresh",
-          onAction: () => navigate(makeUrl({})),
-        },
-        {
-          content: "Back",
-          url: "/app",
-        },
-      ]}
-    >
+    <Page>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a0533 0%, #2d1b69 50%, #0f3460 100%)",
+        borderRadius: "16px",
+        padding: "28px 32px",
+        marginBottom: "24px",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "220px", height: "220px", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-40px", left: "25%", width: "160px", height: "160px", borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1, flexWrap: "wrap", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ width: "54px", height: "54px", borderRadius: "14px", background: "rgba(139,92,246,0.25)", border: "1px solid rgba(139,92,246,0.45)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0 }}>
+              📦
+            </div>
+            <div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#ffffff", marginBottom: "3px", letterSpacing: "-0.3px" }}>Products</div>
+              <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Generate AI-powered SEO content for your product listings</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => navigate(makeUrl({}))}
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600, transition: "background 0.2s" }}
+            >↺ Refresh</button>
+            <a
+              href="/app"
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block" }}
+            >← Back</a>
+            <button
+              disabled
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #8b5cf6, #6366f1)", color: "#fff", cursor: "not-allowed", fontSize: "13px", fontWeight: 600, opacity: 0.75 }}
+            >⚡ Upgrade Plan</button>
+          </div>
+        </div>
+      </div>
+
       <Layout>
         <Layout.Section>
           <Card>

@@ -337,7 +337,7 @@ export default function Index() {
 
   const [openaiKey, setOpenaiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState(defaultAiProvider);
+  const [selectedProvider, setSelectedProvider] = useState(defaultAiProvider || "openai");
 
   return (
     <Page>

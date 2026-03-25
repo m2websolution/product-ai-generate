@@ -596,16 +596,43 @@ export default function BlogPage() {
   ));
 
   return (
-    <Page
-      title="Blog Posts"
-      subtitle="Generate and manage AI content for your Shopify blog articles"
-      backAction={{ content: "Dashboard", url: "/app" }}
-      primaryAction={
-        blogs.length > 0
-          ? { content: "New Article", onAction: openCreateModal }
-          : undefined
-      }
-    >
+    <Page>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a001a 0%, #4a0e4e 50%, #1e0a3c 100%)",
+        borderRadius: "16px",
+        padding: "28px 32px",
+        marginBottom: "24px",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "220px", height: "220px", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-40px", left: "25%", width: "160px", height: "160px", borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.2) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1, flexWrap: "wrap", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ width: "54px", height: "54px", borderRadius: "14px", background: "rgba(236,72,153,0.2)", border: "1px solid rgba(236,72,153,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0 }}>
+              ✍️
+            </div>
+            <div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#ffffff", marginBottom: "3px", letterSpacing: "-0.3px" }}>Blog Posts</div>
+              <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Generate and manage AI content for your Shopify blog articles</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <a
+              href="/app"
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block" }}
+            >← Dashboard</a>
+            {blogs.length > 0 && (
+              <button
+                onClick={openCreateModal}
+                style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #ec4899, #a855f7)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
+              >+ New Article</button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <BlockStack gap="400">
         {articles.length === 0 && (
           <Banner tone="info">

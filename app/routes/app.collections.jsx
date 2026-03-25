@@ -1494,18 +1494,49 @@ export default function CollectionsPage() {
   }));
 
   return (
-    <Page title="Collections">
+    <Page>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: "linear-gradient(135deg, #1c0a00 0%, #431407 50%, #1a2e00 100%)",
+        borderRadius: "16px",
+        padding: "28px 32px",
+        marginBottom: "24px",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "220px", height: "220px", borderRadius: "50%", background: "radial-gradient(circle, rgba(249,115,22,0.3) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-40px", left: "25%", width: "160px", height: "160px", borderRadius: "50%", background: "radial-gradient(circle, rgba(234,179,8,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1, flexWrap: "wrap", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ width: "54px", height: "54px", borderRadius: "14px", background: "rgba(249,115,22,0.2)", border: "1px solid rgba(249,115,22,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0 }}>
+              🗂️
+            </div>
+            <div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#ffffff", marginBottom: "3px", letterSpacing: "-0.3px" }}>Collections</div>
+              <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Optimize your collection pages with AI-generated descriptions</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => navigate(makeUrl({}))}
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
+            >↺ Refresh</button>
+            <a
+              href="/app"
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block" }}
+            >← Back</a>
+            <button
+              disabled
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #f97316, #eab308)", color: "#fff", cursor: "not-allowed", fontSize: "13px", fontWeight: 600, opacity: 0.75 }}
+            >⚡ Upgrade Plan</button>
+          </div>
+        </div>
+      </div>
+
       <Layout>
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <InlineStack gap="300" align="start" blockAlign="center">
-                <Button url="/app" variant="plain">
-                  &larr; Back
-                </Button>
-                <Button onClick={() => navigate(makeUrl({}))}>Refresh</Button>
-                <Button disabled>Upgrade for Bulk Generation</Button>
-              </InlineStack>
 
               <TextField
                 label="Search collections"
