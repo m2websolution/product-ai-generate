@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useNavigation } from "react-router";
+import { useLoaderData, useNavigation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -341,6 +341,7 @@ const editInitialState = {
 export default function PagesPage() {
   const { pages, defaultAiProvider } = useLoaderData();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const isSaving = navigation.state === "submitting";
 
   const [editModal, setEditModal] = useState(false);
@@ -494,10 +495,10 @@ export default function PagesPage() {
               <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Generate and manage AI content for your Shopify storefront pages</div>
             </div>
           </div>
-          <a
-            href="/app"
-            style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block" }}
-          >← Dashboard</a>
+          <button
+            onClick={() => navigate("/app")}
+            style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+          >← Dashboard</button>
         </div>
       </div>
 

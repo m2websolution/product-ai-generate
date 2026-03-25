@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useLoaderData, useSearchParams } from "react-router";
+import { useLoaderData, useSearchParams, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -807,6 +807,7 @@ export default function AnalyticsPage() {
     rangeParam, startDate, endDate, rangeLabel,
   } = useLoaderData();
 
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(null);
   const handleDayClick = useCallback(date => setSelectedDate(p => p === date ? null : date), []);
   const activityRef = useRef(null);
@@ -852,10 +853,10 @@ export default function AnalyticsPage() {
                 <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Track SEO health and AI content generation across your store</div>
               </div>
             </div>
-            <a
-              href="/app"
-              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block", flexShrink: 0 }}
-            >← Dashboard</a>
+            <button
+              onClick={() => navigate("/app")}
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+            >← Dashboard</button>
           </div>
 
           {/* Stats strip */}

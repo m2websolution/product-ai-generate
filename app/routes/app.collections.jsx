@@ -1521,10 +1521,10 @@ export default function CollectionsPage() {
               onClick={() => navigate(makeUrl({}))}
               style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
             >↺ Refresh</button>
-            <a
-              href="/app"
-              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block" }}
-            >← Back</a>
+            <button
+              onClick={() => navigate("/app")}
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            >← Back</button>
             <button
               disabled
               style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #f97316, #eab308)", color: "#fff", cursor: "not-allowed", fontSize: "13px", fontWeight: 600, opacity: 0.75 }}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useNavigation } from "react-router";
+import { useLoaderData, useNavigation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -430,6 +430,7 @@ const editInitialState = {
 export default function BlogPage() {
   const { blogs, articles, defaultAiProvider } = useLoaderData();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const isSaving = navigation.state === "submitting";
 
   const [editModal, setEditModal] = useState(false);
@@ -619,10 +620,10 @@ export default function BlogPage() {
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-            <a
-              href="/app"
-              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "inline-block" }}
-            >← Dashboard</a>
+            <button
+              onClick={() => navigate("/app")}
+              style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            >← Dashboard</button>
             {blogs.length > 0 && (
               <button
                 onClick={openCreateModal}
