@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLoaderData, useActionData, Form, useNavigation } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -285,46 +285,69 @@ function ProviderCard({ label, logo, desc, selected, onClick }) {
         flex: 1,
         padding: "18px",
         borderRadius: "6px",
-        border: selected ? "2px solid #008060" : "2px solid #e8eaed",
-        background: selected ? "rgba(0,128,96,0.04)" : "#fff",
+        border: selected ? "2.5px solid #008060" : "2px solid #e8eaed",
+        background: selected
+          ? "linear-gradient(135deg, rgba(0,128,96,0.08) 0%, rgba(0,179,116,0.04) 100%)"
+          : "#fff",
         cursor: "pointer",
         transition: "all 0.2s ease",
         position: "relative",
+        boxShadow: selected
+          ? "0 0 0 3px rgba(0,128,96,0.15), 0 4px 12px rgba(0,128,96,0.1)"
+          : "0 1px 3px rgba(0,0,0,0.04)",
       }}
     >
-      {selected && (
-        <div
-          style={{
-            position: "absolute",
-            top: "12px",
-            right: "12px",
-            width: "20px",
-            height: "20px",
-            borderRadius: "50%",
-            background: "#008060",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: "12px",
-            fontWeight: 700,
-          }}
-        >
-          ✓
-        </div>
-      )}
+      {/* Selected badge */}
+      <div
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          width: "22px",
+          height: "22px",
+          borderRadius: "50%",
+          background: selected ? "#008060" : "#e8eaed",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: selected ? "#fff" : "transparent",
+          fontSize: "13px",
+          fontWeight: 800,
+          transition: "all 0.2s ease",
+          flexShrink: 0,
+        }}
+      >
+        ✓
+      </div>
+
       <div style={{ fontSize: "28px", marginBottom: "8px" }}>{logo}</div>
       <div
         style={{
           fontSize: "14px",
           fontWeight: 700,
-          color: "#0d1117",
+          color: selected ? "#008060" : "#0d1117",
           marginBottom: "4px",
+          transition: "color 0.2s ease",
         }}
       >
         {label}
       </div>
       <div style={{ fontSize: "12px", color: "#6b7280" }}>{desc}</div>
+
+      {/* Bottom indicator bar */}
+      {selected && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: "3px",
+            background: "linear-gradient(90deg, #008060, #00b374)",
+            borderRadius: "0 0 6px 6px",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -337,10 +360,9 @@ export default function Index() {
 
   const [openaiKey, setOpenaiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState("openai");
-  useEffect(() => {
-    if (defaultAiProvider) setSelectedProvider(defaultAiProvider);
-  }, [defaultAiProvider]);
+  const [selectedProvider, setSelectedProvider] = useState(
+    () => (typeof defaultAiProvider === "string" && defaultAiProvider.trim()) ? defaultAiProvider.trim() : "openai"
+  );
 
   return (
     <Page>
