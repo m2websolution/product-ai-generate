@@ -47,7 +47,6 @@ const ARTICLES_QUERY = `#graphql
           id
           title
           body
-          excerpt
           handle
           publishedAt
           blog {
@@ -209,7 +208,7 @@ export const loader = async ({ request }) => {
     const mfs = (node.metafields?.edges || []).map((me) => me.node);
     return {
       ...node,
-      excerpt: node.excerpt || "",
+      excerpt: "",
       seo: {
         title: mfs.find((m) => m.key === "title_tag")?.value || "",
         description: mfs.find((m) => m.key === "description_tag")?.value || "",
@@ -280,7 +279,6 @@ export const action = async ({ request }) => {
     const blogId = formData.get("blogId");
     const title = formData.get("title") || "";
     const body = formData.get("body") || "";
-    const excerpt = formData.get("excerpt") || "";
     const seoTitle = formData.get("seoTitle") || "";
     const seoDescription = formData.get("seoDescription") || "";
     const isPublished = formData.get("isPublished") === "true";
@@ -293,7 +291,7 @@ export const action = async ({ request }) => {
       const response = await admin.graphql(ARTICLE_CREATE_MUTATION, {
         variables: {
           blogId,
-          article: { title, body, excerpt, isPublished, metafields },
+          article: { title, body, isPublished, metafields },
         },
       });
       const json = await response.json();
@@ -311,7 +309,6 @@ export const action = async ({ request }) => {
     const articleId = formData.get("articleId");
     const title = formData.get("title") || "";
     const body = formData.get("body") || "";
-    const excerpt = formData.get("excerpt") || "";
     const seoTitle = formData.get("seoTitle") || "";
     const seoDescription = formData.get("seoDescription") || "";
     const isPublished = formData.get("isPublished") === "true";
@@ -323,7 +320,6 @@ export const action = async ({ request }) => {
           article: {
             title,
             body,
-            excerpt,
             isPublished,
             metafields: [
               { namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" },
@@ -413,7 +409,6 @@ const editInitialState = {
   blogId: "",
   title: "",
   body: "",
-  excerpt: "",
   seoTitle: "",
   seoDescription: "",
   isPublished: "false",
@@ -477,7 +472,6 @@ export default function BlogPage() {
       blogId: article.blog?.id || "",
       title: article.title || "",
       body: article.body || "",
-      excerpt: article.excerpt || "",
       seoTitle: article.seo?.title || "",
       seoDescription: article.seo?.description || "",
       isPublished: article.publishedAt ? "true" : "false",
@@ -526,7 +520,6 @@ export default function BlogPage() {
     fd.append("blogId", editState.blogId);
     fd.append("title", editState.title);
     fd.append("body", editState.body);
-    fd.append("excerpt", editState.excerpt);
     fd.append("seoTitle", editState.seoTitle);
     fd.append("seoDescription", editState.seoDescription);
     fd.append("isPublished", editState.isPublished);
@@ -541,7 +534,6 @@ export default function BlogPage() {
         ...s,
         title: data.articleTitle || s.title,
         body: data.articleBody || s.body,
-        excerpt: data.excerpt || s.excerpt,
         seoTitle: data.seoTitle || s.seoTitle,
         seoDescription: data.seoDescription || s.seoDescription,
       }));
@@ -723,15 +715,6 @@ export default function BlogPage() {
                   multiline={10}
                   autoComplete="off"
                   helpText="HTML is supported. This is the full article content."
-                />
-
-                <TextField
-                  label="Excerpt"
-                  value={editState.excerpt}
-                  onChange={setField("excerpt")}
-                  multiline={3}
-                  autoComplete="off"
-                  helpText="Short summary shown in blog listings."
                 />
 
                 <Divider />
