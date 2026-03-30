@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { useLoaderData, useNavigation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -433,12 +434,12 @@ export default function BlogPage() {
   const navigate = useNavigate();
   const isSaving = navigation.state === "submitting";
 
+  const shopify = useAppBridge();
   const [editModal, setEditModal] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [editState, setEditState] = useState(editInitialState);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [filterBlogId, setFilterBlogId] = useState("all");
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
@@ -558,7 +559,8 @@ export default function BlogPage() {
       const res = await fetch(window.location.pathname, { method: "POST", body: fd });
       const data = await res.json();
       if (data.success) {
-        setSaveSuccess(true);
+        shopify.toast.show(isCreateMode ? "Article created successfully!" : "Article updated successfully!");
+        closeModal();
       } else {
         setGenerationError(data.error || "Save failed.");
       }
@@ -699,14 +701,6 @@ export default function BlogPage() {
               </Banner>
             </Box>
           )}
-          {saveSuccess && (
-            <Box paddingBlockEnd="400">
-              <Banner tone="success" onDismiss={() => setSaveSuccess(false)}>
-                <p>{isCreateMode ? "Article created successfully!" : "Article updated successfully!"}</p>
-              </Banner>
-            </Box>
-          )}
-
           <Grid>
             {/* Left 40% — content editor */}
             <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 8, lg: 8, xl: 8 }}>

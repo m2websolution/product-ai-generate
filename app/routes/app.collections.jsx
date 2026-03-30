@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   useFetcher,
   useLoaderData,
@@ -1216,6 +1217,7 @@ export default function CollectionsPage() {
   const revalidator = useRevalidator();
   const generateFetcher = useFetcher();
   const updateFetcher = useFetcher();
+  const shopify = useAppBridge();
   const descriptionEditorRef = useRef(null);
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackCollections, setFallbackCollections] = useState(collections);
@@ -1437,19 +1439,10 @@ export default function CollectionsPage() {
       return;
     }
 
-    setEditForm((current) => ({
-      ...current,
-      description: response.content?.description ?? current.description,
-      seoTitle: response.content?.seoTitle ?? current.seoTitle,
-      seoDescription: response.content?.seoDescription ?? current.seoDescription,
-    }));
-
-    setModalMessage({
-      tone: "success",
-      text: response.message || "Collection updated successfully.",
-    });
     revalidator.revalidate();
-  }, [editingCollection?.id, revalidator, updateFetcher.data]);
+    shopify.toast.show(response.message || "Collection updated successfully.");
+    resetEditModalState();
+  }, [editingCollection?.id, revalidator, resetEditModalState, shopify, updateFetcher.data]);
 
   const metaTitleStatus = evaluateSeoTitle(editForm.seoTitle);
   const metaDescriptionStatus = evaluateSeoDescription(editForm.seoDescription);

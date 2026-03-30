@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   useFetcher,
   useLoaderData,
@@ -1054,6 +1055,7 @@ export default function ProductsPage() {
   const revalidator = useRevalidator();
   const generateFetcher = useFetcher();
   const updateFetcher = useFetcher();
+  const shopify = useAppBridge();
   const descriptionEditorRef = useRef(null);
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackProducts, setFallbackProducts] = useState(products);
@@ -1276,19 +1278,10 @@ export default function ProductsPage() {
       return;
     }
 
-    setEditForm((current) => ({
-      ...current,
-      description: response.content?.description ?? current.description,
-      seoTitle: response.content?.seoTitle ?? current.seoTitle,
-      seoDescription: response.content?.seoDescription ?? current.seoDescription,
-    }));
-
-    setModalMessage({
-      tone: "success",
-      text: response.message || "Product updated successfully.",
-    });
     revalidator.revalidate();
-  }, [editingProduct?.id, revalidator, updateFetcher.data]);
+    shopify.toast.show(response.message || "Product updated successfully.");
+    resetEditModalState();
+  }, [editingProduct?.id, revalidator, resetEditModalState, shopify, updateFetcher.data]);
 
   const seoTitleStatus = evaluateSeoTitle(editForm.seoTitle);
   const seoDescriptionStatus = evaluateSeoDescription(editForm.seoDescription);

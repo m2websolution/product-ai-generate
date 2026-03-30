@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { useLoaderData, useNavigation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -344,11 +345,11 @@ export default function PagesPage() {
   const navigate = useNavigate();
   const isSaving = navigation.state === "submitting";
 
+  const shopify = useAppBridge();
   const [editModal, setEditModal] = useState(false);
   const [editState, setEditState] = useState(editInitialState);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(pages);
@@ -432,7 +433,8 @@ export default function PagesPage() {
       const res = await fetch(window.location.pathname, { method: "POST", body: fd });
       const data = await res.json();
       if (data.success) {
-        setSaveSuccess(true);
+        shopify.toast.show("Page updated successfully!");
+        closeEditModal();
       } else {
         setGenerationError(data.error || "Save failed.");
       }
@@ -545,14 +547,6 @@ export default function PagesPage() {
               </Banner>
             </Box>
           )}
-          {saveSuccess && (
-            <Box paddingBlockEnd="400">
-              <Banner tone="success" onDismiss={() => setSaveSuccess(false)}>
-                <p>Page updated successfully!</p>
-              </Banner>
-            </Box>
-          )}
-
           <Grid>
             {/* Left column — 40% — content editor */}
             <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 8, lg: 8, xl: 8 }}>
