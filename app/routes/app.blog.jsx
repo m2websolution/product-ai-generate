@@ -228,6 +228,18 @@ Return ONLY a JSON object with these keys (no markdown, no extra text):
   return { prompt };
 }
 
+async function upsertBlogArticleContent(data) {
+  try {
+    await db.blogArticleGeneratedContent.upsert({
+      where: { shop_articleId: { shop: data.shop, articleId: data.articleId } },
+      create: data,
+      update: data,
+    });
+  } catch (error) {
+    console.error("Failed to upsert blog article generated content", error);
+  }
+}
+
 // ─── Loader ───────────────────────────────────────────────────────────────────
 
 export const loader = async ({ request }) => {
@@ -280,6 +292,8 @@ export const action = async ({ request }) => {
   const intent = formData.get("intent");
 
   if (intent === "generate_article_content") {
+    const articleId = formData.get("articleId") || "";
+    const blogId = formData.get("blogId") || "";
     const articleType = formData.get("articleType") || "How-To Guide";
     const title = formData.get("title") || "";
     const body = formData.get("body") || "";
@@ -311,6 +325,28 @@ export const action = async ({ request }) => {
         parsed.articleBody = raw;
       }
 
+      // Only upsert in edit mode (articleId exists)
+      if (articleId) {
+        await upsertBlogArticleContent({
+          shop: session.shop,
+          articleId,
+          blogId: blogId || null,
+          articleTitle: parsed.articleTitle || title || null,
+          articleType: articleType || null,
+          language: language || null,
+          tone: tone || null,
+          lengthOption: length || null,
+          formatOption: format || null,
+          contextKeywords: contextKeywords || null,
+          aiModel: aiProvider || null,
+          bodyHtml: parsed.articleBody || null,
+          seoTitle: parsed.seoTitle || null,
+          seoDescription: parsed.seoDescription || null,
+          isPublished: false,
+          appliedToShopify: false,
+        });
+      }
+
       return { success: true, intent, ...parsed };
     } catch (err) {
       return { success: false, intent, error: err.message };
@@ -325,6 +361,12 @@ export const action = async ({ request }) => {
     const seoTitle = formData.get("seoTitle") || "";
     const seoDescription = formData.get("seoDescription") || "";
     const isPublished = formData.get("isPublished") === "true";
+    const articleType = formData.get("articleType") || "";
+    const language = formData.get("language") || "";
+    const tone = formData.get("tone") || "";
+    const length = formData.get("length") || "";
+    const format = formData.get("format") || "";
+    const contextKeywords = formData.get("contextKeywords") || "";
 
     try {
       const metafields = [];
@@ -341,6 +383,30 @@ export const action = async ({ request }) => {
       if (userErrors.length > 0) {
         return { success: false, intent, error: userErrors.map((e) => e.message).join(", ") };
       }
+
+      const newArticleId = json.data?.articleCreate?.article?.id;
+      if (newArticleId) {
+        await upsertBlogArticleContent({
+          shop: session.shop,
+          articleId: newArticleId,
+          blogId: blogId || null,
+          articleTitle: title || null,
+          articleType: articleType || null,
+          authorName: authorName || null,
+          language: language || null,
+          tone: tone || null,
+          lengthOption: length || null,
+          formatOption: format || null,
+          contextKeywords: contextKeywords || null,
+          aiModel: null,
+          bodyHtml: body || null,
+          seoTitle: seoTitle || null,
+          seoDescription: seoDescription || null,
+          isPublished,
+          appliedToShopify: true,
+        });
+      }
+
       return { success: true, intent, message: "Article created successfully!" };
     } catch (err) {
       return { success: false, intent, error: err.message };
@@ -349,11 +415,18 @@ export const action = async ({ request }) => {
 
   if (intent === "update_article") {
     const articleId = formData.get("articleId");
+    const blogId = formData.get("blogId") || "";
     const title = formData.get("title") || "";
     const body = formData.get("body") || "";
     const seoTitle = formData.get("seoTitle") || "";
     const seoDescription = formData.get("seoDescription") || "";
     const isPublished = formData.get("isPublished") === "true";
+    const articleType = formData.get("articleType") || "";
+    const language = formData.get("language") || "";
+    const tone = formData.get("tone") || "";
+    const length = formData.get("length") || "";
+    const format = formData.get("format") || "";
+    const contextKeywords = formData.get("contextKeywords") || "";
 
     try {
       const response = await admin.graphql(ARTICLE_UPDATE_MUTATION, {
@@ -375,6 +448,26 @@ export const action = async ({ request }) => {
       if (userErrors.length > 0) {
         return { success: false, intent, error: userErrors.map((e) => e.message).join(", ") };
       }
+
+      await upsertBlogArticleContent({
+        shop: session.shop,
+        articleId,
+        blogId: blogId || null,
+        articleTitle: title || null,
+        articleType: articleType || null,
+        language: language || null,
+        tone: tone || null,
+        lengthOption: length || null,
+        formatOption: format || null,
+        contextKeywords: contextKeywords || null,
+        aiModel: null,
+        bodyHtml: body || null,
+        seoTitle: seoTitle || null,
+        seoDescription: seoDescription || null,
+        isPublished,
+        appliedToShopify: true,
+      });
+
       return { success: true, intent, message: "Article updated successfully!" };
     } catch (err) {
       return { success: false, intent, error: err.message };
@@ -435,7 +528,35 @@ export const action = async ({ request }) => {
         return { success: false, intent, error: fileErrors.map((e) => e.message).join(", ") };
       }
       const created = fileJson.data?.fileCreate?.files?.[0];
-      const imageUrl = created?.image?.url || created?.url || target.resourceUrl;
+      let imageUrl = created?.image?.url || created?.url || null;
+      const createdFileId = created?.id;
+
+      // Shopify processes files asynchronously — poll up to 4× (1.2 s apart) for the final URL
+      if (!imageUrl && createdFileId) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await new Promise((r) => setTimeout(r, 1200));
+          const pollRes = await admin.graphql(`#graphql
+            query GetFiles($query: String!) {
+              files(first: 1, query: $query) {
+                edges {
+                  node {
+                    ... on MediaImage { image { url } }
+                    ... on GenericFile  { url }
+                  }
+                }
+              }
+            }
+          `, { variables: { query: `id:${createdFileId}` } });
+          const pollJson = await pollRes.json();
+          const node = pollJson.data?.files?.edges?.[0]?.node;
+          imageUrl = node?.image?.url || node?.url || null;
+          if (imageUrl) break;
+        }
+      }
+
+      if (!imageUrl) {
+        return { success: false, intent, error: "Image was uploaded but Shopify is still processing it. Please try again in a moment." };
+      }
 
       return { success: true, intent, imageUrl, filename };
     } catch (err) {
@@ -545,6 +666,7 @@ export default function BlogPage() {
   const [uploadedImages, setUploadedImages] = useState([]);
   const imageFetcher = useFetcher();
   const fileInputRef = useRef(null);
+  const pendingImageIdRef = useRef(null);
   const isUploading = imageFetcher.state !== "idle";
 
   const blogFilterOptions = [
@@ -593,6 +715,10 @@ export default function BlogPage() {
   }
 
   function closeModal() {
+    // Free memory for local preview URLs
+    uploadedImages.forEach((img) => {
+      if (img.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(img.previewUrl);
+    });
     setEditModal(false);
     setGenerationError(null);
   }
@@ -604,6 +730,14 @@ export default function BlogPage() {
   function handleImageFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Show instant local preview while uploading
+    const previewUrl = URL.createObjectURL(file);
+    const id = `img_${Date.now()}`;
+    pendingImageIdRef.current = id;
+    setUploadedImages((prev) => [
+      ...prev,
+      { id, previewUrl, realUrl: null, name: file.name, status: "uploading" },
+    ]);
     const fd = new FormData();
     fd.append("intent", "upload_blog_image");
     fd.append("file", file);
@@ -611,8 +745,9 @@ export default function BlogPage() {
     e.target.value = "";
   }
 
-  function insertImageToBody(url, alt) {
-    const imgTag = `\n<img src="${url}" alt="${alt || ""}" style="max-width:100%;height:auto;" />\n`;
+  function insertImageToBody(img) {
+    if (img.status !== "done") return;
+    const imgTag = `\n<img src="${img.realUrl}" alt="${img.name || ""}" style="max-width:100%;height:auto;" />\n`;
     setEditState((s) => ({ ...s, body: s.body + imgTag }));
   }
 
@@ -627,6 +762,8 @@ export default function BlogPage() {
     setGenerationError(null);
     const fd = new FormData();
     fd.append("intent", "generate_article_content");
+    fd.append("articleId", editState.articleId);
+    fd.append("blogId", editState.blogId);
     fd.append("articleType", editState.articleType);
     fd.append("title", editState.title);
     fd.append("body", editState.body);
@@ -650,6 +787,12 @@ export default function BlogPage() {
     fd.append("seoTitle", editState.seoTitle);
     fd.append("seoDescription", editState.seoDescription);
     fd.append("isPublished", editState.isPublished);
+    fd.append("articleType", editState.articleType);
+    fd.append("language", editState.language);
+    fd.append("tone", editState.tone);
+    fd.append("length", editState.length);
+    fd.append("format", editState.format);
+    fd.append("contextKeywords", editState.contextKeywords);
     saveFetcher.submit(fd, { method: "post" });
   }
 
@@ -685,11 +828,20 @@ export default function BlogPage() {
   useEffect(() => {
     const data = imageFetcher.data;
     if (!data || data.intent !== "upload_blog_image") return;
+    const id = pendingImageIdRef.current;
     if (data.success) {
-      setUploadedImages((prev) => [...prev, { url: data.imageUrl, name: data.filename }]);
+      setUploadedImages((prev) =>
+        prev.map((img) =>
+          img.id === id ? { ...img, realUrl: data.imageUrl, status: "done" } : img
+        )
+      );
     } else {
+      setUploadedImages((prev) =>
+        prev.map((img) => (img.id === id ? { ...img, status: "error" } : img))
+      );
       setGenerationError(data.error || "Image upload failed.");
     }
+    pendingImageIdRef.current = null;
   }, [imageFetcher.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rowMarkup = filteredArticles.map((article, index) => (
@@ -888,38 +1040,68 @@ export default function BlogPage() {
 
                   {uploadedImages.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                      {uploadedImages.map((img, i) => (
+                      {uploadedImages.map((img) => (
                         <div
-                          key={i}
+                          key={img.id}
                           style={{
                             position: "relative",
-                            border: "1px solid #ddd",
+                            border: `1px solid ${img.status === "error" ? "#d82c0d" : "#ddd"}`,
                             borderRadius: "6px",
                             overflow: "hidden",
                             width: "90px",
                           }}
                         >
+                          {/* Local preview — shown immediately */}
                           <img
-                            src={img.url}
+                            src={img.previewUrl}
                             alt={img.name}
                             style={{ width: "90px", height: "90px", objectFit: "cover", display: "block" }}
                           />
+
+                          {/* Uploading overlay */}
+                          {img.status === "uploading" && (
+                            <div style={{
+                              position: "absolute", inset: 0,
+                              background: "rgba(0,0,0,0.5)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: "#fff", fontSize: "10px", fontWeight: 600,
+                            }}>
+                              Uploading…
+                            </div>
+                          )}
+
+                          {/* Error overlay */}
+                          {img.status === "error" && (
+                            <div style={{
+                              position: "absolute", inset: 0,
+                              background: "rgba(216,44,13,0.7)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: "#fff", fontSize: "10px", fontWeight: 600, textAlign: "center",
+                              padding: "4px",
+                            }}>
+                              Failed
+                            </div>
+                          )}
+
                           <div style={{ padding: "4px", background: "#f6f6f7" }}>
                             <button
-                              onClick={() => insertImageToBody(img.url, img.name)}
+                              onClick={() => insertImageToBody(img)}
+                              disabled={img.status !== "done"}
                               style={{
                                 width: "100%",
-                                background: "linear-gradient(135deg, #ec4899, #a855f7)",
+                                background: img.status === "done"
+                                  ? "linear-gradient(135deg, #ec4899, #a855f7)"
+                                  : "#ccc",
                                 color: "#fff",
                                 border: "none",
                                 borderRadius: "4px",
-                                cursor: "pointer",
+                                cursor: img.status === "done" ? "pointer" : "not-allowed",
                                 fontSize: "11px",
                                 fontWeight: 600,
                                 padding: "3px 0",
                               }}
                             >
-                              Insert
+                              {img.status === "uploading" ? "…" : img.status === "error" ? "✗" : "Insert"}
                             </button>
                           </div>
                         </div>

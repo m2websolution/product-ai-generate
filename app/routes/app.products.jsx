@@ -752,6 +752,18 @@ async function writeGenerationLog(data) {
   }
 }
 
+async function upsertProductContent(data) {
+  try {
+    await db.productGeneratedContent.upsert({
+      where: { shop_productId: { shop: data.shop, productId: data.productId } },
+      create: data,
+      update: data,
+    });
+  } catch (error) {
+    console.error("Failed to upsert product generated content", error);
+  }
+}
+
 export const action = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
@@ -841,6 +853,22 @@ export const action = async ({ request }) => {
         appliedToProduct: false,
       });
 
+      await upsertProductContent({
+        shop: session.shop,
+        productId,
+        productTitle: title || null,
+        language: language || null,
+        tone: tone || null,
+        lengthOption: lengthOption || null,
+        formatOption: formatOption || null,
+        contextKeywords: contextKeywords || null,
+        aiModel: generated.aiModel || null,
+        descriptionHtml: nextDescription || null,
+        seoTitle: nextSeoTitle || null,
+        seoDescription: nextSeoDescription || null,
+        appliedToProduct: false,
+      });
+
       return {
         ok: true,
         intent,
@@ -906,6 +934,22 @@ export const action = async ({ request }) => {
         generatedDescription: descriptionHtml || null,
         generatedSeoTitle: seoTitle || null,
         generatedSeoDescription: seoDescription || null,
+        appliedToProduct: true,
+      });
+
+      await upsertProductContent({
+        shop: session.shop,
+        productId,
+        productTitle: title || null,
+        language: language || null,
+        tone: tone || null,
+        lengthOption: lengthOption || null,
+        formatOption: formatOption || null,
+        contextKeywords: contextKeywords || null,
+        aiModel: null,
+        descriptionHtml: updatedProduct?.descriptionHtml || descriptionHtml || null,
+        seoTitle: updatedProduct?.seo?.title || seoTitle || null,
+        seoDescription: updatedProduct?.seo?.description || seoDescription || null,
         appliedToProduct: true,
       });
 

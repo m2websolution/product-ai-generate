@@ -76,6 +76,80 @@ model GeneratedContentLog {
   @@map("generated_content_logs")
 }
 
+model ProductGeneratedContent {
+  id              BigInt   @id @default(autoincrement())
+  shop            String
+  productId       String
+  productTitle    String?
+  language        String?
+  tone            String?
+  lengthOption    String?
+  formatOption    String?
+  contextKeywords String?  @db.Text
+  aiModel         String?
+  descriptionHtml String?  @db.LongText
+  seoTitle        String?
+  seoDescription  String?  @db.Text
+  appliedToProduct Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shop, productId], map: "ProductGeneratedContent_shop_productId_key")
+  @@index([shop, updatedAt], map: "ProductGeneratedContent_shop_updatedAt_idx")
+  @@map("product_generated_contents")
+}
+
+model PageGeneratedContent {
+  id              BigInt   @id @default(autoincrement())
+  shop            String
+  pageId          String
+  pageTitle       String?
+  pageType        String?
+  language        String?
+  tone            String?
+  lengthOption    String?
+  formatOption    String?
+  contextKeywords String?  @db.Text
+  aiModel         String?
+  bodyHtml        String?  @db.LongText
+  seoTitle        String?
+  seoDescription  String?  @db.Text
+  appliedToPage   Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shop, pageId], map: "PageGeneratedContent_shop_pageId_key")
+  @@index([shop, updatedAt], map: "PageGeneratedContent_shop_updatedAt_idx")
+  @@map("page_generated_contents")
+}
+
+model BlogArticleGeneratedContent {
+  id               BigInt   @id @default(autoincrement())
+  shop             String
+  articleId        String
+  blogId           String?
+  articleTitle     String?
+  articleType      String?
+  authorName       String?
+  language         String?
+  tone             String?
+  lengthOption     String?
+  formatOption     String?
+  contextKeywords  String?  @db.Text
+  aiModel          String?
+  bodyHtml         String?  @db.LongText
+  seoTitle         String?
+  seoDescription   String?  @db.Text
+  isPublished      Boolean  @default(false)
+  appliedToShopify Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([shop, articleId], map: "BlogArticleGeneratedContent_shop_articleId_key")
+  @@index([shop, updatedAt], map: "BlogArticleGeneratedContent_shop_updatedAt_idx")
+  @@map("blog_article_generated_contents")
+}
+
 model CollectionGeneratedContent {
   id                BigInt   @id @default(autoincrement())
   shop              String

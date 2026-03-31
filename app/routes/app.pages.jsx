@@ -153,6 +153,18 @@ Return ONLY a JSON object with these keys (no markdown, no extra text):
   return { prompt };
 }
 
+async function upsertPageContent(data) {
+  try {
+    await db.pageGeneratedContent.upsert({
+      where: { shop_pageId: { shop: data.shop, pageId: data.pageId } },
+      create: data,
+      update: data,
+    });
+  } catch (error) {
+    console.error("Failed to upsert page generated content", error);
+  }
+}
+
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 export const loader = async ({ request }) => {
@@ -197,6 +209,8 @@ export const action = async ({ request }) => {
   const intent = formData.get("intent");
 
   if (intent === "generate_page_content") {
+    const pageId = formData.get("pageId") || "";
+    const pageTitle = formData.get("pageTitle") || "";
     const pageType = formData.get("pageType") || "About Us";
     const body = formData.get("body") || "";
     const language = formData.get("language") || "en";
@@ -227,6 +241,25 @@ export const action = async ({ request }) => {
         parsed.pageBody = raw;
       }
 
+      if (pageId) {
+        await upsertPageContent({
+          shop: session.shop,
+          pageId,
+          pageTitle: pageTitle || null,
+          pageType: pageType || null,
+          language: language || null,
+          tone: tone || null,
+          lengthOption: length || null,
+          formatOption: format || null,
+          contextKeywords: contextKeywords || null,
+          aiModel: aiProvider || null,
+          bodyHtml: parsed.pageBody || null,
+          seoTitle: parsed.seoTitle || null,
+          seoDescription: parsed.seoDescription || null,
+          appliedToPage: false,
+        });
+      }
+
       return { success: true, intent, ...parsed };
     } catch (err) {
       return { success: false, intent, error: err.message };
@@ -235,9 +268,16 @@ export const action = async ({ request }) => {
 
   if (intent === "update_page") {
     const pageId = formData.get("pageId");
+    const pageTitle = formData.get("pageTitle") || "";
     const body = formData.get("body") || "";
     const seoTitle = formData.get("seoTitle") || "";
     const seoDescription = formData.get("seoDescription") || "";
+    const pageType = formData.get("pageType") || "";
+    const language = formData.get("language") || "";
+    const tone = formData.get("tone") || "";
+    const length = formData.get("length") || "";
+    const format = formData.get("format") || "";
+    const contextKeywords = formData.get("contextKeywords") || "";
 
     try {
       const response = await admin.graphql(PAGE_UPDATE_MUTATION, {
@@ -257,6 +297,24 @@ export const action = async ({ request }) => {
       if (userErrors.length > 0) {
         return { success: false, intent, error: userErrors.map((e) => e.message).join(", ") };
       }
+
+      await upsertPageContent({
+        shop: session.shop,
+        pageId,
+        pageTitle: pageTitle || null,
+        pageType: pageType || null,
+        language: language || null,
+        tone: tone || null,
+        lengthOption: length || null,
+        formatOption: format || null,
+        contextKeywords: contextKeywords || null,
+        aiModel: null,
+        bodyHtml: body || null,
+        seoTitle: seoTitle || null,
+        seoDescription: seoDescription || null,
+        appliedToPage: true,
+      });
+
       return { success: true, intent, message: "Page updated successfully!" };
     } catch (err) {
       return { success: false, intent, error: err.message };
@@ -389,6 +447,8 @@ export default function PagesPage() {
     setGenerationError(null);
     const fd = new FormData();
     fd.append("intent", "generate_page_content");
+    fd.append("pageId", editState.pageId);
+    fd.append("pageTitle", editState.title);
     fd.append("pageType", editState.pageType);
     fd.append("body", editState.body);
     fd.append("language", editState.language);
@@ -404,6 +464,13 @@ export default function PagesPage() {
     const fd = new FormData();
     fd.append("intent", "update_page");
     fd.append("pageId", editState.pageId);
+    fd.append("pageTitle", editState.title);
+    fd.append("pageType", editState.pageType);
+    fd.append("language", editState.language);
+    fd.append("tone", editState.tone);
+    fd.append("length", editState.length);
+    fd.append("format", editState.format);
+    fd.append("contextKeywords", editState.contextKeywords);
     fd.append("body", editState.body);
     fd.append("seoTitle", editState.seoTitle);
     fd.append("seoDescription", editState.seoDescription);
