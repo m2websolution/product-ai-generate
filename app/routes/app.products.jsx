@@ -16,6 +16,7 @@ import {
   Button,
   ButtonGroup,
   Card,
+  Checkbox,
   Divider,
   EmptyState,
   Grid,
@@ -1378,6 +1379,7 @@ export default function ProductsPage() {
   const [bulkSelectedKeywords, setBulkSelectedKeywords] = useState([]);
   const [bulkCustomKeywordInput, setBulkCustomKeywordInput] = useState("");
   const [bulkCustomKeywords, setBulkCustomKeywords] = useState([]);
+  const [selectedProductIds, setSelectedProductIds] = useState([]);
 
   useEffect(() => {
     setSearchValue(filters.search);
@@ -1402,6 +1404,27 @@ export default function ProductsPage() {
       product.title.toLowerCase().includes(normalizedSearch),
     );
   }, [normalizedSearch, products, sourceProducts]);
+
+  const visibleProductIds = useMemo(
+    () => filteredProducts.map((product) => product.id),
+    [filteredProducts],
+  );
+
+  useEffect(() => {
+    setSelectedProductIds((current) => {
+      const visibleSet = new Set(visibleProductIds);
+      const retained = current.filter((id) => visibleSet.has(id));
+      if (retained.length === 0 && visibleProductIds.length > 0) {
+        return [...visibleProductIds];
+      }
+      return retained;
+    });
+  }, [visibleProductIds]);
+
+  const selectedProducts = useMemo(
+    () => filteredProducts.filter((product) => selectedProductIds.includes(product.id)),
+    [filteredProducts, selectedProductIds],
+  );
 
   const makeUrl = useCallback(
     ({ status = filters.status, search = searchValue.trim(), collectionId = filters.collectionId, before, after } = {}) => {
@@ -1559,7 +1582,7 @@ export default function ProductsPage() {
     const payload = new FormData();
     payload.append("intent", "bulk_generate");
     payload.append("products", JSON.stringify(
-      filteredProducts.map((p) => ({
+      selectedProducts.map((p) => ({
         id: p.id,
         title: p.title,
         descriptionHtml: p.descriptionHtml,
@@ -1574,7 +1597,7 @@ export default function ProductsPage() {
     payload.append("contextKeywords", contextKeywords);
     payload.append("aiProvider", bulkSettings.aiProvider);
     bulkFetcher.submit(payload, { method: "post" });
-  }, [bulkCustomKeywords, bulkFetcher, bulkSelectedKeywords, bulkSettings, filteredProducts]);
+  }, [bulkCustomKeywords, bulkFetcher, bulkSelectedKeywords, bulkSettings, selectedProducts]);
 
   const isGenerating = generateFetcher.state !== "idle";
   const isUpdating = updateFetcher.state !== "idle";
@@ -1679,6 +1702,7 @@ export default function ProductsPage() {
   const resourceName = { singular: "product", plural: "products" };
 
   const headings = [
+    { title: "Select" },
     { title: "Image" },
     { title: "Title" },
     { title: "Shopify Status" },
@@ -1705,6 +1729,30 @@ export default function ProductsPage() {
 
   const updateBulkField = (field) => (value) =>
     setBulkSettings((prev) => ({ ...prev, [field]: value }));
+
+  const allVisibleSelected =
+    visibleProductIds.length > 0 && selectedProductIds.length === visibleProductIds.length;
+  const selectionIndeterminate =
+    selectedProductIds.length > 0 && selectedProductIds.length < visibleProductIds.length;
+
+  const handleToggleSelectAllVisible = useCallback(
+    (checked) => {
+      setSelectedProductIds(checked ? [...visibleProductIds] : []);
+    },
+    [visibleProductIds],
+  );
+
+  const handleToggleProductSelection = useCallback(
+    (productId) => (checked) => {
+      setSelectedProductIds((current) => {
+        if (checked) {
+          return current.includes(productId) ? current : [...current, productId];
+        }
+        return current.filter((id) => id !== productId);
+      });
+    },
+    [],
+  );
 
   const bulkKeywordOptions = useMemo(() => {
     const query = bulkKeywordQuery.trim().toLowerCase();
@@ -1753,6 +1801,14 @@ export default function ProductsPage() {
 
   const rowMarkup = filteredProducts.map((product, index) => (
     <IndexTable.Row id={product.id} key={product.id} position={index}>
+      <IndexTable.Cell>
+        <Checkbox
+          label={`Select ${product.title}`}
+          labelHidden
+          checked={selectedProductIds.includes(product.id)}
+          onChange={handleToggleProductSelection(product.id)}
+        />
+      </IndexTable.Cell>
       <IndexTable.Cell>
         {product.imageUrl ? (
           <Thumbnail
@@ -1847,7 +1903,7 @@ export default function ProductsPage() {
                   <BlockStack gap="100">
                     <Text variant="headingMd" as="h2">⚡ Bulk Generate Content</Text>
                     <Text variant="bodySm" tone="subdued" as="p">
-                      Set AI options and generate descriptions + SEO for all {filteredProducts.length} visible products at once.
+                      Set AI options and generate descriptions + SEO for selected products.
                     </Text>
                   </BlockStack>
                   {bulkResult && (
@@ -1859,6 +1915,18 @@ export default function ProductsPage() {
                 </InlineStack>
 
                 <Divider />
+
+                <InlineStack align="space-between" blockAlign="center" wrap gap="200">
+                  <Checkbox
+                    label={`Select all visible products (${filteredProducts.length})`}
+                    checked={allVisibleSelected}
+                    indeterminate={selectionIndeterminate}
+                    onChange={handleToggleSelectAllVisible}
+                  />
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    {selectedProducts.length} selected
+                  </Text>
+                </InlineStack>
 
                 <Grid>
                   <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
@@ -1940,19 +2008,19 @@ export default function ProductsPage() {
                   {isBulkGenerating && (
                     <InlineStack gap="200" blockAlign="center">
                       <Spinner size="small" />
-                      <Text variant="bodySm" tone="subdued">Generating for {filteredProducts.length} products…</Text>
+                      <Text variant="bodySm" tone="subdued">Generating for {selectedProducts.length} products…</Text>
                     </InlineStack>
                   )}
                   <Button
                     variant="primary"
                     onClick={handleBulkGenerate}
                     loading={isBulkGenerating}
-                    disabled={isBulkGenerating || filteredProducts.length === 0}
+                    disabled={isBulkGenerating || selectedProducts.length === 0}
                     tone="success"
                   >
                     {isBulkGenerating
                       ? "Generating…"
-                      : `Bulk Generate All ${filteredProducts.length} Products`}
+                      : `Bulk Generate Selected ${selectedProducts.length} Products`}
                   </Button>
                 </InlineStack>
               </BlockStack>
