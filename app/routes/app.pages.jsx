@@ -526,9 +526,11 @@ export default function PagesPage() {
         <Text variant="bodyMd" fontWeight="bold" as="span">{page.title}</Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodySm" tone="subdued" as="span">
-          {page.bodySummary ? page.bodySummary.slice(0, 80) + "…" : "—"}
-        </Text>
+        <div className="pages-summary-cell">
+          <Text variant="bodySm" tone="subdued" as="span">
+            {page.bodySummary ? page.bodySummary.slice(0, 45) + "…" : "—"}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
         {page.seo?.title
@@ -590,27 +592,38 @@ export default function PagesPage() {
         )}
 
         <Card padding="0">
-          <IndexTable
-            resourceName={{ singular: "page", plural: "pages" }}
-            itemCount={pages.length}
-            selectedItemsCount={allResourcesSelected ? "All" : selectedResources.length}
-            onSelectionChange={handleSelectionChange}
-            headings={[
-              { title: "Title" },
-              { title: "Summary" },
-              { title: "SEO Title" },
-              { title: "SEO Description" },
-              { title: "Generated" },
-              { title: "Action" },
-            ]}
-          >
-            {rowMarkup}
-          </IndexTable>
+          <div className="pages-table-wrap">
+            <IndexTable
+              resourceName={{ singular: "page", plural: "pages" }}
+              itemCount={pages.length}
+              selectedItemsCount={allResourcesSelected ? "All" : selectedResources.length}
+              onSelectionChange={handleSelectionChange}
+              headings={[
+                { title: "Title" },
+                { title: "Summary" },
+                { title: "SEO Title" },
+                { title: "SEO Description" },
+                { title: "Generated" },
+                { title: "Action" },
+              ]}
+            >
+              {rowMarkup}
+            </IndexTable>
+          </div>
         </Card>
       </BlockStack>
 
       {/* Edit Modal */}
-      <style>{".Polaris-Modal-Dialog__Modal { max-width: 66rem !important; }"}</style>
+      <style>{`
+        .Polaris-Modal-Dialog__Modal { max-width: 66rem !important; }
+        .pages-table-wrap .pages-summary-cell {
+          width: 180px;
+          max-width: 180px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      `}</style>
       <Modal
         open={editModal}
         onClose={closeEditModal}
