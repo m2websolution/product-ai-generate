@@ -17,6 +17,7 @@ import {
   Page,
   Popover,
   Select,
+  Spinner,
   Tabs,
   Text,
   TextField,
@@ -179,7 +180,7 @@ function ResourceBadge({ resource }) {
   );
 }
 
-function TemplateCard({ template, active, showResource, isCustom, onPreview, onEdit, onDelete }) {
+function TemplateCard({ template, active, showResource, isCustom, isLoading, onPreview, onEdit, onDelete }) {
   return (
     <Card padding="0">
       <div style={{ display: "flex", flexDirection: "column", minHeight: 340 }}>
@@ -222,15 +223,15 @@ function TemplateCard({ template, active, showResource, isCustom, onPreview, onE
           </Text>
 
           <InlineStack gap="150" align="start">
-            <Button size="micro" onClick={onPreview}>
+            <Button size="micro" onClick={onPreview} disabled={isLoading}>
               Preview
             </Button>
             {isCustom && (
               <>
-                <Button size="micro" onClick={onEdit}>
+                <Button size="micro" onClick={onEdit} disabled={isLoading}>
                   Edit
                 </Button>
-                <Button size="micro" tone="critical" onClick={onDelete}>
+                <Button size="micro" tone="critical" onClick={onDelete} disabled={isLoading}>
                   Delete
                 </Button>
               </>
@@ -256,16 +257,17 @@ function FilterBar({ resourceFilter, typeFilter, onResourceChange, onTypeChange 
               key={f.id}
               onClick={() => onResourceChange(f.id)}
               style={{
-                padding: "5px 14px",
+                padding: "8px 16px",
                 borderRadius: "6px",
-                border: resourceFilter === f.id ? "1.5px solid #1a1a1a" : "1px solid #d1d5db",
-                background: resourceFilter === f.id ? "#1a1a1a" : "#f9fafb",
+                border: resourceFilter === f.id ? "2px solid #1a1a1a" : "1.5px solid #d1d5db",
+                background: resourceFilter === f.id ? "#1a1a1a" : "#ffffff",
                 color: resourceFilter === f.id ? "#ffffff" : "#374151",
                 cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: resourceFilter === f.id ? 600 : 400,
-                transition: "all 0.15s ease",
-                lineHeight: "1.4",
+                fontSize: "14px",
+                fontWeight: resourceFilter === f.id ? 600 : 500,
+                transition: "all 0.2s ease",
+                lineHeight: "1.5",
+                boxShadow: resourceFilter === f.id ? "0 1px 3px rgba(0,0,0,0.12)" : "0 1px 2px rgba(0,0,0,0.05)",
               }}
             >
               {f.label}
@@ -280,6 +282,7 @@ function FilterBar({ resourceFilter, typeFilter, onResourceChange, onTypeChange 
             <Button
               size="slim"
               disclosure
+              variant="secondary"
               onClick={() => setPopoverActive((v) => !v)}
             >
               {selectedTypeLabel}
@@ -339,6 +342,9 @@ export default function TemplatePage() {
   // Delete confirm
   const [deleteTargetId, setDeleteTargetId] = useState(null);
 
+  // Loading state
+  const [isLoading, setIsLoading] = useState(false);
+
   const selectionMap = useMemo(
     () => ({
       product: productSelection,
@@ -366,83 +372,99 @@ export default function TemplatePage() {
 
   // ── Apply template ──────────────────────────────────────────────────────────
 
-  function applyTemplate(template, resourceId, typeId) {
+  async function applyTemplate(template, resourceId, typeId) {
     if (!template || !resourceId || !typeId) return;
-
-    if (resourceId === "product") {
-      const next = { ...productSelection };
-      if (typeId === "description") {
-        next.descriptionTemplateId = template.id;
-        next.descriptionPromptTemplate = template.template;
-      } else if (typeId === "seo-title") {
-        next.metaTitleTemplateId = template.id;
-        next.metaTitlePromptTemplate = template.template;
-      } else if (typeId === "seo-description") {
-        next.metaDescriptionTemplateId = template.id;
-        next.metaDescriptionPromptTemplate = template.template;
+    
+    setIsLoading(true);
+    try {
+      if (resourceId === "product") {
+        const next = { ...productSelection };
+        if (typeId === "description") {
+          next.descriptionTemplateId = template.id;
+          next.descriptionPromptTemplate = template.template;
+        } else if (typeId === "seo-title") {
+          next.metaTitleTemplateId = template.id;
+          next.metaTitlePromptTemplate = template.template;
+        } else if (typeId === "seo-description") {
+          next.metaDescriptionTemplateId = template.id;
+          next.metaDescriptionPromptTemplate = template.template;
+        }
+        setProductSelection(writeStoredProductPromptTemplateSelection(next));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        shopify.toast.show(`${template.name} applied to products.`);
+        return;
       }
-      setProductSelection(writeStoredProductPromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} applied to products.`);
-      return;
-    }
 
-    if (resourceId === "collection") {
-      const next = { ...collectionSelection };
-      if (typeId === "description") {
-        next.descriptionTemplateId = template.id;
-        next.descriptionPromptTemplate = template.template;
-      } else if (typeId === "seo-title") {
-        next.metaTitleTemplateId = template.id;
-        next.metaTitlePromptTemplate = template.template;
-      } else if (typeId === "seo-description") {
-        next.metaDescriptionTemplateId = template.id;
-        next.metaDescriptionPromptTemplate = template.template;
+      if (resourceId === "collection") {
+        const next = { ...collectionSelection };
+        if (typeId === "description") {
+          next.descriptionTemplateId = template.id;
+          next.descriptionPromptTemplate = template.template;
+        } else if (typeId === "seo-title") {
+          next.metaTitleTemplateId = template.id;
+          next.metaTitlePromptTemplate = template.template;
+        } else if (typeId === "seo-description") {
+          next.metaDescriptionTemplateId = template.id;
+          next.metaDescriptionPromptTemplate = template.template;
+        }
+        setCollectionSelection(writeStoredCollectionPromptTemplateSelection(next));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        shopify.toast.show(`${template.name} applied to collections.`);
+        return;
       }
-      setCollectionSelection(writeStoredCollectionPromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} applied to collections.`);
-      return;
-    }
 
-    if (resourceId === "page") {
-      const next = { ...pageSelection };
-      if (typeId === "description") {
-        next.bodyTemplateId = template.id;
-        next.bodyPromptTemplate = template.template;
-      } else if (typeId === "seo-title") {
-        next.metaTitleTemplateId = template.id;
-        next.metaTitlePromptTemplate = template.template;
-      } else if (typeId === "seo-description") {
-        next.metaDescriptionTemplateId = template.id;
-        next.metaDescriptionPromptTemplate = template.template;
+      if (resourceId === "page") {
+        const next = { ...pageSelection };
+        if (typeId === "description") {
+          next.bodyTemplateId = template.id;
+          next.bodyPromptTemplate = template.template;
+        } else if (typeId === "seo-title") {
+          next.metaTitleTemplateId = template.id;
+          next.metaTitlePromptTemplate = template.template;
+        } else if (typeId === "seo-description") {
+          next.metaDescriptionTemplateId = template.id;
+          next.metaDescriptionPromptTemplate = template.template;
+        }
+        setPageSelection(writeStoredPagePromptTemplateSelection(next));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        shopify.toast.show(`${template.name} applied to pages.`);
+        return;
       }
-      setPageSelection(writeStoredPagePromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} applied to pages.`);
-      return;
-    }
 
-    if (resourceId === "blog") {
-      const next = { ...blogSelection };
-      if (typeId === "description") {
-        next.bodyTemplateId = template.id;
-        next.bodyPromptTemplate = template.template;
-      } else if (typeId === "seo-title") {
-        next.metaTitleTemplateId = template.id;
-        next.metaTitlePromptTemplate = template.template;
-      } else if (typeId === "seo-description") {
-        next.metaDescriptionTemplateId = template.id;
-        next.metaDescriptionPromptTemplate = template.template;
+      if (resourceId === "blog") {
+        const next = { ...blogSelection };
+        if (typeId === "description") {
+          next.bodyTemplateId = template.id;
+          next.bodyPromptTemplate = template.template;
+        } else if (typeId === "seo-title") {
+          next.metaTitleTemplateId = template.id;
+          next.metaTitlePromptTemplate = template.template;
+        } else if (typeId === "seo-description") {
+          next.metaDescriptionTemplateId = template.id;
+          next.metaDescriptionPromptTemplate = template.template;
+        }
+        setBlogSelection(writeStoredBlogPromptTemplateSelection(next));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        shopify.toast.show(`${template.name} applied to blog posts.`);
+        return;
       }
-      setBlogSelection(writeStoredBlogPromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} applied to blogs.`);
+    } finally {
+      setIsLoading(false);
     }
   }
 
-  function clearAllTemplateSelections() {
-    setProductSelection(clearStoredProductPromptTemplateSelection());
-    setCollectionSelection(clearStoredCollectionPromptTemplateSelection());
-    setPageSelection(clearStoredPagePromptTemplateSelection());
-    setBlogSelection(clearStoredBlogPromptTemplateSelection());
-    shopify.toast.show("All template selections cleared.");
+  async function clearAllTemplateSelections() {
+    setIsLoading(true);
+    try {
+      setProductSelection(clearStoredProductPromptTemplateSelection());
+      setCollectionSelection(clearStoredCollectionPromptTemplateSelection());
+      setPageSelection(clearStoredPagePromptTemplateSelection());
+      setBlogSelection(clearStoredBlogPromptTemplateSelection());
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      shopify.toast.show("All template selections have been cleared.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function copyText(value, label) {
@@ -486,37 +508,50 @@ export default function TemplatePage() {
     return errors;
   }
 
-  function handleFormSave() {
+  async function handleFormSave() {
     const errors = validateForm();
     if (Object.keys(errors).length) {
       setFormErrors(errors);
       return;
     }
 
-    if (editingId) {
-      const updated = customTemplates.map((t) =>
-        t.id === editingId ? { ...t, ...formData } : t,
-      );
-      setCustomTemplates(saveCustomTemplates(updated));
-      shopify.toast.show("Custom template updated.");
-    } else {
-      const newEntry = {
-        id: `custom-${Date.now()}`,
-        ...formData,
-        createdAt: Date.now(),
-      };
-      const updated = [...customTemplates, newEntry];
-      setCustomTemplates(saveCustomTemplates(updated));
-      shopify.toast.show("Custom template created.");
+    setIsLoading(true);
+    try {
+      if (editingId) {
+        const updated = customTemplates.map((t) =>
+          t.id === editingId ? { ...t, ...formData } : t,
+        );
+        setCustomTemplates(saveCustomTemplates(updated));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        shopify.toast.show("Custom template updated.");
+      } else {
+        const newEntry = {
+          id: `custom-${Date.now()}`,
+          ...formData,
+          createdAt: Date.now(),
+        };
+        const updated = [...customTemplates, newEntry];
+        setCustomTemplates(saveCustomTemplates(updated));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        shopify.toast.show("Custom template created.");
+      }
+      setShowFormModal(false);
+    } finally {
+      setIsLoading(false);
     }
-    setShowFormModal(false);
   }
 
-  function handleDelete(templateId) {
-    const updated = customTemplates.filter((t) => t.id !== templateId);
-    setCustomTemplates(saveCustomTemplates(updated));
-    setDeleteTargetId(null);
-    shopify.toast.show("Custom template deleted.");
+  async function handleDelete(templateId) {
+    setIsLoading(true);
+    try {
+      const updated = customTemplates.filter((t) => t.id !== templateId);
+      setCustomTemplates(saveCustomTemplates(updated));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      setDeleteTargetId(null);
+      shopify.toast.show("Custom template deleted.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -526,42 +561,75 @@ export default function TemplatePage() {
   const showResourceBadge = resourceFilter === "all";
 
   return (
-    <Page
+    <>
+      {isLoading && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+            }}
+          >
+            <Spinner accessibilityLabel="Loading" size="large" />
+            <Text as="p" variant="bodySm" tone="subdued">
+              Processing...
+            </Text>
+          </div>
+        </div>
+      )}
+      <Page
       fullWidth
       title="Templates"
       subtitle="Manage prompt templates for AI content generation."
       primaryAction={{
         content: "Clear All Selections",
         onAction: clearAllTemplateSelections,
+        variant: "primary",
+        disabled: isLoading,
       }}
       secondaryActions={[
-        { content: "Products", onAction: () => navigate("/app/products") },
-        { content: "Collections", onAction: () => navigate("/app/collections") },
-        { content: "Pages", onAction: () => navigate("/app/pages") },
-        { content: "Blogs", onAction: () => navigate("/app/blog") },
+        { content: "Products", onAction: () => navigate("/app/products"), variant: "secondary", disabled: isLoading },
+        { content: "Collections", onAction: () => navigate("/app/collections"), variant: "secondary", disabled: isLoading },
+        { content: "Pages", onAction: () => navigate("/app/pages"), variant: "secondary", disabled: isLoading },
+        { content: "Blogs", onAction: () => navigate("/app/blog"), variant: "secondary", disabled: isLoading },
       ]}
     >
       <Layout>
         {/* Status badges */}
         <Layout.Section>
-          <Card>
-            <BlockStack gap="200">
+          <Card padding="400" tone="success">
+            <BlockStack gap="300">
               <Text as="p" variant="bodyMd" fontWeight="semibold">
                 Active selections
               </Text>
               <InlineStack gap="200" wrap>
-                <Badge tone={productSelection.descriptionTemplateId ? "success" : "attention"}>
+                <Badge tone={productSelection.descriptionTemplateId ? "success" : "warning"}>
                   Product:{" "}
                   {productSelection.descriptionTemplateId ? "Configured" : "Not selected"}
                 </Badge>
-                <Badge tone={collectionSelection.descriptionTemplateId ? "success" : "attention"}>
+                <Badge tone={collectionSelection.descriptionTemplateId ? "success" : "warning"}>
                   Collection:{" "}
                   {collectionSelection.descriptionTemplateId ? "Configured" : "Not selected"}
                 </Badge>
-                <Badge tone={pageSelection.bodyTemplateId ? "success" : "attention"}>
+                <Badge tone={pageSelection.bodyTemplateId ? "success" : "warning"}>
                   Page: {pageSelection.bodyTemplateId ? "Configured" : "Not selected"}
                 </Badge>
-                <Badge tone={blogSelection.bodyTemplateId ? "success" : "attention"}>
+                <Badge tone={blogSelection.bodyTemplateId ? "success" : "warning"}>
                   Blog: {blogSelection.bodyTemplateId ? "Configured" : "Not selected"}
                 </Badge>
               </InlineStack>
@@ -589,7 +657,7 @@ export default function TemplatePage() {
                   </Text>
                 </BlockStack>
                 {!isSystemTab && (
-                  <Button variant="primary" size="slim" onClick={openCreateModal}>
+                  <Button variant="primary" size="slim" onClick={openCreateModal} disabled={isLoading}>
                     Create template
                   </Button>
                 )}
@@ -618,7 +686,7 @@ export default function TemplatePage() {
                 }
                 image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 action={
-                  !isSystemTab
+                  !isSystemTab && !isLoading
                     ? { content: "Create template", onAction: openCreateModal }
                     : undefined
                 }
@@ -648,6 +716,7 @@ export default function TemplatePage() {
                     active={activeId === template.id}
                     showResource={showResourceBadge}
                     isCustom={!isSystemTab}
+                    isLoading={isLoading}
                     onPreview={() =>
                       setPreviewData({
                         ...template,
@@ -677,14 +746,16 @@ export default function TemplatePage() {
             applyTemplate(previewData, previewData.resourceId, previewData.filterId);
             setPreviewData(null);
           },
+          disabled: isLoading,
         }}
         secondaryActions={[
           {
             content: "Copy",
             onAction: () =>
               copyText(previewData?.template || "", previewData?.name || "Template"),
+            disabled: isLoading,
           },
-          { content: "Close", onAction: () => setPreviewData(null) },
+          { content: "Close", onAction: () => setPreviewData(null), disabled: isLoading },
         ]}
       >
         <Modal.Section>
@@ -720,8 +791,8 @@ export default function TemplatePage() {
         open={showFormModal}
         onClose={() => setShowFormModal(false)}
         title={editingId ? "Edit custom template" : "Create custom template"}
-        primaryAction={{ content: "Save", onAction: handleFormSave }}
-        secondaryActions={[{ content: "Cancel", onAction: () => setShowFormModal(false) }]}
+        primaryAction={{ content: "Save", onAction: handleFormSave, disabled: isLoading }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setShowFormModal(false), disabled: isLoading }]}
         large
       >
         <Modal.Section>
@@ -732,12 +803,14 @@ export default function TemplatePage() {
                 options={RESOURCE_SELECT_OPTIONS}
                 value={formData.resource}
                 onChange={(v) => setFormData((p) => ({ ...p, resource: v }))}
+                disabled={isLoading}
               />
               <Select
                 label="Content type"
                 options={TYPE_OPTIONS}
                 value={formData.type}
                 onChange={(v) => setFormData((p) => ({ ...p, type: v }))}
+                disabled={isLoading}
               />
             </FormLayout.Group>
             <TextField
@@ -746,6 +819,7 @@ export default function TemplatePage() {
               onChange={(v) => setFormData((p) => ({ ...p, name: v }))}
               error={formErrors.name}
               autoComplete="off"
+              disabled={isLoading}
             />
             <TextField
               label="Description"
@@ -753,6 +827,7 @@ export default function TemplatePage() {
               onChange={(v) => setFormData((p) => ({ ...p, description: v }))}
               autoComplete="off"
               helpText="Short description of what this template is for."
+              disabled={isLoading}
             />
             <TextField
               label="Template content"
@@ -763,6 +838,7 @@ export default function TemplatePage() {
               autoComplete="off"
               helpText="Use [brackets] for structure placeholders and {curly_braces} for dynamic values."
               monospaced
+              disabled={isLoading}
             />
           </FormLayout>
         </Modal.Section>
@@ -777,8 +853,9 @@ export default function TemplatePage() {
           content: "Delete",
           tone: "critical",
           onAction: () => handleDelete(deleteTargetId),
+          disabled: isLoading,
         }}
-        secondaryActions={[{ content: "Cancel", onAction: () => setDeleteTargetId(null) }]}
+        secondaryActions={[{ content: "Cancel", onAction: () => setDeleteTargetId(null), disabled: isLoading }]}
       >
         <Modal.Section>
           <Text as="p" variant="bodyMd">
@@ -787,5 +864,6 @@ export default function TemplatePage() {
         </Modal.Section>
       </Modal>
     </Page>
+    </>
   );
 }

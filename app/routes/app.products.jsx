@@ -1909,25 +1909,15 @@ export default function ProductsPage() {
 
             {/* Generate Button */}
             <div style={{ padding: "12px 16px" }}>
-              {isBulkGenerating && (
-                <div style={{ marginBottom: "8px" }}>
-                  <InlineStack align="center" blockAlign="center" gap="200">
-                    <Spinner size="small" />
-                    <Text variant="bodySm" tone="subdued">Generating for {selectedProducts.length} products...</Text>
-                  </InlineStack>
-                </div>
-              )}
               <Button
                 fullWidth
                 variant="primary"
                 onClick={handleBulkGenerate}
                 disabled={isBulkGenerating || selectedProducts.length === 0 || exceedsBulkLimit}
+                loading={isBulkGenerating}
                 tone="success"
-                icon={<span style={{ fontSize: "14px" }}>✏️</span>}
               >
-                {isBulkGenerating
-                  ? "Generating..."
-                  : `Generate ${selectedProducts.length} items (${selectedProducts.length} products × ${bulkContentTypes.length} types)`}
+                {`Generate ${selectedProducts.length} items (${selectedProducts.length} products × ${bulkContentTypes.length} types)`}
               </Button>
             </div>
           </Card>

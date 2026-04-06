@@ -26,7 +26,6 @@ import {
   Checkbox,
   IndexTable,
   useIndexResourceState,
-  Spinner,
 } from "@shopify/polaris";
 
 // ─── GraphQL ────────────────────────────────────────────────────────────────
@@ -833,24 +832,15 @@ export default function PagesPage() {
 
             {/* Generate Button */}
             <div style={{ padding: "12px 16px" }}>
-              {isBulkGenerating && (
-                <div style={{ marginBottom: "8px" }}>
-                  <InlineStack align="center" blockAlign="center" gap="200">
-                    <Spinner size="small" />
-                    <Text variant="bodySm" tone="subdued">Generating for {selectedResources.length} pages...</Text>
-                  </InlineStack>
-                </div>
-              )}
               <Button
                 fullWidth
                 variant="primary"
                 onClick={handleBulkGenerate}
                 disabled={isBulkGenerating || selectedResources.length === 0}
+                loading={isBulkGenerating}
                 tone="success"
               >
-                {isBulkGenerating
-                  ? "Generating..."
-                  : `Generate ${selectedResources.length} page${selectedResources.length !== 1 ? "s" : ""}`}
+                {`Generate ${selectedResources.length} page${selectedResources.length !== 1 ? "s" : ""}`}
               </Button>
             </div>
           </Card>

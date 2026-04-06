@@ -1894,25 +1894,15 @@ export default function CollectionsPage() {
 
             {/* Generate Button */}
             <div style={{ padding: "12px 16px" }}>
-              {isBulkGenerating && (
-                <div style={{ marginBottom: "8px" }}>
-                  <InlineStack align="center" blockAlign="center" gap="200">
-                    <Spinner size="small" />
-                    <Text variant="bodySm" tone="subdued">Generating for {selectedCollections.length} collections...</Text>
-                  </InlineStack>
-                </div>
-              )}
               <Button
                 fullWidth
                 variant="primary"
                 onClick={handleBulkGenerate}
                 disabled={isBulkGenerating || selectedCollections.length === 0 || exceedsBulkLimit}
+                loading={isBulkGenerating}
                 tone="success"
-                icon={<span style={{ fontSize: "14px" }}>✏️</span>}
               >
-                {isBulkGenerating
-                  ? "Generating..."
-                  : `Generate ${selectedCollections.length} items (${selectedCollections.length} collections × ${bulkContentTypes.length} types)`}
+                {`Generate ${selectedCollections.length} items (${selectedCollections.length} collections × ${bulkContentTypes.length} types)`}
               </Button>
             </div>
           </Card>
