@@ -2,18 +2,24 @@ import { useMemo, useState } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useNavigate } from "react-router";
 import {
+  ActionList,
   Badge,
   BlockStack,
   Box,
   Button,
-  ButtonGroup,
   Card,
+  Divider,
+  EmptyState,
+  FormLayout,
   InlineStack,
   Layout,
   Modal,
   Page,
+  Popover,
+  Select,
   Tabs,
   Text,
+  TextField,
 } from "@shopify/polaris";
 import {
   COLLECTION_DESCRIPTION_TEMPLATES,
@@ -48,147 +54,263 @@ import {
   writeStoredPagePromptTemplateSelection,
 } from "../lib/pagePromptTemplateLibrary";
 
-// Main resource tabs
-const RESOURCE_TABS = [
-  { id: "product", content: "Product", panelID: "product-panel" },
-  { id: "collection", content: "Collection", panelID: "collection-panel" },
-  { id: "page", content: "Page", panelID: "page-panel" },
-  { id: "blog", content: "Blog", panelID: "blog-panel" },
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MAIN_TABS = [
+  { id: "system", content: "System templates", panelID: "system-panel" },
+  { id: "custom", content: "Custom templates", panelID: "custom-panel" },
 ];
 
-// Sub-filters per resource
-const RESOURCE_FILTERS = {
-  product: [
-    { id: "description", label: "Description" },
-    { id: "meta-description", label: "Meta Description" },
-    { id: "meta-title", label: "Meta Title" },
-  ],
-  collection: [
-    { id: "description", label: "Description" },
-    { id: "meta-description", label: "Meta Description" },
-    { id: "meta-title", label: "Meta Title" },
-  ],
-  page: [
-    { id: "body", label: "Body" },
-    { id: "meta-description", label: "Meta Description" },
-    { id: "meta-title", label: "Meta Title" },
-  ],
-  blog: [
-    { id: "body", label: "Body" },
-    { id: "meta-description", label: "Meta Description" },
-    { id: "meta-title", label: "Meta Title" },
-  ],
+const RESOURCE_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "product", label: "Product" },
+  { id: "collection", label: "Collection" },
+  { id: "page", label: "Page" },
+  { id: "blog", label: "Blog" },
+];
+
+const TYPE_OPTIONS = [
+  { label: "Description", value: "description" },
+  { label: "SEO Description", value: "seo-description" },
+  { label: "SEO Title", value: "seo-title" },
+];
+
+const RESOURCE_BADGE_TONE = {
+  product: "info",
+  collection: "warning",
+  page: "success",
+  blog: "attention",
 };
 
-// Default filter per resource
-const DEFAULT_FILTER = {
-  product: "description",
-  collection: "description",
-  page: "body",
-  blog: "body",
+const RESOURCE_SELECT_OPTIONS = [
+  { label: "Product", value: "product" },
+  { label: "Collection", value: "collection" },
+  { label: "Page", value: "page" },
+  { label: "Blog", value: "blog" },
+];
+
+const CUSTOM_TEMPLATES_KEY = "custom_prompt_templates_v1";
+
+const EMPTY_CUSTOM_FORM = {
+  name: "",
+  description: "",
+  resource: "product",
+  type: "description",
+  template: "",
 };
 
-function getTemplates(resourceId, filterId) {
-  if (resourceId === "product") {
-    if (filterId === "description") return PRODUCT_DESCRIPTION_TEMPLATES;
-    if (filterId === "meta-description") return PRODUCT_META_DESCRIPTION_TEMPLATES;
-    if (filterId === "meta-title") return PRODUCT_META_TITLE_TEMPLATES;
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const SYSTEM_TEMPLATE_MAP = {
+  product: {
+    description: PRODUCT_DESCRIPTION_TEMPLATES,
+    "seo-description": PRODUCT_META_DESCRIPTION_TEMPLATES,
+    "seo-title": PRODUCT_META_TITLE_TEMPLATES,
+  },
+  collection: {
+    description: COLLECTION_DESCRIPTION_TEMPLATES,
+    "seo-description": COLLECTION_META_DESCRIPTION_TEMPLATES,
+    "seo-title": COLLECTION_META_TITLE_TEMPLATES,
+  },
+  page: {
+    description: PAGE_BODY_TEMPLATES,
+    "seo-description": PAGE_META_DESCRIPTION_TEMPLATES,
+    "seo-title": PAGE_META_TITLE_TEMPLATES,
+  },
+  blog: {
+    description: BLOG_BODY_TEMPLATES,
+    "seo-description": BLOG_META_DESCRIPTION_TEMPLATES,
+    "seo-title": BLOG_META_TITLE_TEMPLATES,
+  },
+};
+
+function getSystemTemplates(resourceId, typeId) {
+  if (resourceId === "all") {
+    const result = [];
+    for (const [res, types] of Object.entries(SYSTEM_TEMPLATE_MAP)) {
+      (types[typeId] || []).forEach((t) => result.push({ ...t, resource: res }));
+    }
+    return result;
   }
-  if (resourceId === "collection") {
-    if (filterId === "description") return COLLECTION_DESCRIPTION_TEMPLATES;
-    if (filterId === "meta-description") return COLLECTION_META_DESCRIPTION_TEMPLATES;
-    if (filterId === "meta-title") return COLLECTION_META_TITLE_TEMPLATES;
-  }
-  if (resourceId === "page") {
-    if (filterId === "body") return PAGE_BODY_TEMPLATES;
-    if (filterId === "meta-description") return PAGE_META_DESCRIPTION_TEMPLATES;
-    if (filterId === "meta-title") return PAGE_META_TITLE_TEMPLATES;
-  }
-  if (resourceId === "blog") {
-    if (filterId === "body") return BLOG_BODY_TEMPLATES;
-    if (filterId === "meta-description") return BLOG_META_DESCRIPTION_TEMPLATES;
-    if (filterId === "meta-title") return BLOG_META_TITLE_TEMPLATES;
-  }
-  return [];
+  return (SYSTEM_TEMPLATE_MAP[resourceId]?.[typeId] || []).map((t) => ({
+    ...t,
+    resource: resourceId,
+  }));
 }
 
-function getActiveTemplateId(resourceId, filterId, selectionMap) {
+function getActiveTemplateId(resourceId, typeId, selectionMap) {
   const sel = selectionMap[resourceId];
   if (!sel) return "";
-  if (resourceId === "product" || resourceId === "collection") {
-    if (filterId === "description") return sel.descriptionTemplateId;
-    if (filterId === "meta-description") return sel.metaDescriptionTemplateId;
-    if (filterId === "meta-title") return sel.metaTitleTemplateId;
-  }
-  if (resourceId === "page" || resourceId === "blog") {
-    if (filterId === "body") return sel.bodyTemplateId;
-    if (filterId === "meta-description") return sel.metaDescriptionTemplateId;
-    if (filterId === "meta-title") return sel.metaTitleTemplateId;
-  }
+  const isBodyResource = resourceId === "page" || resourceId === "blog";
+  if (typeId === "description") return isBodyResource ? sel.bodyTemplateId : sel.descriptionTemplateId;
+  if (typeId === "seo-description") return sel.metaDescriptionTemplateId;
+  if (typeId === "seo-title") return sel.metaTitleTemplateId;
   return "";
 }
 
-function PromptGalleryCard({ template, active, onPreview }) {
+function readCustomTemplates() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_TEMPLATES_KEY);
+    return Array.isArray(JSON.parse(raw || "null")) ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomTemplates(templates) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+  }
+  return templates;
+}
+
+function typeLabel(typeId) {
+  return TYPE_OPTIONS.find((o) => o.value === typeId)?.label || typeId;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function ResourceBadge({ resource }) {
+  return (
+    <Badge tone={RESOURCE_BADGE_TONE[resource] || "new"}>
+      {resource.charAt(0).toUpperCase() + resource.slice(1)}
+    </Badge>
+  );
+}
+
+function TemplateCard({ template, active, showResource, isCustom, onPreview, onEdit, onDelete }) {
   return (
     <Card padding="0">
-      <div
-        style={{
-          minHeight: 380,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", minHeight: 340 }}>
+        {/* Preview area */}
         <div
           style={{
-            minHeight: 210,
-            maxHeight: 210,
+            height: 180,
             overflowY: "auto",
-            padding: 16,
+            padding: "12px 14px",
             borderBottom: "1px solid var(--p-color-border)",
             whiteSpace: "pre-wrap",
-            lineHeight: 1.5,
-            fontSize: 16,
+            lineHeight: 1.55,
+            fontSize: 12.5,
+            color: "var(--p-color-text-secondary)",
+            fontFamily: "var(--p-font-family-mono, monospace)",
           }}
         >
           {template.template}
         </div>
 
+        {/* Meta area */}
         <div
           style={{
-            padding: 16,
+            padding: "12px 14px",
             background: "var(--p-color-bg-surface-secondary)",
             flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
           }}
         >
-          <BlockStack gap="300">
-            <InlineStack align="space-between">
-              <Text as="h3" variant="headingMd">
+          <InlineStack align="space-between" blockAlign="start" wrap={false}>
+            <BlockStack gap="100">
+              <Text as="h3" variant="bodyMd" fontWeight="semibold">
                 {template.name}
               </Text>
-              {active ? <Badge tone="success">Active</Badge> : null}
-            </InlineStack>
-            <Text as="p" tone="subdued">
-              {template.description}
-            </Text>
-            <InlineStack>
-              <Button size="slim" onClick={onPreview}>
-                Preview
-              </Button>
-            </InlineStack>
-          </BlockStack>
+              {showResource && <ResourceBadge resource={template.resource} />}
+            </BlockStack>
+            {active && <Badge tone="success">Active</Badge>}
+          </InlineStack>
+
+          <Text as="p" variant="bodySm" tone="subdued">
+            {template.description}
+          </Text>
+
+          <InlineStack gap="150" align="start">
+            <Button size="micro" onClick={onPreview}>
+              Preview
+            </Button>
+            {isCustom && (
+              <>
+                <Button size="micro" onClick={onEdit}>
+                  Edit
+                </Button>
+                <Button size="micro" tone="critical" onClick={onDelete}>
+                  Delete
+                </Button>
+              </>
+            )}
+          </InlineStack>
         </div>
       </div>
     </Card>
   );
 }
 
+function FilterBar({ resourceFilter, typeFilter, onResourceChange, onTypeChange }) {
+  const [popoverActive, setPopoverActive] = useState(false);
+  const selectedTypeLabel = TYPE_OPTIONS.find((o) => o.value === typeFilter)?.label || "Description";
+
+  return (
+    <Box padding="400" paddingBlockStart="300" paddingBlockEnd="300">
+      <InlineStack align="space-between" blockAlign="center" wrap={false}>
+        {/* Resource pills */}
+        <InlineStack gap="150" wrap>
+          {RESOURCE_FILTERS.map((f) => (
+            <Button
+              key={f.id}
+              size="slim"
+              pressed={resourceFilter === f.id}
+              onClick={() => onResourceChange(f.id)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </InlineStack>
+
+        {/* Type dropdown */}
+        <Popover
+          active={popoverActive}
+          activator={
+            <Button
+              size="slim"
+              disclosure
+              onClick={() => setPopoverActive((v) => !v)}
+            >
+              {selectedTypeLabel}
+            </Button>
+          }
+          onClose={() => setPopoverActive(false)}
+        >
+          <ActionList
+            items={TYPE_OPTIONS.map((opt) => ({
+              content: opt.label,
+              active: opt.value === typeFilter,
+              onAction: () => {
+                onTypeChange(opt.value);
+                setPopoverActive(false);
+              },
+            }))}
+          />
+        </Popover>
+      </InlineStack>
+    </Box>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function TemplatePage() {
   const shopify = useAppBridge();
   const navigate = useNavigate();
 
-  const [selectedTab, setSelectedTab] = useState(0);
-  const [activeFilter, setActiveFilter] = useState({ ...DEFAULT_FILTER });
+  // Main tab: 0 = system, 1 = custom
+  const [mainTab, setMainTab] = useState(0);
 
+  // Shared filters
+  const [resourceFilter, setResourceFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("description");
+
+  // Selection state (localStorage)
   const [productSelection, setProductSelection] = useState(() =>
     readStoredProductPromptTemplateSelection(),
   );
@@ -197,11 +319,19 @@ export default function TemplatePage() {
   );
   const [pageSelection, setPageSelection] = useState(() => readStoredPagePromptTemplateSelection());
   const [blogSelection, setBlogSelection] = useState(() => readStoredBlogPromptTemplateSelection());
+
+  // Preview modal
   const [previewData, setPreviewData] = useState(null);
 
-  const currentResourceId = RESOURCE_TABS[selectedTab]?.id || "product";
-  const currentFilterId = activeFilter[currentResourceId] || DEFAULT_FILTER[currentResourceId];
-  const currentTemplates = getTemplates(currentResourceId, currentFilterId);
+  // Custom templates
+  const [customTemplates, setCustomTemplates] = useState(readCustomTemplates);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState(EMPTY_CUSTOM_FORM);
+  const [formErrors, setFormErrors] = useState({});
+
+  // Delete confirm
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
 
   const selectionMap = useMemo(
     () => ({
@@ -213,94 +343,91 @@ export default function TemplatePage() {
     [productSelection, collectionSelection, pageSelection, blogSelection],
   );
 
-  function handleTabSelect(index) {
-    setSelectedTab(index);
-  }
+  // ── Derived data ────────────────────────────────────────────────────────────
 
-  function handleFilterSelect(resourceId, filterId) {
-    setActiveFilter((prev) => ({ ...prev, [resourceId]: filterId }));
-  }
+  const systemTemplates = useMemo(
+    () => getSystemTemplates(resourceFilter, typeFilter),
+    [resourceFilter, typeFilter],
+  );
 
-  async function copyText(value, label) {
-    if (!value) return;
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-      }
-      shopify.toast.show(`${label} copied.`);
-    } catch {
-      shopify.toast.show(`Failed to copy ${label.toLowerCase()}.`);
-    }
-  }
+  const filteredCustomTemplates = useMemo(() => {
+    return customTemplates.filter((t) => {
+      const resourceMatch = resourceFilter === "all" || t.resource === resourceFilter;
+      const typeMatch = t.type === typeFilter;
+      return resourceMatch && typeMatch;
+    });
+  }, [customTemplates, resourceFilter, typeFilter]);
 
-  function applyTemplate(template, resourceId, filterId) {
-    if (!template || !resourceId) return;
+  // ── Apply template ──────────────────────────────────────────────────────────
+
+  function applyTemplate(template, resourceId, typeId) {
+    if (!template || !resourceId || !typeId) return;
 
     if (resourceId === "product") {
       const next = { ...productSelection };
-      if (filterId === "description") {
+      if (typeId === "description") {
         next.descriptionTemplateId = template.id;
         next.descriptionPromptTemplate = template.template;
-      } else if (filterId === "meta-title") {
+      } else if (typeId === "seo-title") {
         next.metaTitleTemplateId = template.id;
         next.metaTitlePromptTemplate = template.template;
-      } else if (filterId === "meta-description") {
+      } else if (typeId === "seo-description") {
         next.metaDescriptionTemplateId = template.id;
         next.metaDescriptionPromptTemplate = template.template;
       }
       setProductSelection(writeStoredProductPromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} product template applied.`);
+      shopify.toast.show(`${template.name} applied to products.`);
       return;
     }
 
     if (resourceId === "collection") {
       const next = { ...collectionSelection };
-      if (filterId === "description") {
+      if (typeId === "description") {
         next.descriptionTemplateId = template.id;
         next.descriptionPromptTemplate = template.template;
-      } else if (filterId === "meta-title") {
+      } else if (typeId === "seo-title") {
         next.metaTitleTemplateId = template.id;
         next.metaTitlePromptTemplate = template.template;
-      } else if (filterId === "meta-description") {
+      } else if (typeId === "seo-description") {
         next.metaDescriptionTemplateId = template.id;
         next.metaDescriptionPromptTemplate = template.template;
       }
       setCollectionSelection(writeStoredCollectionPromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} collection template applied.`);
+      shopify.toast.show(`${template.name} applied to collections.`);
       return;
     }
 
     if (resourceId === "page") {
       const next = { ...pageSelection };
-      if (filterId === "body") {
+      if (typeId === "description") {
         next.bodyTemplateId = template.id;
         next.bodyPromptTemplate = template.template;
-      } else if (filterId === "meta-title") {
+      } else if (typeId === "seo-title") {
         next.metaTitleTemplateId = template.id;
         next.metaTitlePromptTemplate = template.template;
-      } else if (filterId === "meta-description") {
+      } else if (typeId === "seo-description") {
         next.metaDescriptionTemplateId = template.id;
         next.metaDescriptionPromptTemplate = template.template;
       }
       setPageSelection(writeStoredPagePromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} page template applied.`);
+      shopify.toast.show(`${template.name} applied to pages.`);
       return;
     }
 
     if (resourceId === "blog") {
       const next = { ...blogSelection };
-      if (filterId === "body") {
+      if (typeId === "description") {
         next.bodyTemplateId = template.id;
         next.bodyPromptTemplate = template.template;
-      } else if (filterId === "meta-title") {
+      } else if (typeId === "seo-title") {
         next.metaTitleTemplateId = template.id;
         next.metaTitlePromptTemplate = template.template;
-      } else if (filterId === "meta-description") {
+      } else if (typeId === "seo-description") {
         next.metaDescriptionTemplateId = template.id;
         next.metaDescriptionPromptTemplate = template.template;
       }
       setBlogSelection(writeStoredBlogPromptTemplateSelection(next));
-      shopify.toast.show(`${template.name} blog template applied.`);
+      shopify.toast.show(`${template.name} applied to blogs.`);
     }
   }
 
@@ -312,31 +439,113 @@ export default function TemplatePage() {
     shopify.toast.show("All template selections cleared.");
   }
 
-  const filters = RESOURCE_FILTERS[currentResourceId] || [];
+  async function copyText(value, label) {
+    if (!value) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      }
+      shopify.toast.show(`${label} copied.`);
+    } catch {
+      shopify.toast.show(`Failed to copy.`);
+    }
+  }
+
+  // ── Custom template form ────────────────────────────────────────────────────
+
+  function openCreateModal() {
+    setEditingId(null);
+    setFormData(EMPTY_CUSTOM_FORM);
+    setFormErrors({});
+    setShowFormModal(true);
+  }
+
+  function openEditModal(template) {
+    setEditingId(template.id);
+    setFormData({
+      name: template.name,
+      description: template.description || "",
+      resource: template.resource,
+      type: template.type,
+      template: template.template,
+    });
+    setFormErrors({});
+    setShowFormModal(true);
+  }
+
+  function validateForm() {
+    const errors = {};
+    if (!formData.name.trim()) errors.name = "Template name is required.";
+    if (!formData.template.trim()) errors.template = "Template content is required.";
+    return errors;
+  }
+
+  function handleFormSave() {
+    const errors = validateForm();
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      return;
+    }
+
+    if (editingId) {
+      const updated = customTemplates.map((t) =>
+        t.id === editingId ? { ...t, ...formData } : t,
+      );
+      setCustomTemplates(saveCustomTemplates(updated));
+      shopify.toast.show("Custom template updated.");
+    } else {
+      const newEntry = {
+        id: `custom-${Date.now()}`,
+        ...formData,
+        createdAt: Date.now(),
+      };
+      const updated = [...customTemplates, newEntry];
+      setCustomTemplates(saveCustomTemplates(updated));
+      shopify.toast.show("Custom template created.");
+    }
+    setShowFormModal(false);
+  }
+
+  function handleDelete(templateId) {
+    const updated = customTemplates.filter((t) => t.id !== templateId);
+    setCustomTemplates(saveCustomTemplates(updated));
+    setDeleteTargetId(null);
+    shopify.toast.show("Custom template deleted.");
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  const isSystemTab = mainTab === 0;
+  const templates = isSystemTab ? systemTemplates : filteredCustomTemplates;
+  const showResourceBadge = resourceFilter === "all";
 
   return (
     <Page
-      title="Template"
-      subtitle="Multiple prompt templates for Products, Collections, Pages, and Blogs."
+      title="Templates"
+      subtitle="Manage prompt templates for AI content generation."
       primaryAction={{
-        content: "Open Pages",
-        onAction: () => navigate("/app/pages"),
+        content: "Clear All Selections",
+        onAction: clearAllTemplateSelections,
       }}
+      secondaryActions={[
+        { content: "Products", onAction: () => navigate("/app/products") },
+        { content: "Collections", onAction: () => navigate("/app/collections") },
+        { content: "Pages", onAction: () => navigate("/app/pages") },
+        { content: "Blogs", onAction: () => navigate("/app/blog") },
+      ]}
     >
       <Layout>
+        {/* Status badges */}
         <Layout.Section>
           <Card>
-            <BlockStack gap="300">
-              <Text as="h1" variant="headingLg">
-                Prompt Template Library
-              </Text>
-              <Text as="p" tone="subdued">
-                Preview and apply templates. Selected templates are used directly in AI generation on
-                Products, Collections, Pages, and Blogs.
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                Active selections
               </Text>
               <InlineStack gap="200" wrap>
                 <Badge tone={productSelection.descriptionTemplateId ? "success" : "attention"}>
-                  Product: {productSelection.descriptionTemplateId ? "Configured" : "Not selected"}
+                  Product:{" "}
+                  {productSelection.descriptionTemplateId ? "Configured" : "Not selected"}
                 </Badge>
                 <Badge tone={collectionSelection.descriptionTemplateId ? "success" : "attention"}>
                   Collection:{" "}
@@ -349,74 +558,107 @@ export default function TemplatePage() {
                   Blog: {blogSelection.bodyTemplateId ? "Configured" : "Not selected"}
                 </Badge>
               </InlineStack>
-              <InlineStack gap="200" wrap>
-                <Button onClick={clearAllTemplateSelections}>Clear All Templates</Button>
-                <Button onClick={() => navigate("/app/products")} variant="primary">
-                  Go To Products
-                </Button>
-                <Button onClick={() => navigate("/app/collections")} variant="primary">
-                  Go To Collections
-                </Button>
-                <Button onClick={() => navigate("/app/pages")} variant="primary">
-                  Go To Pages
-                </Button>
-                <Button onClick={() => navigate("/app/blog")} variant="primary">
-                  Go To Blogs
-                </Button>
-              </InlineStack>
             </BlockStack>
           </Card>
         </Layout.Section>
 
+        {/* Main tabs */}
         <Layout.Section>
           <Card padding="0">
-            <Tabs tabs={RESOURCE_TABS} selected={selectedTab} onSelect={handleTabSelect} />
-            <Box padding="400" paddingBlockStart="300" paddingBlockEnd="300">
-              <InlineStack gap="200" wrap>
-                {filters.map((filter) => (
-                  <Button
-                    key={filter.id}
-                    size="slim"
-                    pressed={currentFilterId === filter.id}
-                    onClick={() => handleFilterSelect(currentResourceId, filter.id)}
-                  >
-                    {filter.label}
+            <Tabs tabs={MAIN_TABS} selected={mainTab} onSelect={setMainTab} />
+            <Divider />
+
+            {/* Tab header */}
+            <Box padding="400" paddingBlockEnd="0">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingMd">
+                    {isSystemTab ? "System templates" : "Custom templates"}
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {isSystemTab
+                      ? "Customize and organize your content generation templates"
+                      : "Create and manage your own prompt templates"}
+                  </Text>
+                </BlockStack>
+                {!isSystemTab && (
+                  <Button variant="primary" size="slim" onClick={openCreateModal}>
+                    Create template
                   </Button>
-                ))}
+                )}
               </InlineStack>
             </Box>
+
+            {/* Filter bar */}
+            <FilterBar
+              resourceFilter={resourceFilter}
+              typeFilter={typeFilter}
+              onResourceChange={setResourceFilter}
+              onTypeChange={setTypeFilter}
+            />
           </Card>
         </Layout.Section>
 
+        {/* Template grid */}
         <Layout.Section>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: 16,
-            }}
-          >
-            {currentTemplates.map((template) => (
-              <PromptGalleryCard
-                key={template.id}
-                template={template}
-                active={
-                  getActiveTemplateId(currentResourceId, currentFilterId, selectionMap) ===
-                  template.id
+          {templates.length === 0 ? (
+            <Card>
+              <EmptyState
+                heading={
+                  isSystemTab
+                    ? "No templates for this filter"
+                    : "No custom templates yet"
                 }
-                onPreview={() =>
-                  setPreviewData({
-                    ...template,
-                    resourceId: currentResourceId,
-                    filterId: currentFilterId,
-                  })
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                action={
+                  !isSystemTab
+                    ? { content: "Create template", onAction: openCreateModal }
+                    : undefined
                 }
-              />
-            ))}
-          </div>
+              >
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {isSystemTab
+                    ? "Try selecting a different resource or content type."
+                    : "Create your first custom prompt template to use in AI generation."}
+                </Text>
+              </EmptyState>
+            </Card>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {templates.map((template) => {
+                const res = template.resource;
+                const activeId = getActiveTemplateId(res, typeFilter, selectionMap);
+                return (
+                  <TemplateCard
+                    key={template.id}
+                    template={template}
+                    active={activeId === template.id}
+                    showResource={showResourceBadge}
+                    isCustom={!isSystemTab}
+                    onPreview={() =>
+                      setPreviewData({
+                        ...template,
+                        resourceId: res,
+                        filterId: typeFilter,
+                      })
+                    }
+                    onEdit={() => openEditModal(template)}
+                    onDelete={() => setDeleteTargetId(template.id)}
+                  />
+                );
+              })}
+            </div>
+          )}
         </Layout.Section>
       </Layout>
 
+      {/* ── Preview Modal ──────────────────────────────────────────────────── */}
       <Modal
         open={Boolean(previewData)}
         onClose={() => setPreviewData(null)}
@@ -432,13 +674,19 @@ export default function TemplatePage() {
         secondaryActions={[
           {
             content: "Copy",
-            onAction: () => copyText(previewData?.template || "", previewData?.name || "Template"),
+            onAction: () =>
+              copyText(previewData?.template || "", previewData?.name || "Template"),
           },
+          { content: "Close", onAction: () => setPreviewData(null) },
         ]}
       >
         <Modal.Section>
           <BlockStack gap="300">
-            <Text as="p" tone="subdued">
+            <InlineStack gap="200" blockAlign="center">
+              {previewData?.resource && <ResourceBadge resource={previewData.resource} />}
+              <Badge>{typeLabel(previewData?.filterId || "description")}</Badge>
+            </InlineStack>
+            <Text as="p" variant="bodySm" tone="subdued">
               {previewData?.description}
             </Text>
             <Card>
@@ -446,8 +694,10 @@ export default function TemplatePage() {
                 <div
                   style={{
                     whiteSpace: "pre-wrap",
-                    lineHeight: 1.6,
-                    fontSize: 15,
+                    lineHeight: 1.65,
+                    fontSize: 13,
+                    fontFamily: "var(--p-font-family-mono, monospace)",
+                    color: "var(--p-color-text)",
                   }}
                 >
                   {previewData?.template || ""}
@@ -455,6 +705,78 @@ export default function TemplatePage() {
               </Box>
             </Card>
           </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      {/* ── Create / Edit Custom Template Modal ───────────────────────────── */}
+      <Modal
+        open={showFormModal}
+        onClose={() => setShowFormModal(false)}
+        title={editingId ? "Edit custom template" : "Create custom template"}
+        primaryAction={{ content: "Save", onAction: handleFormSave }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setShowFormModal(false) }]}
+        large
+      >
+        <Modal.Section>
+          <FormLayout>
+            <FormLayout.Group>
+              <Select
+                label="Resource"
+                options={RESOURCE_SELECT_OPTIONS}
+                value={formData.resource}
+                onChange={(v) => setFormData((p) => ({ ...p, resource: v }))}
+              />
+              <Select
+                label="Content type"
+                options={TYPE_OPTIONS}
+                value={formData.type}
+                onChange={(v) => setFormData((p) => ({ ...p, type: v }))}
+              />
+            </FormLayout.Group>
+            <TextField
+              label="Template name"
+              value={formData.name}
+              onChange={(v) => setFormData((p) => ({ ...p, name: v }))}
+              error={formErrors.name}
+              autoComplete="off"
+            />
+            <TextField
+              label="Description"
+              value={formData.description}
+              onChange={(v) => setFormData((p) => ({ ...p, description: v }))}
+              autoComplete="off"
+              helpText="Short description of what this template is for."
+            />
+            <TextField
+              label="Template content"
+              value={formData.template}
+              onChange={(v) => setFormData((p) => ({ ...p, template: v }))}
+              error={formErrors.template}
+              multiline={10}
+              autoComplete="off"
+              helpText="Use [brackets] for structure placeholders and {curly_braces} for dynamic values."
+              monospaced
+            />
+          </FormLayout>
+        </Modal.Section>
+      </Modal>
+
+      {/* ── Delete Confirm Modal ───────────────────────────────────────────── */}
+      <Modal
+        open={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        title="Delete custom template?"
+        primaryAction={{
+          content: "Delete",
+          tone: "critical",
+          onAction: () => handleDelete(deleteTargetId),
+        }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setDeleteTargetId(null) }]}
+      >
+        <Modal.Section>
+          <Text as="p" variant="bodyMd">
+            This action cannot be undone. The template will be permanently removed.
+          </Text>
         </Modal.Section>
       </Modal>
     </Page>
