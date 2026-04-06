@@ -20,6 +20,7 @@ import {
   Page,
   Select,
   Spinner,
+  Tabs,
   Text,
   TextField,
 } from "@shopify/polaris";
@@ -128,147 +129,6 @@ const COLLECTION_LIST_QUERY = `#graphql
     }
   }
 `;
-const LANGUAGE_OPTIONS = [
-  "English",
-  "English (British)",
-  "English (US)",
-  "Afrikaans",
-  "Akan",
-  "Albanian",
-  "Amharic",
-  "Arabic",
-  "Armenian",
-  "Assamese",
-  "Aymara",
-  "Azerbaijani",
-  "Bambara",
-  "Basque",
-  "Belarusian",
-  "Bengali",
-  "Bhojpuri",
-  "Bosnian",
-  "Bulgarian",
-  "Burmese",
-  "Catalan",
-  "Cebuano",
-  "Chinese",
-  "Chinese (Simplified)",
-  "Chinese (Traditional)",
-  "Corsican",
-  "Croatian",
-  "Czech",
-  "Danish",
-  "Dhivehi",
-  "Dogri",
-  "Dutch",
-  "Esperanto",
-  "Estonian",
-  "Ewe",
-  "Filipino",
-  "Finnish",
-  "French",
-  "Frisian",
-  "Galician",
-  "Georgian",
-  "German",
-  "Greek",
-  "Guarani",
-  "Gujarati",
-  "Haitian Creole",
-  "Hausa",
-  "Hawaiian",
-  "Hebrew",
-  "Hindi",
-  "Hmong",
-  "Hungarian",
-  "Icelandic",
-  "Igbo",
-  "Ilocano",
-  "Indonesian",
-  "Irish",
-  "Italian",
-  "Japanese",
-  "Javanese",
-  "Kannada",
-  "Kashmiri",
-  "Kazakh",
-  "Khmer",
-  "Kinyarwanda",
-  "Konkani",
-  "Korean",
-  "Krio",
-  "Kurdish (Kurmanji)",
-  "Kurdish (Sorani)",
-  "Kyrgyz",
-  "Lao",
-  "Latin",
-  "Latvian",
-  "Lingala",
-  "Lithuanian",
-  "Luganda",
-  "Luxembourgish",
-  "Macedonian",
-  "Maithili",
-  "Malagasy",
-  "Malay",
-  "Malayalam",
-  "Maltese",
-  "Maori",
-  "Marathi",
-  "Meiteilon (Manipuri)",
-  "Mizo",
-  "Mongolian",
-  "Nepali",
-  "Norwegian",
-  "Nyanja (Chichewa)",
-  "Odia",
-  "Oromo",
-  "Pashto",
-  "Persian",
-  "Polish",
-  "Portuguese",
-  "Punjabi",
-  "Quechua",
-  "Romanian",
-  "Russian",
-  "Samoan",
-  "Sanskrit",
-  "Scots Gaelic",
-  "Sepedi",
-  "Serbian",
-  "Sesotho",
-  "Shona",
-  "Sindhi",
-  "Sinhala",
-  "Slovak",
-  "Slovenian",
-  "Somali",
-  "Spanish",
-  "Sundanese",
-  "Swahili",
-  "Swedish",
-  "Tajik",
-  "Tamil",
-  "Tatar",
-  "Telugu",
-  "Thai",
-  "Tigrinya",
-  "Tsonga",
-  "Turkish",
-  "Turkmen",
-  "Twi",
-  "Ukrainian",
-  "Urdu",
-  "Uyghur",
-  "Uzbek",
-  "Vietnamese",
-  "Welsh",
-  "Xhosa",
-  "Yiddish",
-  "Yoruba",
-  "Zulu",
-];
-
 
 function escapeSearchValue(value) {
   return value.replace(/[\\"]/g, "\\$&");
@@ -1130,6 +990,10 @@ export default function CollectionsPage() {
   const [selectedMetaDescTemplateId, setSelectedMetaDescTemplateId] = useState("");
   const [selectedMetaTitleTemplateId, setSelectedMetaTitleTemplateId] = useState("");
   const bulkResultHandledRef = useRef(false);
+  const [showAdvancedBulkSettings, setShowAdvancedBulkSettings] = useState(false);
+  const [bulkDescKeywords, setBulkDescKeywords] = useState(() => readGlobalSettings().collectionDescKeywords || "");
+  const [bulkMetaTitleKeywords, setBulkMetaTitleKeywords] = useState(() => readGlobalSettings().collectionMetaTitleKeywords || "");
+  const [bulkMetaDescKeywords, setBulkMetaDescKeywords] = useState(() => readGlobalSettings().collectionMetaDescKeywords || "");
 
   useEffect(() => {
     const templateSelection = readStoredCollectionPromptTemplateSelection();
@@ -1217,7 +1081,6 @@ export default function CollectionsPage() {
 
     setBulkValidationMessage(null);
     setBulkResult(null);
-    const contextKeywords = readGlobalSettings().contextKeywords || "";
     const payload = new FormData();
     payload.append("intent", BULK_GENERATE_INTENT);
     payload.append("collections", JSON.stringify(
@@ -1229,15 +1092,17 @@ export default function CollectionsPage() {
         seoDescriptionValue: c.seoDescriptionValue,
       })),
     ));
-    payload.append("language", bulkSettings.language);
+    payload.append("language", readGlobalSettings().language || "English");
     payload.append("tone", bulkSettings.tone);
     payload.append("length", bulkSettings.length);
     payload.append("format", bulkSettings.format);
-    payload.append("contextKeywords", contextKeywords);
+    payload.append("descKeywords", bulkDescKeywords || "");
+    payload.append("metaTitleKeywords", bulkMetaTitleKeywords || "");
+    payload.append("metaDescKeywords", bulkMetaDescKeywords || "");
+    payload.append("contextKeywords", [bulkDescKeywords, bulkMetaTitleKeywords, bulkMetaDescKeywords].filter(Boolean).join(", "));
     payload.append("descriptionPromptTemplate", bulkDescTemplate || "");
     payload.append("metaTitlePromptTemplate", bulkMetaTitleTemplate || "");
     payload.append("metaDescriptionPromptTemplate", bulkMetaDescTemplate || "");
-    payload.append("aiProvider", bulkSettings.aiProvider);
     bulkFetcher.submit(payload, { method: "post" });
   }, [
     bulkDescTemplate,
@@ -1293,7 +1158,6 @@ export default function CollectionsPage() {
     { title: "Status" },
   ];
 
-  const languageSelectOptions = LANGUAGE_OPTIONS.map((lang) => ({ label: lang, value: lang }));
 
   const updateBulkField = (field) => (value) =>
     setBulkSettings((prev) => ({ ...prev, [field]: value }));
@@ -1383,61 +1247,29 @@ export default function CollectionsPage() {
               <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Optimize your collection pages with AI-generated descriptions</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-            <button
-              onClick={() => navigate(makeUrl({}))}
-              style={{ padding: "7px 16px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
-            >↺ Refresh</button>
-            <button
-              onClick={() => navigate("/app")}
-              style={{ padding: "7px 16px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            >← Back</button>
-            <button
-              disabled
-              style={{ padding: "7px 16px", borderRadius: "6px", border: "none", background: "linear-gradient(135deg, #f97316, #eab308)", color: "#fff", cursor: "not-allowed", fontSize: "13px", fontWeight: 600, opacity: 0.75 }}
-            >⚡ Upgrade Plan</button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", "--p-color-text": "#fff", "--p-color-bg-fill": "rgba(255,255,255,0.08)", "--p-color-border": "rgba(255,255,255,0.25)" }}>
+            <Button onClick={() => navigate(makeUrl({}))} variant="secondary" size="slim">↺ Refresh</Button>
+            <Button onClick={() => navigate("/app")} variant="secondary" size="slim">← Back</Button>
+            <Button disabled variant="primary" size="slim" tone="critical">⚡ Upgrade Plan</Button>
           </div>
         </div>
       </div>
 
       {/* Products / Collections tab bar */}
-      <div style={{ display: "flex", gap: "0", borderBottom: "2px solid #e5e7eb", marginBottom: "16px" }}>
-        <button
-          onClick={() => navigate("/app/products")}
-          style={{
-            padding: "10px 24px",
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            fontSize: "14px",
-            fontWeight: 500,
-            color: "#6b7280",
-            borderBottom: "2px solid transparent",
-            marginBottom: "-2px",
-          }}
-        >
-          Products
-        </button>
-        <button
-          style={{
-            padding: "10px 24px",
-            border: "none",
-            background: "none",
-            cursor: "default",
-            fontSize: "14px",
-            fontWeight: 700,
-            color: "#111",
-            borderBottom: "2px solid #111",
-            marginBottom: "-2px",
-          }}
-        >
-          Collections
-        </button>
+      <div style={{ marginBottom: "16px" }}>
+        <Tabs
+          tabs={[
+            { id: "products", content: "Products" },
+            { id: "collections", content: "Collections" },
+          ]}
+          selected={1}
+          onSelect={(index) => { if (index === 0) navigate("/app/products"); }}
+        />
       </div>
 
       <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", marginTop: "0" }}>
         {/* ── LEFT: Collection List ── */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
           {/* Instructions Card */}
           <div style={{ marginBottom: "16px" }}>
             <Card>
@@ -1519,7 +1351,7 @@ export default function CollectionsPage() {
         </div>
 
         {/* ── RIGHT: Bulk Settings Panel ── */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div style={{ flex: 3, minWidth: 0 }}>
           <Card padding="0">
             <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <BlockStack gap="100">
@@ -1571,16 +1403,6 @@ export default function CollectionsPage() {
               </div>
             </div>
 
-            {/* Output Language */}
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-              <Select
-                label="Output Language"
-                options={languageSelectOptions}
-                value={bulkSettings.language}
-                onChange={updateBulkField("language")}
-              />
-            </div>
-
             {/* Description Settings */}
             {bulkContentTypes.includes("description") && (
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
@@ -1591,6 +1413,16 @@ export default function CollectionsPage() {
                     options={[{ label: "— Default (no template) —", value: "" }, ...COLLECTION_DESCRIPTION_TEMPLATES.map((t) => ({ label: t.name, value: t.id }))]}
                     value={selectedDescTemplateId}
                     onChange={(id) => { setSelectedDescTemplateId(id); setBulkDescTemplate(COLLECTION_DESCRIPTION_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
+                  />
+                </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Description Keywords"
+                    value={bulkDescKeywords}
+                    onChange={setBulkDescKeywords}
+                    placeholder="e.g. curated, seasonal"
+                    helpText="Keywords specific to collection descriptions"
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -1608,6 +1440,16 @@ export default function CollectionsPage() {
                     onChange={(id) => { setSelectedMetaDescTemplateId(id); setBulkMetaDescTemplate(COLLECTION_META_DESCRIPTION_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
                   />
                 </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Meta Desc Keywords"
+                    value={bulkMetaDescKeywords}
+                    onChange={setBulkMetaDescKeywords}
+                    placeholder="e.g. wide selection, quality"
+                    helpText="Keywords specific to meta descriptions"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             )}
 
@@ -1623,18 +1465,28 @@ export default function CollectionsPage() {
                     onChange={(id) => { setSelectedMetaTitleTemplateId(id); setBulkMetaTitleTemplate(COLLECTION_META_TITLE_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
                   />
                 </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Meta Title Keywords"
+                    value={bulkMetaTitleKeywords}
+                    onChange={setBulkMetaTitleKeywords}
+                    placeholder="e.g. shop, explore"
+                    helpText="Keywords specific to meta titles"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             )}
 
             {/* Show Advanced Settings toggle */}
             <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-              <button
+              <Button
+                variant="plain"
                 onClick={() => setShowAdvancedBulkSettings((v) => !v)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#374151", display: "flex", alignItems: "center", gap: "6px", padding: "0", fontWeight: 500 }}
+                icon={showAdvancedBulkSettings ? "▲" : "▼"}
               >
-                <span>{showAdvancedBulkSettings ? "▲" : "▼"}</span>
                 {showAdvancedBulkSettings ? "Hide" : "Show"} Advanced Settings
-              </button>
+              </Button>
             </div>
 
             {/* Advanced Settings (collapsed by default) */}
@@ -1683,17 +1535,6 @@ export default function CollectionsPage() {
                     )}
                   </BlockStack>
 
-                  <Select
-                    label="AI Provider"
-                    options={[
-                      { label: "Auto", value: "auto" },
-                      { label: "OpenAI", value: "openai" },
-                      { label: "Anthropic", value: "anthropic" },
-                      { label: "Ollama", value: "ollama" },
-                    ]}
-                    value={bulkSettings.aiProvider}
-                    onChange={updateBulkField("aiProvider")}
-                  />
                 </BlockStack>
               </div>
             )}

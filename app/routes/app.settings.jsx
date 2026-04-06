@@ -59,20 +59,6 @@ export default function SettingsPage() {
     >
       <BlockStack gap="600">
 
-        {/* General */}
-        <Card>
-          <BlockStack gap="400">
-            <SectionLabel>General</SectionLabel>
-            <Select
-              label="Output Language"
-              options={LANGUAGE_OPTIONS}
-              value={settings.language}
-              onChange={update("language")}
-              helpText="Default language used for all AI-generated content."
-            />
-          </BlockStack>
-        </Card>
-
         {/* Generation Settings */}
         <Card>
           <BlockStack gap="400">
@@ -80,51 +66,158 @@ export default function SettingsPage() {
             <Text as="p" variant="bodySm" tone="subdued">
               These defaults are applied across all pages. Individual pages use these values automatically.
             </Text>
-            <Select
-              label="Tone"
-              options={[
-                { label: "Professional", value: "professional" },
-                { label: "Casual", value: "casual" },
-                { label: "Friendly", value: "friendly" },
-                { label: "Persuasive", value: "persuasive" },
-                { label: "Informative", value: "informative" },
-                { label: "Luxury", value: "luxury" },
-                { label: "Playful", value: "playful" },
-                { label: "Urgent", value: "urgent" },
-              ]}
-              value={settings.tone}
-              onChange={update("tone")}
-            />
-            <Select
-              label="Length"
-              options={[
-                { label: "Short (50 - 100 words)", value: "short (50 - 100 words)" },
-                { label: "Medium (100 - 200 words)", value: "medium (100 - 200 words)" },
-                { label: "Long (200 - 300 words)", value: "long (200 - 300 words)" },
-                { label: "Extra Long (300 - 500 words)", value: "extra long (300 - 500 words)" },
-              ]}
-              value={settings.length}
-              onChange={update("length")}
-            />
-            <Select
-              label="AI Provider"
-              options={[
-                { label: "Auto (recommended)", value: "auto" },
-                { label: "OpenAI", value: "openai" },
-                { label: "Anthropic", value: "anthropic" },
-                { label: "Ollama", value: "ollama" },
-              ]}
-              value={settings.aiProvider}
-              onChange={update("aiProvider")}
-            />
-            <TextField
-              label="Context Keywords"
-              value={settings.contextKeywords}
-              onChange={update("contextKeywords")}
-              placeholder="e.g. eco-friendly, premium, handmade (comma separated)"
-              helpText="Keywords sent to the AI as context for all content generation."
-              autoComplete="off"
-            />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <Select
+                label="Output Language"
+                options={LANGUAGE_OPTIONS}
+                value={settings.language}
+                onChange={update("language")}
+                helpText="Default language for all AI-generated content."
+              />
+              <Select
+                label="Tone"
+                options={[
+                  { label: "Professional", value: "professional" },
+                  { label: "Casual", value: "casual" },
+                  { label: "Friendly", value: "friendly" },
+                  { label: "Persuasive", value: "persuasive" },
+                  { label: "Informative", value: "informative" },
+                  { label: "Luxury", value: "luxury" },
+                  { label: "Playful", value: "playful" },
+                  { label: "Urgent", value: "urgent" },
+                ]}
+                value={settings.tone}
+                onChange={update("tone")}
+              />
+            </div>
+          </BlockStack>
+        </Card>
+
+        {/* Context Keywords */}
+        <Card>
+          <BlockStack gap="500">
+            <div>
+              <SectionLabel>Context Keywords</SectionLabel>
+              <Text as="p" variant="bodySm" tone="subdued">Specific keywords sent to the AI for each content type. Separate with commas.</Text>
+            </div>
+
+            {/* Product */}
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">Product</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                <TextField
+                  label="Description Keywords"
+                  value={settings.productDescKeywords}
+                  onChange={update("productDescKeywords")}
+                  placeholder="e.g. eco-friendly, premium"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Title Keywords"
+                  value={settings.productMetaTitleKeywords}
+                  onChange={update("productMetaTitleKeywords")}
+                  placeholder="e.g. buy, shop, best"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Desc Keywords"
+                  value={settings.productMetaDescKeywords}
+                  onChange={update("productMetaDescKeywords")}
+                  placeholder="e.g. fast shipping, handmade"
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+
+            <Divider />
+
+            {/* Collections */}
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">Collections</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                <TextField
+                  label="Description Keywords"
+                  value={settings.collectionDescKeywords}
+                  onChange={update("collectionDescKeywords")}
+                  placeholder="e.g. curated, seasonal"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Title Keywords"
+                  value={settings.collectionMetaTitleKeywords}
+                  onChange={update("collectionMetaTitleKeywords")}
+                  placeholder="e.g. shop, explore"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Desc Keywords"
+                  value={settings.collectionMetaDescKeywords}
+                  onChange={update("collectionMetaDescKeywords")}
+                  placeholder="e.g. wide selection, quality"
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+
+            <Divider />
+
+            {/* Pages */}
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">Pages</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                <TextField
+                  label="Content Keywords"
+                  value={settings.pageContentKeywords}
+                  onChange={update("pageContentKeywords")}
+                  placeholder="e.g. about us, mission"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Title Keywords"
+                  value={settings.pageMetaTitleKeywords}
+                  onChange={update("pageMetaTitleKeywords")}
+                  placeholder="e.g. official, store"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Desc Keywords"
+                  value={settings.pageMetaDescKeywords}
+                  onChange={update("pageMetaDescKeywords")}
+                  placeholder="e.g. learn more, discover"
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+
+            <Divider />
+
+            {/* Blog */}
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">Blog</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                <TextField
+                  label="Content Keywords"
+                  value={settings.blogContentKeywords}
+                  onChange={update("blogContentKeywords")}
+                  placeholder="e.g. tips, guide, how-to"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Title Keywords"
+                  value={settings.blogMetaTitleKeywords}
+                  onChange={update("blogMetaTitleKeywords")}
+                  placeholder="e.g. best, top, ultimate"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta Desc Keywords"
+                  value={settings.blogMetaDescKeywords}
+                  onChange={update("blogMetaDescKeywords")}
+                  placeholder="e.g. read more, in-depth"
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
           </BlockStack>
         </Card>
 

@@ -20,6 +20,7 @@ import {
   Text,
   Button,
   Select,
+  TextField,
   Banner,
   Badge,
   IndexTable,
@@ -366,19 +367,6 @@ const ARTICLE_TYPE_OPTIONS = [
   { label: "Custom", value: "Custom" },
 ];
 
-const LANGUAGE_OPTIONS = [
-  { label: "English", value: "en" },
-  { label: "Spanish", value: "es" },
-  { label: "French", value: "fr" },
-  { label: "German", value: "de" },
-  { label: "Italian", value: "it" },
-  { label: "Portuguese", value: "pt" },
-  { label: "Dutch", value: "nl" },
-  { label: "Japanese", value: "ja" },
-  { label: "Chinese (Simplified)", value: "zh" },
-  { label: "Hindi", value: "hi" },
-  { label: "Arabic", value: "ar" },
-];
 
 const TONE_OPTIONS = [
   { label: "Professional", value: "professional" },
@@ -419,12 +407,10 @@ export default function BlogPage() {
   const [bulkSettings, setBulkSettings] = useState(() => {
     const gs = readGlobalSettings();
     return {
-      language: "English",
       tone: gs.tone || "professional",
       length: gs.length || "medium",
       format: "headings and paragraphs",
       articleType: "How-To Guide",
-      aiProvider: gs.aiProvider || "auto",
     };
   });
   const [selectedBodyTemplateId, setSelectedBodyTemplateId] = useState("");
@@ -435,6 +421,9 @@ export default function BlogPage() {
   const [bulkMetaTitlePromptTemplate, setBulkMetaTitlePromptTemplate] = useState("");
   const [bulkValidationMessage, setBulkValidationMessage] = useState(null);
   const [bulkResult, setBulkResult] = useState(null);
+  const [bulkBodyKeywords, setBulkBodyKeywords] = useState(() => readGlobalSettings().blogContentKeywords || "");
+  const [bulkMetaTitleKeywords, setBulkMetaTitleKeywords] = useState(() => readGlobalSettings().blogMetaTitleKeywords || "");
+  const [bulkMetaDescKeywords, setBulkMetaDescKeywords] = useState(() => readGlobalSettings().blogMetaDescKeywords || "");
 
   const [filterBlogId, setFilterBlogId] = useState("all");
 
@@ -474,16 +463,18 @@ export default function BlogPage() {
         body: a.body || "",
       }))
     ));
-    payload.append("language", bulkSettings.language);
+    payload.append("language", readGlobalSettings().language || "English");
     payload.append("tone", bulkSettings.tone);
     payload.append("length", bulkSettings.length);
     payload.append("format", bulkSettings.format);
     payload.append("articleType", bulkSettings.articleType);
-    payload.append("aiProvider", bulkSettings.aiProvider);
+    payload.append("bodyKeywords", bulkBodyKeywords || "");
+    payload.append("metaTitleKeywords", bulkMetaTitleKeywords || "");
+    payload.append("metaDescKeywords", bulkMetaDescKeywords || "");
+    payload.append("contextKeywords", [bulkBodyKeywords, bulkMetaTitleKeywords, bulkMetaDescKeywords].filter(Boolean).join(", "));
     payload.append("bodyPromptTemplate", bulkBodyPromptTemplate);
     payload.append("metaTitlePromptTemplate", bulkMetaTitlePromptTemplate);
     payload.append("metaDescriptionPromptTemplate", bulkMetaDescPromptTemplate);
-    payload.append("contextKeywords", readGlobalSettings().contextKeywords || "");
     bulkFetcher.submit(payload, { method: "post" });
   }
 
@@ -545,11 +536,8 @@ export default function BlogPage() {
               <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Generate and manage AI content for your Shopify blog articles</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-            <button
-              onClick={() => navigate("/app")}
-              style={{ padding: "7px 16px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            >← Dashboard</button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", "--p-color-text": "#fff", "--p-color-bg-fill": "rgba(255,255,255,0.08)", "--p-color-border": "rgba(255,255,255,0.25)" }}>
+            <Button onClick={() => navigate("/app")} variant="secondary" size="slim">← Dashboard</Button>
           </div>
         </div>
       </div>
@@ -557,7 +545,7 @@ export default function BlogPage() {
       <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
 
         {/* ── LEFT: Article List ── */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
           {articles.length === 0 && (
             <Banner tone="info">
               <p>
@@ -605,7 +593,7 @@ export default function BlogPage() {
         </div>
 
         {/* ── RIGHT: Bulk Settings Panel ── */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div style={{ flex: 3, minWidth: 0 }}>
           <Card padding="0">
             {/* Header */}
             <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
@@ -658,16 +646,6 @@ export default function BlogPage() {
               </div>
             </div>
 
-            {/* Output Language */}
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-              <Select
-                label="Output Language"
-                options={LANGUAGE_OPTIONS}
-                value={bulkSettings.language}
-                onChange={(v) => setBulkSettings((s) => ({ ...s, language: v }))}
-              />
-            </div>
-
             {/* Body Template Section */}
             {bulkContentTypes.includes("body") && (
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
@@ -678,6 +656,16 @@ export default function BlogPage() {
                     options={[{ label: "— Default (no template) —", value: "" }, ...BLOG_BODY_TEMPLATES.map((t) => ({ label: t.name, value: t.id }))]}
                     value={selectedBodyTemplateId}
                     onChange={(id) => { setSelectedBodyTemplateId(id); setBulkBodyPromptTemplate(BLOG_BODY_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
+                  />
+                </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Body Keywords"
+                    value={bulkBodyKeywords}
+                    onChange={setBulkBodyKeywords}
+                    placeholder="e.g. tips, guide, how-to"
+                    helpText="Keywords specific to article body content"
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -695,6 +683,16 @@ export default function BlogPage() {
                     onChange={(id) => { setSelectedMetaDescTemplateId(id); setBulkMetaDescPromptTemplate(BLOG_META_DESCRIPTION_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
                   />
                 </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Meta Desc Keywords"
+                    value={bulkMetaDescKeywords}
+                    onChange={setBulkMetaDescKeywords}
+                    placeholder="e.g. read more, in-depth"
+                    helpText="Keywords specific to meta descriptions"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             )}
 
@@ -708,6 +706,16 @@ export default function BlogPage() {
                     options={[{ label: "— Default (no template) —", value: "" }, ...BLOG_META_TITLE_TEMPLATES.map((t) => ({ label: t.name, value: t.id }))]}
                     value={selectedMetaTitleTemplateId}
                     onChange={(id) => { setSelectedMetaTitleTemplateId(id); setBulkMetaTitlePromptTemplate(BLOG_META_TITLE_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
+                  />
+                </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Meta Title Keywords"
+                    value={bulkMetaTitleKeywords}
+                    onChange={setBulkMetaTitleKeywords}
+                    placeholder="e.g. best, top, ultimate"
+                    helpText="Keywords specific to meta titles"
+                    autoComplete="off"
                   />
                 </div>
               </div>

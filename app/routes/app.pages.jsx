@@ -19,6 +19,7 @@ import {
   Text,
   Button,
   Select,
+  TextField,
   Banner,
   Badge,
   IndexTable,
@@ -397,19 +398,6 @@ const PAGE_TYPE_OPTIONS = [
   { label: "Custom", value: "Custom" },
 ];
 
-const LANGUAGE_OPTIONS = [
-  { label: "English", value: "en" },
-  { label: "Spanish", value: "es" },
-  { label: "French", value: "fr" },
-  { label: "German", value: "de" },
-  { label: "Italian", value: "it" },
-  { label: "Portuguese", value: "pt" },
-  { label: "Dutch", value: "nl" },
-  { label: "Japanese", value: "ja" },
-  { label: "Chinese (Simplified)", value: "zh" },
-  { label: "Hindi", value: "hi" },
-  { label: "Arabic", value: "ar" },
-];
 
 const TONE_OPTIONS = [
   { label: "Professional", value: "professional" },
@@ -446,12 +434,10 @@ export default function PagesPage() {
   const [bulkSettings, setBulkSettings] = useState(() => {
     const gs = readGlobalSettings();
     return {
-      language: "English",
       tone: gs.tone || "professional",
       length: gs.length || "medium",
       format: "paragraphs",
       pageType: "About Us",
-      aiProvider: gs.aiProvider || "auto",
     };
   });
   const [bulkContentTypes, setBulkContentTypes] = useState(["body", "meta_title", "meta_description"]);
@@ -463,6 +449,9 @@ export default function PagesPage() {
   const [selectedBodyTemplateId, setSelectedBodyTemplateId] = useState("");
   const [selectedMetaTitleTemplateId, setSelectedMetaTitleTemplateId] = useState("");
   const [selectedMetaDescTemplateId, setSelectedMetaDescTemplateId] = useState("");
+  const [bulkBodyKeywords, setBulkBodyKeywords] = useState(() => readGlobalSettings().pageContentKeywords || "");
+  const [bulkMetaTitleKeywords, setBulkMetaTitleKeywords] = useState(() => readGlobalSettings().pageMetaTitleKeywords || "");
+  const [bulkMetaDescKeywords, setBulkMetaDescKeywords] = useState(() => readGlobalSettings().pageMetaDescKeywords || "");
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(pages);
@@ -485,16 +474,18 @@ export default function PagesPage() {
     const fd = new FormData();
     fd.append("intent", "bulk_generate_pages");
     fd.append("pages", JSON.stringify(selectedPages.map((p) => ({ id: p.id, title: p.title, body: p.body || "" }))));
-    fd.append("language", bulkSettings.language);
+    fd.append("language", readGlobalSettings().language || "English");
     fd.append("tone", bulkSettings.tone);
     fd.append("length", bulkSettings.length);
     fd.append("format", bulkSettings.format);
     fd.append("pageType", bulkSettings.pageType);
-    fd.append("contextKeywords", readGlobalSettings().contextKeywords || "");
+    fd.append("bodyKeywords", bulkBodyKeywords || "");
+    fd.append("metaTitleKeywords", bulkMetaTitleKeywords || "");
+    fd.append("metaDescKeywords", bulkMetaDescKeywords || "");
+    fd.append("contextKeywords", [bulkBodyKeywords, bulkMetaTitleKeywords, bulkMetaDescKeywords].filter(Boolean).join(", "));
     fd.append("bodyPromptTemplate", bulkBodyTemplate || "");
     fd.append("metaTitlePromptTemplate", bulkMetaTitleTemplate || "");
     fd.append("metaDescriptionPromptTemplate", bulkMetaDescTemplate || "");
-    fd.append("aiProvider", bulkSettings.aiProvider);
     bulkFetcher.submit(fd, { method: "post" });
   }
 
@@ -531,16 +522,15 @@ export default function PagesPage() {
               <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Generate and manage AI content for your Shopify storefront pages</div>
             </div>
           </div>
-          <button
-            onClick={() => navigate("/app")}
-            style={{ padding: "7px 16px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-          >← Dashboard</button>
+          <div style={{ "--p-color-text": "#fff", "--p-color-bg-fill": "rgba(255,255,255,0.08)", "--p-color-border": "rgba(255,255,255,0.25)" }}>
+            <Button onClick={() => navigate("/app")} variant="secondary" size="slim">← Dashboard</Button>
+          </div>
         </div>
       </div>
 
       <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
         {/* LEFT: Pages Table */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
           {pages.length === 0 && (
             <Banner tone="info">
               <p>No pages found in your store. Create pages in Shopify Admin first.</p>
@@ -579,7 +569,7 @@ export default function PagesPage() {
         </div>
 
         {/* RIGHT: Bulk Settings Panel */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div style={{ flex: 3, minWidth: 0 }}>
           <Card padding="0">
             <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <BlockStack gap="100">
@@ -641,16 +631,6 @@ export default function PagesPage() {
               </div>
             </div>
 
-            {/* Output Language */}
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-              <Select
-                label="Output Language"
-                options={LANGUAGE_OPTIONS}
-                value={bulkSettings.language}
-                onChange={(v) => setBulkSettings((s) => ({ ...s, language: v }))}
-              />
-            </div>
-
             {/* Body Template Section */}
             {bulkContentTypes.includes("body") && (
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
@@ -661,6 +641,16 @@ export default function PagesPage() {
                     options={[{ label: "— Default (no template) —", value: "" }, ...PAGE_BODY_TEMPLATES.map((t) => ({ label: t.name, value: t.id }))]}
                     value={selectedBodyTemplateId}
                     onChange={(id) => { setSelectedBodyTemplateId(id); setBulkBodyTemplate(PAGE_BODY_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
+                  />
+                </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Body Keywords"
+                    value={bulkBodyKeywords}
+                    onChange={setBulkBodyKeywords}
+                    placeholder="e.g. about us, mission, values"
+                    helpText="Keywords specific to page body content"
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -678,6 +668,16 @@ export default function PagesPage() {
                     onChange={(id) => { setSelectedMetaTitleTemplateId(id); setBulkMetaTitleTemplate(PAGE_META_TITLE_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
                   />
                 </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Meta Title Keywords"
+                    value={bulkMetaTitleKeywords}
+                    onChange={setBulkMetaTitleKeywords}
+                    placeholder="e.g. official, store"
+                    helpText="Keywords specific to meta titles"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             )}
 
@@ -691,6 +691,16 @@ export default function PagesPage() {
                     options={[{ label: "— Default (no template) —", value: "" }, ...PAGE_META_DESCRIPTION_TEMPLATES.map((t) => ({ label: t.name, value: t.id }))]}
                     value={selectedMetaDescTemplateId}
                     onChange={(id) => { setSelectedMetaDescTemplateId(id); setBulkMetaDescTemplate(PAGE_META_DESCRIPTION_TEMPLATES.find((t) => t.id === id)?.template || ""); }}
+                  />
+                </div>
+                <div style={{ marginTop: "8px" }}>
+                  <TextField
+                    label="Meta Desc Keywords"
+                    value={bulkMetaDescKeywords}
+                    onChange={setBulkMetaDescKeywords}
+                    placeholder="e.g. learn more, discover"
+                    helpText="Keywords specific to meta descriptions"
+                    autoComplete="off"
                   />
                 </div>
               </div>
