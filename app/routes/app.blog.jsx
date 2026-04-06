@@ -420,7 +420,6 @@ export default function BlogPage() {
 
   // ── Bulk state ──────────────────────────────────────────────────────────────
   const [bulkContentTypes, setBulkContentTypes] = useState(["body", "meta_description", "meta_title"]);
-  const [activeSection, setActiveSection] = useState("body");
   const [bulkSettings, setBulkSettings] = useState({
     language: "en",
     tone: "professional",
@@ -661,7 +660,6 @@ export default function BlogPage() {
                   { id: "meta_title", label: "Meta Title" },
                 ].map((type) => {
                   const isSelected = bulkContentTypes.includes(type.id);
-                  const isFocused = activeSection === type.id;
                   return (
                     <button
                       key={type.id}
@@ -669,13 +667,12 @@ export default function BlogPage() {
                         setBulkContentTypes((prev) =>
                           prev.includes(type.id) ? prev.filter((t) => t !== type.id) : [...prev, type.id]
                         );
-                        setActiveSection(type.id);
                       }}
                       style={{
                         padding: "5px 14px",
                         borderRadius: "20px",
                         border: isSelected ? "2px solid #1a1a1a" : "1px solid #d1d5db",
-                        background: isSelected ? "#1a1a1a" : isFocused ? "#f3f4f6" : "#fff",
+                        background: isSelected ? "#1a1a1a" : "#fff",
                         color: isSelected ? "#fff" : "#374151",
                         cursor: "pointer",
                         fontSize: "13px",
@@ -691,9 +688,6 @@ export default function BlogPage() {
                   );
                 })}
               </div>
-              <div style={{ marginTop: "6px" }}>
-                <Text as="span" variant="bodySm" tone="subdued">Click a type to view its settings below. Selected types will all be generated.</Text>
-              </div>
             </div>
 
             {/* Output Language */}
@@ -707,7 +701,7 @@ export default function BlogPage() {
             </div>
 
             {/* Body Template Section */}
-            {activeSection === "body" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Body</Text>
                 <button onClick={() => openBlogTemplateLib("description", "bulk_body")} style={btnStyle}>Browse Templates</button>
@@ -735,10 +729,10 @@ export default function BlogPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Meta Description Template Section */}
-            {activeSection === "meta_description" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Description</Text>
                 <button onClick={() => openBlogTemplateLib("seo-description", "bulk_meta_desc")} style={btnStyle}>Browse Templates</button>
@@ -766,10 +760,10 @@ export default function BlogPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Meta Title Template Section */}
-            {activeSection === "meta_title" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Title</Text>
                 <button onClick={() => openBlogTemplateLib("seo-title", "bulk_meta_title")} style={btnStyle}>Browse Templates</button>
@@ -797,7 +791,7 @@ export default function BlogPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Advanced Settings Toggle */}
             <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--p-color-border)" }}>

@@ -1207,7 +1207,6 @@ export default function CollectionsPage() {
   const [selectedCollectionIds, setSelectedCollectionIds] = useState([]);
   const [bulkValidationMessage, setBulkValidationMessage] = useState(null);
   const [bulkContentTypes, setBulkContentTypes] = useState(["description"]);
-  const [activeSection, setActiveSection] = useState("description");
   const [useCustomInstructions, setUseCustomInstructions] = useState(false);
   const [useCustomMetaDescInstructions, setUseCustomMetaDescInstructions] = useState(false);
   const [useCustomMetaTitleInstructions, setUseCustomMetaTitleInstructions] = useState(false);
@@ -1674,7 +1673,6 @@ export default function CollectionsPage() {
                   { id: "meta_title", label: "Meta Title" },
                 ].map((type) => {
                   const isSelected = bulkContentTypes.includes(type.id);
-                  const isFocused = activeSection === type.id;
                   return (
                     <button
                       key={type.id}
@@ -1684,13 +1682,12 @@ export default function CollectionsPage() {
                             ? prev.length > 1 ? prev.filter((t) => t !== type.id) : prev
                             : [...prev, type.id]
                         );
-                        setActiveSection(type.id);
                       }}
                       style={{
                         padding: "5px 14px",
                         borderRadius: "20px",
                         border: isSelected ? "2px solid #1a1a1a" : "1px solid #d1d5db",
-                        background: isSelected ? "#1a1a1a" : isFocused ? "#f3f4f6" : "#fff",
+                        background: isSelected ? "#1a1a1a" : "#fff",
                         color: isSelected ? "#fff" : "#374151",
                         cursor: "pointer",
                         fontSize: "13px",
@@ -1706,9 +1703,6 @@ export default function CollectionsPage() {
                   );
                 })}
               </div>
-              <div style={{ marginTop: "6px" }}>
-                <Text as="span" variant="bodySm" tone="subdued">Click a type to view its settings below. Selected types will all be generated.</Text>
-              </div>
             </div>
 
             {/* Output Language */}
@@ -1722,7 +1716,7 @@ export default function CollectionsPage() {
             </div>
 
             {/* Description Settings */}
-            {activeSection === "description" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Description</Text>
                 <button onClick={() => openCollectionTemplateLib("description", "descriptionPromptTemplate")} style={btnStyle}>Browse Templates</button>
@@ -1751,10 +1745,10 @@ export default function CollectionsPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Meta Description Settings */}
-            {activeSection === "meta_description" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Description</Text>
                 <button onClick={() => openCollectionTemplateLib("seo-description", "metaDescriptionPromptTemplate")} style={btnStyle}>Browse Templates</button>
@@ -1783,10 +1777,10 @@ export default function CollectionsPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Meta Title Settings */}
-            {activeSection === "meta_title" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Title</Text>
                 <button onClick={() => openCollectionTemplateLib("seo-title", "metaTitlePromptTemplate")} style={btnStyle}>Browse Templates</button>
@@ -1815,7 +1809,7 @@ export default function CollectionsPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Show Advanced Settings toggle */}
             <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--p-color-border)" }}>

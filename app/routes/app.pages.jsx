@@ -455,7 +455,6 @@ export default function PagesPage() {
     pageType: "About Us",
     aiProvider: defaultAiProvider || "auto",
   });
-  const [activeSection, setActiveSection] = useState("description");
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkValidationMessage, setBulkValidationMessage] = useState(null);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
@@ -639,39 +638,8 @@ export default function PagesPage() {
               />
             </div>
 
-            {/* Content Type Pills */}
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {[
-                  { id: "description", label: "Body" },
-                  { id: "meta_title", label: "Meta Title" },
-                  { id: "meta_description", label: "Meta Description" },
-                ].map((type) => {
-                  const isFocused = activeSection === type.id;
-                  return (
-                    <button
-                      key={type.id}
-                      onClick={() => setActiveSection(type.id)}
-                      style={{
-                        padding: "5px 14px",
-                        borderRadius: "20px",
-                        border: isFocused ? "2px solid #1a1a1a" : "1px solid #d1d5db",
-                        background: isFocused ? "#1a1a1a" : "#fff",
-                        color: isFocused ? "#fff" : "#374151",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontWeight: isFocused ? 600 : 400,
-                      }}
-                    >
-                      {type.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Body Template Section */}
-            {activeSection === "description" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Body</Text>
                 <button onClick={() => openPageTemplateLib("description", "pageBodyPromptTemplate")} style={btnStyle}>Browse Templates</button>
@@ -699,10 +667,10 @@ export default function PagesPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Meta Title Template Section */}
-            {activeSection === "meta_title" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Title</Text>
                 <button onClick={() => openPageTemplateLib("seo-title", "pageMetaTitlePromptTemplate")} style={btnStyle}>Browse Templates</button>
@@ -730,10 +698,10 @@ export default function PagesPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Meta Description Template Section */}
-            {activeSection === "meta_description" && <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Description</Text>
                 <button onClick={() => openPageTemplateLib("seo-description", "pageMetaDescriptionPromptTemplate")} style={btnStyle}>Browse Templates</button>
@@ -761,7 +729,7 @@ export default function PagesPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Advanced Settings Toggle */}
             <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
