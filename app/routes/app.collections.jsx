@@ -14,16 +14,11 @@ import {
   BlockStack,
   Box,
   Button,
-  ButtonGroup,
   Card,
   Checkbox,
-  Divider,
   EmptyState,
-  Grid,
   IndexTable,
   InlineStack,
-  Layout,
-  Modal,
   Page,
   Select,
   Spinner,
@@ -32,7 +27,6 @@ import {
   TextField,
   Thumbnail,
 } from "@shopify/polaris";
-import { ViewIcon, UndoIcon } from "@shopify/polaris-icons";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { buildCollectionContentPrompt } from "../lib/contentPromptTemplates";
@@ -46,11 +40,6 @@ import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
 /* global process */
 
 const FETCH_BATCH_SIZE = 250;
-const EDIT_MODAL_ID = "collection-edit-modal";
-const GENERATE_ALL_INTENT = "generate_all";
-const GENERATE_META_TITLE_INTENT = "generate_meta_title";
-const GENERATE_META_DESCRIPTION_INTENT = "generate_meta_description";
-const UPDATE_COLLECTION_INTENT = "update_collection";
 const BULK_GENERATE_INTENT = "bulk_generate";
 const MAX_BULK_ITEMS = 50;
 const MIN_BULK_COLLECTION_SELECTION_ERROR = "Select at least one collection for bulk generation.";
@@ -305,24 +294,6 @@ const BULK_KEYWORD_OPTIONS = [
   "Use cases",
   "Target audience",
 ];
-const DESCRIPTION_STYLE_OPTIONS = ["Normal", "Heading", "Subheading"];
-
-const editInitialState = {
-  title: "",
-  description: "",
-  descriptionStyle: "Normal",
-  seoTitle: "",
-  seoDescription: "",
-  language: "English",
-  tone: "Neutral",
-  length: "50 - 150 words",
-  format: "Single paragraph",
-  contextKeywords: "",
-  descriptionPromptTemplate: "",
-  metaTitlePromptTemplate: "",
-  metaDescriptionPromptTemplate: "",
-  aiProvider: "auto",
-};
 
 function escapeSearchValue(value) {
   return value.replace(/[\\"]/g, "\\$&");
@@ -529,15 +500,7 @@ function buildGenerationPrompt({
   descriptionPromptTemplate,
   metaTitlePromptTemplate,
   metaDescriptionPromptTemplate,
-  intent,
 }) {
-  const promptIntent =
-    intent === GENERATE_META_TITLE_INTENT
-      ? "seo_title"
-      : intent === GENERATE_META_DESCRIPTION_INTENT
-        ? "seo_description"
-        : "all";
-
   return buildCollectionContentPrompt({
     title,
     descriptionText,
@@ -551,7 +514,7 @@ function buildGenerationPrompt({
     descriptionPromptTemplate,
     metaTitlePromptTemplate,
     metaDescriptionPromptTemplate,
-    intent: promptIntent,
+    intent: "all",
   });
 }
 
@@ -944,25 +907,6 @@ export const action = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = readFormString(formData, "intent");
-  const collectionId = readFormString(formData, "collectionId");
-
-  if (!collectionId && intent !== BULK_GENERATE_INTENT) {
-    return { ok: false, intent, error: "Collection id is required." };
-  }
-
-  const title = readFormString(formData, "title");
-  const descriptionHtml = readFormString(formData, "description");
-  const seoTitle = readFormString(formData, "seoTitle");
-  const seoDescription = readFormString(formData, "seoDescription");
-  const language = readFormString(formData, "language");
-  const tone = readFormString(formData, "tone");
-  const lengthOption = readFormString(formData, "length");
-  const formatOption = readFormString(formData, "format");
-  const contextKeywords = readFormString(formData, "contextKeywords");
-  const descriptionPromptTemplate = readFormString(formData, "descriptionPromptTemplate");
-  const metaTitlePromptTemplate = readFormString(formData, "metaTitlePromptTemplate");
-  const metaDescriptionPromptTemplate = readFormString(formData, "metaDescriptionPromptTemplate");
-  const aiProvider = readFormString(formData, "aiProvider") || "auto";
 
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
@@ -970,224 +914,6 @@ export const action = async ({ request }) => {
   });
 
   try {
-    if (
-      intent === GENERATE_ALL_INTENT ||
-      intent === GENERATE_META_TITLE_INTENT ||
-      intent === GENERATE_META_DESCRIPTION_INTENT
-    ) {
-      const generated = await generateContent(
-        {
-          title,
-          descriptionText: stripHtml(descriptionHtml),
-          seoTitle,
-          seoDescription,
-          language,
-          tone,
-          lengthOption,
-          format: formatOption,
-          contextKeywords,
-          descriptionPromptTemplate,
-          metaTitlePromptTemplate,
-          metaDescriptionPromptTemplate,
-          intent,
-        },
-        {
-          aiProvider,
-          shopOpenaiKey: shopData?.openaiApiKey || null,
-          shopAnthropicKey: shopData?.anthropicApiKey || null,
-        },
-      );
-
-      let nextDescription = descriptionHtml;
-      let nextSeoTitle = seoTitle;
-      let nextSeoDescription = seoDescription;
-
-      if (intent === GENERATE_ALL_INTENT && generated.collectionDescription) {
-        nextDescription = toParagraphHtml(generated.collectionDescription);
-      }
-      if (
-        (intent === GENERATE_ALL_INTENT || intent === GENERATE_META_TITLE_INTENT) &&
-        generated.seoTitle
-      ) {
-        nextSeoTitle = generated.seoTitle;
-      }
-      if (
-        (intent === GENERATE_ALL_INTENT || intent === GENERATE_META_DESCRIPTION_INTENT) &&
-        generated.seoDescription
-      ) {
-        nextSeoDescription = generated.seoDescription;
-      }
-
-      await writeGenerationLog({
-        shop: session.shop,
-        productId: collectionId,
-        productTitle: title || null,
-        intent,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: generated.aiModel || null,
-        generatedDescription: nextDescription || null,
-        generatedSeoTitle: nextSeoTitle || null,
-        generatedSeoDescription: nextSeoDescription || null,
-        appliedToProduct: false,
-      });
-
-      await upsertCollectionGeneratedContent({
-        shop: session.shop,
-        collectionId,
-        collectionTitle: title || null,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: generated.aiModel || null,
-        descriptionHtml: nextDescription || null,
-        seoTitle: nextSeoTitle || null,
-        seoDescription: nextSeoDescription || null,
-        appliedToCollection: false,
-      });
-
-      return {
-        ok: true,
-        intent,
-        collectionId,
-        message: "AI content generated successfully.",
-        content: {
-          description: nextDescription,
-          seoTitle: nextSeoTitle,
-          seoDescription: nextSeoDescription,
-        },
-      };
-    }
-
-    if (intent === UPDATE_COLLECTION_INTENT) {
-      const updateInputPayload = {
-        id: collectionId,
-        descriptionHtml,
-        seo: {
-          title: seoTitle,
-          description: seoDescription,
-        },
-      };
-
-      const mutationAttempts = [
-        {
-          mutation: COLLECTION_UPDATE_MUTATION_INPUT,
-          variables: { input: updateInputPayload },
-        },
-        {
-          mutation: COLLECTION_UPDATE_MUTATION_FALLBACK,
-          variables: { collection: updateInputPayload },
-        },
-      ];
-
-      let updateJson = null;
-      let lastGraphqlErrors = [];
-
-      for (let attemptIndex = 0; attemptIndex < mutationAttempts.length; attemptIndex += 1) {
-        const attempt = mutationAttempts[attemptIndex];
-        const updateResponse = await admin.graphql(attempt.mutation, {
-          variables: attempt.variables,
-        });
-        const candidate = await updateResponse.json();
-        const graphqlErrors = candidate?.errors?.map((item) => item?.message).filter(Boolean) || [];
-
-        if (graphqlErrors.length > 0) {
-          lastGraphqlErrors = graphqlErrors;
-          const schemaMismatch =
-            /unknown type|unknown argument|cannot query field|is not defined|expected type/i.test(
-              graphqlErrors.join(" "),
-            );
-          const isLastAttempt = attemptIndex === mutationAttempts.length - 1;
-          if (!isLastAttempt && schemaMismatch) {
-            continue;
-          }
-
-          return {
-            ok: false,
-            intent,
-            collectionId,
-            error: graphqlErrors.join(" "),
-          };
-        }
-
-        updateJson = candidate;
-        break;
-      }
-
-      if (!updateJson) {
-        return {
-          ok: false,
-          intent,
-          collectionId,
-          error:
-            lastGraphqlErrors.join(" ") ||
-            "Unable to update collection due to GraphQL schema mismatch.",
-        };
-      }
-
-      const userErrors = updateJson?.data?.collectionUpdate?.userErrors || [];
-      if (userErrors.length > 0) {
-        return {
-          ok: false,
-          intent,
-          collectionId,
-          error: userErrors.map((item) => item?.message).filter(Boolean).join(" "),
-        };
-      }
-
-      const updatedCollection = updateJson?.data?.collectionUpdate?.collection;
-
-      await writeGenerationLog({
-        shop: session.shop,
-        productId: collectionId,
-        productTitle: title || null,
-        intent,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: null,
-        generatedDescription: descriptionHtml || null,
-        generatedSeoTitle: seoTitle || null,
-        generatedSeoDescription: seoDescription || null,
-        appliedToProduct: true,
-      });
-
-      await upsertCollectionGeneratedContent({
-        shop: session.shop,
-        collectionId,
-        collectionTitle: title || null,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: null,
-        descriptionHtml: descriptionHtml || null,
-        seoTitle: seoTitle || null,
-        seoDescription: seoDescription || null,
-        appliedToCollection: true,
-      });
-
-      return {
-        ok: true,
-        intent,
-        collectionId,
-        message: "Collection updated successfully in Shopify.",
-        content: {
-          description: updatedCollection?.descriptionHtml || descriptionHtml,
-          seoTitle: updatedCollection?.seo?.title || seoTitle,
-          seoDescription: updatedCollection?.seo?.description || seoDescription,
-        },
-      };
-    }
-
     if (intent === BULK_GENERATE_INTENT) {
       const collectionsJson = formData.get("collections");
       const bulkCollections = JSON.parse(collectionsJson || "[]");
@@ -1227,7 +953,7 @@ export const action = async ({ request }) => {
               descriptionPromptTemplate,
               metaTitlePromptTemplate,
               metaDescriptionPromptTemplate,
-              intent: GENERATE_ALL_INTENT,
+              intent: "all",
             },
             {
               aiProvider,
@@ -1330,22 +1056,29 @@ export const action = async ({ request }) => {
             appliedToCollection: true,
           });
 
-          return { id: c.id, title: c.title };
+          return { id: c.id, title: c.title, seoTitle: nextSeoTitle, seoDescription: nextSeoDescription };
         }),
       );
 
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.filter((r) => r.status === "rejected").length;
-      return { ok: true, intent, succeeded, failed, total: bulkCollections.length };
+      const itemResults = results.map((r, i) => ({
+        id: bulkCollections[i].id,
+        title: bulkCollections[i].title,
+        status: r.status === "fulfilled" ? "success" : "failed",
+        error: r.status === "rejected" ? r.reason?.message : null,
+        seoTitle: r.status === "fulfilled" ? r.value.seoTitle : null,
+        seoDescription: r.status === "fulfilled" ? r.value.seoDescription : null,
+      }));
+      return { ok: true, intent, succeeded, failed, total: bulkCollections.length, results: itemResults };
     }
 
-    return { ok: false, intent, collectionId, error: "Unsupported action." };
+    return { ok: false, intent, error: "Unsupported action." };
   } catch (error) {
     console.error("Collection content action failed", error);
     return {
       ok: false,
       intent,
-      collectionId,
       error: error?.message || "Failed to process request.",
     };
   }
@@ -1458,17 +1191,13 @@ export default function CollectionsPage() {
   const navigation = useNavigation();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const generateFetcher = useFetcher();
-  const updateFetcher = useFetcher();
   const bulkFetcher = useFetcher();
   const shopify = useAppBridge();
-  const descriptionEditorRef = useRef(null);
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackCollections, setFallbackCollections] = useState(collections);
-  const [editingCollection, setEditingCollection] = useState(null);
-  const [editForm, setEditForm] = useState(editInitialState);
-  const [modalMessage, setModalMessage] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [bulkDescTemplate, setBulkDescTemplate] = useState("");
+  const [bulkMetaDescTemplate, setBulkMetaDescTemplate] = useState("");
+  const [bulkMetaTitleTemplate, setBulkMetaTitleTemplate] = useState("");
   const [bulkSettings, setBulkSettings] = useState({ ...bulkInitialSettings, aiProvider: defaultAiProvider });
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkKeywordQuery, setBulkKeywordQuery] = useState("");
@@ -1499,21 +1228,17 @@ export default function CollectionsPage() {
     setTemplateLib({ open: true, tab, target });
   }
   function handleCollectionUseTemplate(templateText) {
-    updateEditField(templateLib.target, templateText);
+    if (templateLib.target === "descriptionPromptTemplate") { setBulkDescTemplate(templateText); setUseCustomInstructions(true); }
+    else if (templateLib.target === "metaDescriptionPromptTemplate") { setBulkMetaDescTemplate(templateText); setUseCustomMetaDescInstructions(true); }
+    else if (templateLib.target === "metaTitlePromptTemplate") { setBulkMetaTitleTemplate(templateText); setUseCustomMetaTitleInstructions(true); }
     setTemplateLib((s) => ({ ...s, open: false }));
   }
 
   useEffect(() => {
     const templateSelection = readStoredCollectionPromptTemplateSelection();
-    setEditForm((current) => ({
-      ...current,
-      descriptionPromptTemplate:
-        current.descriptionPromptTemplate || templateSelection.descriptionPromptTemplate || "",
-      metaTitlePromptTemplate:
-        current.metaTitlePromptTemplate || templateSelection.metaTitlePromptTemplate || "",
-      metaDescriptionPromptTemplate:
-        current.metaDescriptionPromptTemplate || templateSelection.metaDescriptionPromptTemplate || "",
-    }));
+    if (templateSelection.descriptionPromptTemplate) setBulkDescTemplate(templateSelection.descriptionPromptTemplate);
+    if (templateSelection.metaTitlePromptTemplate) setBulkMetaTitleTemplate(templateSelection.metaTitlePromptTemplate);
+    if (templateSelection.metaDescriptionPromptTemplate) setBulkMetaDescTemplate(templateSelection.metaDescriptionPromptTemplate);
   }, []);
 
   useEffect(() => {
@@ -1583,134 +1308,6 @@ export default function CollectionsPage() {
     setSearchValue(value || "");
   }, []);
 
-  const resetEditModalState = useCallback(() => {
-    setEditingCollection(null);
-    setEditForm(editInitialState);
-    setModalMessage(null);
-    setModalOpen(false);
-  }, []);
-
-  const openEditModal = useCallback((collection) => {
-    const templateSelection = readStoredCollectionPromptTemplateSelection();
-    setEditingCollection(collection);
-    setModalMessage(null);
-    setEditForm({
-      ...editInitialState,
-      aiProvider: defaultAiProvider,
-      title: collection.title || "",
-      description: collection.descriptionHtml || collection.descriptionText || "",
-      seoTitle: collection.seoTitleValue || "",
-      seoDescription: collection.seoDescriptionValue || "",
-      descriptionPromptTemplate: templateSelection.descriptionPromptTemplate || "",
-      metaTitlePromptTemplate: templateSelection.metaTitlePromptTemplate || "",
-      metaDescriptionPromptTemplate: templateSelection.metaDescriptionPromptTemplate || "",
-    });
-    setModalOpen(true);
-  }, [defaultAiProvider]);
-
-  const updateEditField = useCallback((field, value) => {
-    setEditForm((current) => ({ ...current, [field]: value }));
-  }, []);
-
-  const appendKeywordChip = useCallback((chip) => {
-    setEditForm((current) => {
-      const currentValue = current.contextKeywords.trim();
-      const nextValue = currentValue ? `${currentValue} ${chip}` : chip;
-      return { ...current, contextKeywords: nextValue };
-    });
-  }, []);
-
-  const applyDescriptionCommand = useCallback(
-    (command, value) => {
-      const editor = descriptionEditorRef.current;
-      if (!editor || typeof document === "undefined") return;
-
-      editor.focus();
-      document.execCommand(command, false, value);
-      updateEditField("description", editor.innerHTML || "");
-    },
-    [updateEditField],
-  );
-
-  const handleDescriptionStyleChange = useCallback(
-    (styleValue) => {
-      updateEditField("descriptionStyle", styleValue || "Normal");
-
-      if (styleValue === "Heading") {
-        applyDescriptionCommand("formatBlock", "H2");
-        return;
-      }
-
-      if (styleValue === "Subheading") {
-        applyDescriptionCommand("formatBlock", "H3");
-        return;
-      }
-
-      applyDescriptionCommand("formatBlock", "P");
-    },
-    [applyDescriptionCommand, updateEditField],
-  );
-
-  const handleDescriptionLink = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const url = window.prompt("Enter link URL");
-    if (!url) return;
-    applyDescriptionCommand("createLink", url);
-  }, [applyDescriptionCommand]);
-
-  const submitEditAction = useCallback(
-    (intent) => {
-      if (!editingCollection?.id) return;
-
-      setModalMessage(null);
-      const payload = {
-        intent,
-        collectionId: editingCollection.id,
-        title: editForm.title,
-        description: editForm.description,
-        seoTitle: editForm.seoTitle,
-        seoDescription: editForm.seoDescription,
-        language: editForm.language,
-        tone: editForm.tone,
-        length: editForm.length,
-        format: editForm.format,
-        contextKeywords: editForm.contextKeywords,
-        descriptionPromptTemplate: editForm.descriptionPromptTemplate,
-        metaTitlePromptTemplate: editForm.metaTitlePromptTemplate,
-        metaDescriptionPromptTemplate: editForm.metaDescriptionPromptTemplate,
-        aiProvider: editForm.aiProvider,
-      };
-
-      if (intent === UPDATE_COLLECTION_INTENT) {
-        updateFetcher.submit(payload, { method: "post" });
-        return;
-      }
-
-      generateFetcher.submit(payload, { method: "post" });
-    },
-    [editForm, editingCollection, generateFetcher, updateFetcher],
-  );
-
-  const handleGenerateMetaTitle = useCallback(
-    () => submitEditAction(GENERATE_META_TITLE_INTENT),
-    [submitEditAction],
-  );
-
-  const handleGenerateMetaDescription = useCallback(
-    () => submitEditAction(GENERATE_META_DESCRIPTION_INTENT),
-    [submitEditAction],
-  );
-
-  const handleGenerate = useCallback(
-    () => submitEditAction(GENERATE_ALL_INTENT),
-    [submitEditAction],
-  );
-
-  const handleUpdateCollection = useCallback(
-    () => submitEditAction(UPDATE_COLLECTION_INTENT),
-    [submitEditAction],
-  );
-
   const handleBulkGenerate = useCallback(() => {
     if (selectedCollections.length === 0) {
       setBulkValidationMessage(MIN_BULK_COLLECTION_SELECTION_ERROR);
@@ -1740,68 +1337,23 @@ export default function CollectionsPage() {
     payload.append("length", bulkSettings.length);
     payload.append("format", bulkSettings.format);
     payload.append("contextKeywords", contextKeywords);
-    payload.append("descriptionPromptTemplate", editForm.descriptionPromptTemplate || "");
-    payload.append("metaTitlePromptTemplate", editForm.metaTitlePromptTemplate || "");
-    payload.append("metaDescriptionPromptTemplate", editForm.metaDescriptionPromptTemplate || "");
+    payload.append("descriptionPromptTemplate", bulkDescTemplate || "");
+    payload.append("metaTitlePromptTemplate", bulkMetaTitleTemplate || "");
+    payload.append("metaDescriptionPromptTemplate", bulkMetaDescTemplate || "");
     payload.append("aiProvider", bulkSettings.aiProvider);
     bulkFetcher.submit(payload, { method: "post" });
   }, [
     bulkCustomKeywords,
+    bulkDescTemplate,
+    bulkMetaDescTemplate,
+    bulkMetaTitleTemplate,
     bulkFetcher,
     bulkSelectedKeywords,
     bulkSettings,
-    editForm.descriptionPromptTemplate,
-    editForm.metaDescriptionPromptTemplate,
-    editForm.metaTitlePromptTemplate,
     selectedCollections,
   ]);
 
-  const isGenerating = generateFetcher.state !== "idle";
-  const isUpdating = updateFetcher.state !== "idle";
   const isBulkGenerating = bulkFetcher.state !== "idle";
-  const canUpdateCollection = Boolean(editingCollection?.id) && !isGenerating && !isUpdating;
-
-  useEffect(() => {
-    const response = generateFetcher.data;
-    if (!response || response.collectionId !== editingCollection?.id) return;
-
-    if (!response.ok) {
-      setModalMessage({
-        tone: "critical",
-        text: response.error || "AI generation failed.",
-      });
-      return;
-    }
-
-    setEditForm((current) => ({
-      ...current,
-      description: response.content?.description ?? current.description,
-      seoTitle: response.content?.seoTitle ?? current.seoTitle,
-      seoDescription: response.content?.seoDescription ?? current.seoDescription,
-    }));
-
-    setModalMessage({
-      tone: "success",
-      text: response.message || "AI content generated successfully.",
-    });
-  }, [editingCollection?.id, generateFetcher.data]);
-
-  useEffect(() => {
-    const response = updateFetcher.data;
-    if (!response || response.collectionId !== editingCollection?.id) return;
-
-    if (!response.ok) {
-      setModalMessage({
-        tone: "critical",
-        text: response.error || "Collection update failed.",
-      });
-      return;
-    }
-
-    revalidator.revalidate();
-    shopify.toast.show(response.message || "Collection updated successfully.");
-    resetEditModalState();
-  }, [editingCollection?.id, revalidator, resetEditModalState, shopify, updateFetcher.data]);
 
   useEffect(() => {
     if (bulkFetcher.state !== "idle") {
@@ -1840,23 +1392,6 @@ export default function CollectionsPage() {
     }
   }, [bulkValidationMessage, selectedCollections.length]);
 
-  const metaTitleStatus = evaluateSeoTitle(editForm.seoTitle);
-  const metaDescriptionStatus = evaluateSeoDescription(editForm.seoDescription);
-  const isDescriptionEmpty = !stripHtml(editForm.description).trim();
-  const metaTitleLength = editForm.seoTitle.length;
-  const metaDescriptionLength = editForm.seoDescription.length;
-
-  useEffect(() => {
-    if (!modalOpen || !editingCollection) return;
-    const editor = descriptionEditorRef.current;
-    if (!editor) return;
-
-    const nextHtml = editForm.description || "";
-    if (editor.innerHTML !== nextHtml) {
-      editor.innerHTML = nextHtml;
-    }
-  }, [editForm.description, editingCollection?.id, modalOpen]);
-
   const tableHeadings = [
     { title: "Select" },
     { title: "Image" },
@@ -1865,17 +1400,12 @@ export default function CollectionsPage() {
     { title: "Generated In" },
     { title: "SEO Title" },
     { title: "SEO Description" },
-    { title: "Actions" },
   ];
 
   const languageSelectOptions = LANGUAGE_OPTIONS.map((lang) => ({ label: lang, value: lang }));
   const toneSelectOptions = TONE_OPTIONS.map((t) => ({ label: t, value: t }));
   const lengthSelectOptions = LENGTH_OPTIONS.map((l) => ({ label: l, value: l }));
   const formatSelectOptions = FORMAT_OPTIONS.map((f) => ({ label: f, value: f }));
-  const descriptionStyleSelectOptions = DESCRIPTION_STYLE_OPTIONS.map((s) => ({
-    label: s,
-    value: s,
-  }));
 
   const updateBulkField = (field) => (value) =>
     setBulkSettings((prev) => ({ ...prev, [field]: value }));
@@ -2021,14 +1551,6 @@ export default function CollectionsPage() {
         {renderBadge(collection.seoDescription)}
       </IndexTable.Cell>
 
-      <IndexTable.Cell>
-        <Button
-          size="slim"
-          onClick={() => openEditModal(collection)}
-        >
-          Edit Content
-        </Button>
-      </IndexTable.Cell>
     </IndexTable.Row>
   ));
 
@@ -2074,7 +1596,7 @@ export default function CollectionsPage() {
 
       <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", marginTop: "0" }}>
         {/* ── LEFT: Collection List ── */}
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           {/* Instructions Card */}
           <div style={{ marginBottom: "16px" }}>
             <Card>
@@ -2170,7 +1692,7 @@ export default function CollectionsPage() {
         </div>
 
         {/* ── RIGHT: Bulk Settings Panel ── */}
-        <div style={{ flex: "0 0 360px", minWidth: "300px" }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           <Card padding="0">
             <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <BlockStack gap="100">
@@ -2250,8 +1772,8 @@ export default function CollectionsPage() {
                     <TextField
                       label="Custom Prompt"
                       labelHidden
-                      value={editForm.descriptionPromptTemplate}
-                      onChange={(v) => updateEditField("descriptionPromptTemplate", v)}
+                      value={bulkDescTemplate}
+                      onChange={setBulkDescTemplate}
                       multiline={4}
                       placeholder="Enter custom instructions for description generation..."
                       autoComplete="off"
@@ -2259,7 +1781,7 @@ export default function CollectionsPage() {
                     <div style={{ marginTop: "6px" }}>
                       <InlineStack gap="200" blockAlign="center">
                         <Button size="micro" onClick={() => openCollectionTemplateLib("description", "descriptionPromptTemplate")}>Browse Templates</Button>
-                        <Button size="micro" onClick={() => updateEditField("descriptionPromptTemplate", "")}>Reset to Default</Button>
+                        <Button size="micro" onClick={() => setBulkDescTemplate("")}>Reset to Default</Button>
                       </InlineStack>
                     </div>
                   </div>
@@ -2285,8 +1807,8 @@ export default function CollectionsPage() {
                     <TextField
                       label="Custom Prompt"
                       labelHidden
-                      value={editForm.metaDescriptionPromptTemplate}
-                      onChange={(v) => updateEditField("metaDescriptionPromptTemplate", v)}
+                      value={bulkMetaDescTemplate}
+                      onChange={setBulkMetaDescTemplate}
                       multiline={4}
                       placeholder="Enter custom instructions for meta description generation..."
                       autoComplete="off"
@@ -2294,7 +1816,7 @@ export default function CollectionsPage() {
                     <div style={{ marginTop: "6px" }}>
                       <InlineStack gap="200" blockAlign="center">
                         <Button size="micro" onClick={() => openCollectionTemplateLib("seo-description", "metaDescriptionPromptTemplate")}>Browse Templates</Button>
-                        <Button size="micro" onClick={() => updateEditField("metaDescriptionPromptTemplate", "")}>Reset to Default</Button>
+                        <Button size="micro" onClick={() => setBulkMetaDescTemplate("")}>Reset to Default</Button>
                       </InlineStack>
                     </div>
                   </div>
@@ -2320,8 +1842,8 @@ export default function CollectionsPage() {
                     <TextField
                       label="Custom Prompt"
                       labelHidden
-                      value={editForm.metaTitlePromptTemplate}
-                      onChange={(v) => updateEditField("metaTitlePromptTemplate", v)}
+                      value={bulkMetaTitleTemplate}
+                      onChange={setBulkMetaTitleTemplate}
                       multiline={4}
                       placeholder="Enter custom instructions for meta title generation..."
                       autoComplete="off"
@@ -2329,7 +1851,7 @@ export default function CollectionsPage() {
                     <div style={{ marginTop: "6px" }}>
                       <InlineStack gap="200" blockAlign="center">
                         <Button size="micro" onClick={() => openCollectionTemplateLib("seo-title", "metaTitlePromptTemplate")}>Browse Templates</Button>
-                        <Button size="micro" onClick={() => updateEditField("metaTitlePromptTemplate", "")}>Reset to Default</Button>
+                        <Button size="micro" onClick={() => setBulkMetaTitleTemplate("")}>Reset to Default</Button>
                       </InlineStack>
                     </div>
                   </div>
@@ -2460,7 +1982,6 @@ export default function CollectionsPage() {
       </div>
 
       <style>{`
-        .Polaris-Modal-Dialog__Modal { max-width: 66rem !important; }
         .collections-table-wrap .Polaris-IndexTable__ScrollContainer {
           overflow-x: hidden !important;
         }
@@ -2478,318 +1999,56 @@ export default function CollectionsPage() {
           text-overflow: ellipsis;
         }
       `}</style>
-      <Modal
-        open={modalOpen}
-        onClose={resetEditModalState}
-        title="Edit Collection Content"
-        size="large"
-      >
-        <Modal.Section>
-          {!editingCollection ? (
-            <Banner tone="info">
-              Select a collection and click <strong>Edit Content</strong> to open editor.
-            </Banner>
-          ) : (
-            <BlockStack gap="400">
-              {modalMessage ? (
-                <Banner
-                  tone={modalMessage.tone === "critical" ? "critical" : "success"}
-                  onDismiss={() => setModalMessage(null)}
-                >
-                  {modalMessage.text}
-                </Banner>
-              ) : null}
 
-              <Grid>
-                {/* ── Left column: description + SEO ── */}
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 5, lg: 5, xl: 5 }}>
-                  <Card>
-                    <BlockStack gap="400">
-                      <TextField
-                        label="Collection Title"
-                        value={editForm.title}
-                        readOnly
-                        autoComplete="off"
-                      />
-
-                      {/* Description editor */}
-                      <BlockStack gap="200">
-                        <Text as="p" variant="headingSm">Description</Text>
-                        <Box
-                          borderWidth="025"
-                          borderColor="border"
-                          borderRadius="150"
-                          background="bg-surface"
-                        >
-                          <Box
-                            padding="200"
-                            background="bg-surface-secondary"
-                            borderBlockEndWidth="025"
-                            borderColor="border"
-                          >
-                            <InlineStack gap="200" blockAlign="center" wrap>
-                              <Box minWidth="124px">
-                                <Select
-                                  label="Description style"
-                                  labelHidden
-                                  options={descriptionStyleSelectOptions}
-                                  value={editForm.descriptionStyle}
-                                  onChange={handleDescriptionStyleChange}
-                                />
-                              </Box>
-                              <ButtonGroup>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("bold")} accessibilityLabel="Bold"><strong>B</strong></Button>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("italic")} accessibilityLabel="Italic"><em>I</em></Button>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("underline")} accessibilityLabel="Underline"><span style={{ textDecoration: "underline" }}>U</span></Button>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("strikeThrough")} accessibilityLabel="Strikethrough"><span style={{ textDecoration: "line-through" }}>S</span></Button>
-                                <Button size="slim" onClick={handleDescriptionLink} accessibilityLabel="Link">Link</Button>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("insertUnorderedList")} accessibilityLabel="Bullet list">• List</Button>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("insertOrderedList")} accessibilityLabel="Numbered list">1. List</Button>
-                                <Button size="slim" onClick={() => applyDescriptionCommand("removeFormat")} accessibilityLabel="Clear formatting">Clear</Button>
-                              </ButtonGroup>
-                            </InlineStack>
-                          </Box>
-                          <Box padding="300" background="bg-surface">
-                            <div style={{ position: "relative", minHeight: "120px" }}>
-                              {isDescriptionEmpty && (
-                                <span style={{ position: "absolute", top: 0, left: 0, color: "var(--p-color-text-disabled)", fontSize: "14px", pointerEvents: "none" }}>
-                                  Enter collection description…
-                                </span>
-                              )}
-                              <div
-                                ref={descriptionEditorRef}
-                                contentEditable
-                                suppressContentEditableWarning
-                                style={{ minHeight: "120px", fontSize: "14px", lineHeight: 1.6, color: "var(--p-color-text)", outline: "none", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
-                                role="textbox"
-                                aria-label="Description body"
-                                onInput={(e) => updateEditField("description", e.currentTarget.innerHTML || "")}
-                              />
-                            </div>
-                          </Box>
-                        </Box>
-                      </BlockStack>
-
-                      <Divider />
-
-                      {/* SEO Title */}
-                      <BlockStack gap="200">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text as="h3" variant="headingSm">SEO Title</Text>
-                          <Badge tone={toBadgeTone(metaTitleStatus.tone)}>{metaTitleStatus.label}</Badge>
-                          <Text as="span" variant="bodySm" tone="subdued">{metaTitleLength}/70</Text>
-                        </InlineStack>
-                        <TextField
-                          label="SEO Title"
-                          labelHidden
-                          value={editForm.seoTitle}
-                          onChange={(value) => updateEditField("seoTitle", value || "")}
-                          maxLength={70}
-                          showCharacterCount
-                          placeholder="Enter SEO title…"
-                          autoComplete="off"
-                        />
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Optimal: 40–70 characters. Current: {metaTitleLength} chars.
-                        </Text>
-                        <InlineStack align="end">
-                          <Button
-                            variant="primary"
-                            tone="success"
-                            disabled={isGenerating || isUpdating}
-                            onClick={handleGenerateMetaTitle}
-                            loading={isGenerating}
-                          >
-                            {isGenerating ? "Generating…" : "Generate SEO Title"}
-                          </Button>
-                        </InlineStack>
-                      </BlockStack>
-
-                      <Divider />
-
-                      {/* SEO Description */}
-                      <BlockStack gap="200">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text as="h3" variant="headingSm">SEO Description</Text>
-                          <Badge tone={toBadgeTone(metaDescriptionStatus.tone)}>{metaDescriptionStatus.label}</Badge>
-                          <Text as="span" variant="bodySm" tone="subdued">{metaDescriptionLength}/160</Text>
-                        </InlineStack>
-                        <TextField
-                          label="SEO Description"
-                          labelHidden
-                          value={editForm.seoDescription}
-                          onChange={(value) => updateEditField("seoDescription", value || "")}
-                          maxLength={160}
-                          showCharacterCount
-                          multiline={4}
-                          placeholder="Enter SEO description…"
-                          autoComplete="off"
-                        />
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Optimal: 140–160 characters. Current: {metaDescriptionLength} chars.
-                        </Text>
-                        <InlineStack align="end">
-                          <Button
-                            variant="primary"
-                            tone="success"
-                            disabled={isGenerating || isUpdating}
-                            onClick={handleGenerateMetaDescription}
-                            loading={isGenerating}
-                          >
-                            {isGenerating ? "Generating…" : "Generate SEO Description"}
-                          </Button>
-                        </InlineStack>
-                      </BlockStack>
-                    </BlockStack>
-                  </Card>
-                </Grid.Cell>
-
-                {/* ── Right column: AI settings + actions ── */}
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 7, lg: 7, xl: 7 }}>
-                  <Card>
-                    <BlockStack gap="400">
-                      <Text as="h3" variant="headingSm">AI Settings</Text>
-
-                      <Divider />
-
-                      <Select
-                        label="Language"
-                        options={languageSelectOptions}
-                        value={editForm.language}
-                        onChange={(value) => updateEditField("language", value || "")}
-                      />
-                      <Select
-                        label="Tone"
-                        options={toneSelectOptions}
-                        value={editForm.tone}
-                        onChange={(value) => updateEditField("tone", value || "")}
-                      />
-                      <Select
-                        label="Length (Words)"
-                        options={lengthSelectOptions}
-                        value={editForm.length}
-                        onChange={(value) => updateEditField("length", value || "")}
-                      />
-                      <Select
-                        label="Description Format"
-                        options={formatSelectOptions}
-                        value={editForm.format}
-                        onChange={(value) => updateEditField("format", value || "")}
-                      />
-
-                      <BlockStack gap="200">
-                        <TextField
-                          label="AI Context & Keywords"
-                          value={editForm.contextKeywords}
-                          onChange={(value) => updateEditField("contextKeywords", value || "")}
-                          multiline={4}
-                          placeholder="List features, keywords, or brand notes…"
-                          autoComplete="off"
-                        />
-                        <InlineStack gap="150" wrap>
-                          {KEYWORD_CHIPS.map((chip) => (
-                            <Button key={chip} size="slim" onClick={() => appendKeywordChip(chip)}>
-                              {chip}
-                            </Button>
-                          ))}
-                        </InlineStack>
-                      </BlockStack>
-
-                      <Divider />
-
-                      <BlockStack gap="300">
-                        <Text as="h4" variant="headingSm">
-                          Collection Prompt Templates
-                        </Text>
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          Templates selected in the Template page are applied during generation. You can edit them here.
-                        </Text>
-
-                        <TextField
-                          label="Description Prompt Template"
-                          value={editForm.descriptionPromptTemplate}
-                          multiline={4}
-                          autoComplete="off"
-                          placeholder="No template selected"
-                          onChange={(value) =>
-                            updateEditField("descriptionPromptTemplate", value || "")
-                          }
-                        />
-
-                        <TextField
-                          label="Meta Title Prompt Template"
-                          value={editForm.metaTitlePromptTemplate}
-                          multiline={2}
-                          autoComplete="off"
-                          placeholder="No template selected"
-                          onChange={(value) =>
-                            updateEditField("metaTitlePromptTemplate", value || "")
-                          }
-                        />
-
-                        <TextField
-                          label="Meta Description Prompt Template"
-                          value={editForm.metaDescriptionPromptTemplate}
-                          multiline={3}
-                          autoComplete="off"
-                          placeholder="No template selected"
-                          onChange={(value) =>
-                            updateEditField("metaDescriptionPromptTemplate", value || "")
-                          }
-                        />
-                      </BlockStack>
-
-                      <Divider />
-
-                      <Button
-                        variant="primary"
-                        fullWidth
-                        size="large"
-                        disabled={isGenerating || isUpdating}
-                        onClick={handleGenerate}
-                        loading={isGenerating}
-                      >
-                        {isGenerating ? "Generating…" : "✦ Generate All Content"}
-                      </Button>
-
-                      <InlineStack align="space-between" blockAlign="center">
-                        <ButtonGroup>
-                          <Button
-                            size="slim"
-                            icon={ViewIcon}
-                            accessibilityLabel="Preview"
-                          />
-                          <Button
-                            size="slim"
-                            icon={UndoIcon}
-                            accessibilityLabel="Undo"
-                          />
-                          <Button
-                            size="slim"
-                            variant="plain"
-                            tone="critical"
-                            onClick={resetEditModalState}
-                          >
-                            Cancel
-                          </Button>
-                        </ButtonGroup>
-                        <Button
-                          variant="primary"
-                          disabled={!canUpdateCollection}
-                          onClick={handleUpdateCollection}
-                          loading={isUpdating}
-                        >
-                          {isUpdating ? "Updating…" : "Update Collection"}
-                        </Button>
-                      </InlineStack>
-                    </BlockStack>
-                  </Card>
-                </Grid.Cell>
-              </Grid>
-            </BlockStack>
-          )}
-        </Modal.Section>
-      </Modal>
+      {/* ── Generation Results Table ── */}
+      {bulkResult && bulkResult.results && bulkResult.results.length > 0 && (
+        <div style={{ marginTop: "24px" }}>
+          <Card padding="0">
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd" fontWeight="bold">Generation Results</Text>
+                <Badge tone={bulkResult.failed > 0 ? "warning" : "success"}>
+                  {bulkResult.succeeded}/{bulkResult.total} succeeded
+                </Badge>
+              </InlineStack>
+            </div>
+            <IndexTable
+              resourceName={{ singular: "collection", plural: "collections" }}
+              itemCount={bulkResult.results.length}
+              selectable={false}
+              headings={[
+                { title: "Collection" },
+                { title: "Status" },
+                { title: "Meta Title" },
+                { title: "Meta Description" },
+              ]}
+            >
+              {bulkResult.results.map((r, index) => (
+                <IndexTable.Row id={r.id} key={r.id} position={index}>
+                  <IndexTable.Cell>
+                    <Text variant="bodyMd" fontWeight="medium" as="span">{r.title}</Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {r.status === "success"
+                      ? <Badge tone="success">Updated</Badge>
+                      : <Badge tone="critical">Failed</Badge>}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoTitle ? undefined : "subdued"}>
+                      {r.seoTitle ? r.seoTitle.slice(0, 60) + (r.seoTitle.length > 60 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoDescription ? undefined : "subdued"}>
+                      {r.seoDescription ? r.seoDescription.slice(0, 80) + (r.seoDescription.length > 80 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          </Card>
+        </div>
+      )}
 
       {/* Template Library Popup */}
       <TemplateLibraryModal

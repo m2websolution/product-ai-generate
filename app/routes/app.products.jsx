@@ -19,11 +19,8 @@ import {
   Checkbox,
   Divider,
   EmptyState,
-  Grid,
   IndexTable,
   InlineStack,
-  Layout,
-  Modal,
   Page,
   Select,
   Spinner,
@@ -47,11 +44,6 @@ import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
 
 const FETCH_BATCH_SIZE = 250;
 const STATUS_FILTERS = ["all", "active", "draft"];
-const EDIT_MODAL_ID = "product-edit-modal";
-const GENERATE_ALL_INTENT = "generate_all";
-const GENERATE_SEO_TITLE_INTENT = "generate_seo_title";
-const GENERATE_SEO_DESCRIPTION_INTENT = "generate_seo_description";
-const UPDATE_PRODUCT_INTENT = "update_product";
 const BULK_GENERATE_INTENT = "bulk_generate";
 const MAX_BULK_ITEMS = 50;
 const MIN_BULK_PRODUCT_SELECTION_ERROR = "Select at least one product for bulk generation.";
@@ -331,24 +323,6 @@ const BULK_KEYWORD_OPTIONS = [
   "Use cases",
   "Target audience",
 ];
-const DESCRIPTION_STYLE_OPTIONS = ["Normal", "Heading", "Subheading"];
-
-const editInitialState = {
-  title: "",
-  description: "",
-  descriptionStyle: "Normal",
-  seoTitle: "",
-  seoDescription: "",
-  language: "English",
-  tone: "Neutral",
-  length: "50 - 150 words",
-  format: "Single paragraph",
-  contextKeywords: "",
-  descriptionPromptTemplate: "",
-  metaTitlePromptTemplate: "",
-  metaDescriptionPromptTemplate: "",
-  aiProvider: "auto",
-};
 
 function escapeSearchValue(value) {
   return value.replace(/[\\"]/g, "\\$&");
@@ -549,15 +523,7 @@ function buildGenerationPrompt({
   descriptionPromptTemplate,
   metaTitlePromptTemplate,
   metaDescriptionPromptTemplate,
-  intent,
 }) {
-  const promptIntent =
-    intent === GENERATE_SEO_TITLE_INTENT
-      ? "seo_title"
-      : intent === GENERATE_SEO_DESCRIPTION_INTENT
-        ? "seo_description"
-        : "all";
-
   return buildProductContentPrompt({
     title,
     descriptionText,
@@ -571,7 +537,7 @@ function buildGenerationPrompt({
     descriptionPromptTemplate,
     metaTitlePromptTemplate,
     metaDescriptionPromptTemplate,
-    intent: promptIntent,
+    intent: "all",
   });
 }
 
@@ -918,25 +884,6 @@ export const action = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = readFormString(formData, "intent");
-  const productId = readFormString(formData, "productId");
-
-  if (!productId && intent !== BULK_GENERATE_INTENT) {
-    return { ok: false, intent, error: "Product id is required." };
-  }
-
-  const title = readFormString(formData, "title");
-  const descriptionHtml = readFormString(formData, "description");
-  const seoTitle = readFormString(formData, "seoTitle");
-  const seoDescription = readFormString(formData, "seoDescription");
-  const language = readFormString(formData, "language");
-  const tone = readFormString(formData, "tone");
-  const lengthOption = readFormString(formData, "length");
-  const formatOption = readFormString(formData, "format");
-  const contextKeywords = readFormString(formData, "contextKeywords");
-  const descriptionPromptTemplate = readFormString(formData, "descriptionPromptTemplate");
-  const metaTitlePromptTemplate = readFormString(formData, "metaTitlePromptTemplate");
-  const metaDescriptionPromptTemplate = readFormString(formData, "metaDescriptionPromptTemplate");
-  const aiProvider = readFormString(formData, "aiProvider") || "auto";
 
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
@@ -944,184 +891,6 @@ export const action = async ({ request }) => {
   });
 
   try {
-    if (
-      intent === GENERATE_ALL_INTENT ||
-      intent === GENERATE_SEO_TITLE_INTENT ||
-      intent === GENERATE_SEO_DESCRIPTION_INTENT
-    ) {
-      const generated = await generateContent(
-        {
-          title,
-          descriptionText: stripHtml(descriptionHtml),
-          seoTitle,
-          seoDescription,
-          language,
-          tone,
-          lengthOption,
-          format: formatOption,
-          contextKeywords,
-          descriptionPromptTemplate,
-          metaTitlePromptTemplate,
-          metaDescriptionPromptTemplate,
-          intent,
-        },
-        {
-          aiProvider,
-          shopOpenaiKey: shopData?.openaiApiKey || null,
-          shopAnthropicKey: shopData?.anthropicApiKey || null,
-        },
-      );
-
-      let nextDescription = descriptionHtml;
-      let nextSeoTitle = seoTitle;
-      let nextSeoDescription = seoDescription;
-
-      if (intent === GENERATE_ALL_INTENT && generated.productDescription) {
-        nextDescription = toParagraphHtml(generated.productDescription);
-      }
-      if (
-        (intent === GENERATE_ALL_INTENT || intent === GENERATE_SEO_TITLE_INTENT) &&
-        generated.seoTitle
-      ) {
-        nextSeoTitle = generated.seoTitle;
-      }
-      if (
-        (intent === GENERATE_ALL_INTENT || intent === GENERATE_SEO_DESCRIPTION_INTENT) &&
-        generated.seoDescription
-      ) {
-        nextSeoDescription = generated.seoDescription;
-      }
-
-      await writeGenerationLog({
-        shop: session.shop,
-        productId,
-        productTitle: title || null,
-        intent,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: generated.aiModel || null,
-        generatedDescription: nextDescription || null,
-        generatedSeoTitle: nextSeoTitle || null,
-        generatedSeoDescription: nextSeoDescription || null,
-        appliedToProduct: false,
-      });
-
-      await upsertProductContent({
-        shop: session.shop,
-        productId,
-        productTitle: title || null,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: generated.aiModel || null,
-        descriptionHtml: nextDescription || null,
-        seoTitle: nextSeoTitle || null,
-        seoDescription: nextSeoDescription || null,
-        appliedToProduct: false,
-      });
-
-      return {
-        ok: true,
-        intent,
-        productId,
-        message: "AI content generated successfully.",
-        content: {
-          description: nextDescription,
-          seoTitle: nextSeoTitle,
-          seoDescription: nextSeoDescription,
-        },
-      };
-    }
-
-    if (intent === UPDATE_PRODUCT_INTENT) {
-      const updateResponse = await admin.graphql(PRODUCT_UPDATE_MUTATION, {
-        variables: {
-          product: {
-            id: productId,
-            descriptionHtml,
-            seo: {
-              title: seoTitle,
-              description: seoDescription,
-            },
-          },
-        },
-      });
-
-      const updateJson = await updateResponse.json();
-      const graphqlErrors =
-        updateJson?.errors?.map((item) => item?.message).filter(Boolean) || [];
-      if (graphqlErrors.length > 0) {
-        return {
-          ok: false,
-          intent,
-          productId,
-          error: graphqlErrors.join(" "),
-        };
-      }
-
-      const userErrors = updateJson?.data?.productUpdate?.userErrors || [];
-      if (userErrors.length > 0) {
-        return {
-          ok: false,
-          intent,
-          productId,
-          error: userErrors.map((item) => item?.message).filter(Boolean).join(" "),
-        };
-      }
-
-      const updatedProduct = updateJson?.data?.productUpdate?.product;
-
-      await writeGenerationLog({
-        shop: session.shop,
-        productId,
-        productTitle: title || null,
-        intent,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: null,
-        generatedDescription: descriptionHtml || null,
-        generatedSeoTitle: seoTitle || null,
-        generatedSeoDescription: seoDescription || null,
-        appliedToProduct: true,
-      });
-
-      await upsertProductContent({
-        shop: session.shop,
-        productId,
-        productTitle: title || null,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: lengthOption || null,
-        formatOption: formatOption || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: null,
-        descriptionHtml: updatedProduct?.descriptionHtml || descriptionHtml || null,
-        seoTitle: updatedProduct?.seo?.title || seoTitle || null,
-        seoDescription: updatedProduct?.seo?.description || seoDescription || null,
-        appliedToProduct: true,
-      });
-
-      return {
-        ok: true,
-        intent,
-        productId,
-        message: "Product updated successfully in Shopify.",
-        content: {
-          description: updatedProduct?.descriptionHtml || descriptionHtml,
-          seoTitle: updatedProduct?.seo?.title || seoTitle,
-          seoDescription: updatedProduct?.seo?.description || seoDescription,
-        },
-      };
-    }
-
     if (intent === BULK_GENERATE_INTENT) {
       const productsJson = formData.get("products");
       const bulkProducts = JSON.parse(productsJson || "[]");
@@ -1161,7 +930,7 @@ export const action = async ({ request }) => {
               descriptionPromptTemplate,
               metaTitlePromptTemplate,
               metaDescriptionPromptTemplate,
-              intent: GENERATE_ALL_INTENT,
+              intent: "all",
             },
             {
               aiProvider,
@@ -1222,22 +991,29 @@ export const action = async ({ request }) => {
             appliedToProduct: true,
           });
 
-          return { id: p.id, title: p.title };
+          return { id: p.id, title: p.title, seoTitle: nextSeoTitle, seoDescription: nextSeoDescription, description: nextDescription };
         }),
       );
 
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.filter((r) => r.status === "rejected").length;
-      return { ok: true, intent, succeeded, failed, total: bulkProducts.length };
+      const itemResults = results.map((r, i) => ({
+        id: bulkProducts[i].id,
+        title: bulkProducts[i].title,
+        status: r.status === "fulfilled" ? "success" : "failed",
+        error: r.status === "rejected" ? r.reason?.message : null,
+        seoTitle: r.status === "fulfilled" ? r.value.seoTitle : null,
+        seoDescription: r.status === "fulfilled" ? r.value.seoDescription : null,
+      }));
+      return { ok: true, intent, succeeded, failed, total: bulkProducts.length, results: itemResults };
     }
 
-    return { ok: false, intent, productId, error: "Unsupported action." };
+    return { ok: false, intent, error: "Unsupported action." };
   } catch (error) {
     console.error("Product content action failed", error);
     return {
       ok: false,
       intent,
-      productId,
       error: error?.message || "Failed to process request.",
     };
   }
@@ -1385,17 +1161,13 @@ export default function ProductsPage() {
   const navigation = useNavigation();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const generateFetcher = useFetcher();
-  const updateFetcher = useFetcher();
   const bulkFetcher = useFetcher();
   const shopify = useAppBridge();
-  const descriptionEditorRef = useRef(null);
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackProducts, setFallbackProducts] = useState(products);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState(editInitialState);
-  const [modalMessage, setModalMessage] = useState(null);
+  const [bulkDescTemplate, setBulkDescTemplate] = useState("");
+  const [bulkMetaDescTemplate, setBulkMetaDescTemplate] = useState("");
+  const [bulkMetaTitleTemplate, setBulkMetaTitleTemplate] = useState("");
   const [bulkSettings, setBulkSettings] = useState({ ...bulkInitialSettings, aiProvider: defaultAiProvider });
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkKeywordQuery, setBulkKeywordQuery] = useState("");
@@ -1426,21 +1198,17 @@ export default function ProductsPage() {
     setTemplateLib({ open: true, tab, target });
   }
   function handleProductUseTemplate(templateText) {
-    updateEditField(templateLib.target, templateText);
+    if (templateLib.target === "descriptionPromptTemplate") { setBulkDescTemplate(templateText); setUseCustomInstructions(true); }
+    else if (templateLib.target === "metaDescriptionPromptTemplate") { setBulkMetaDescTemplate(templateText); setUseCustomMetaDescInstructions(true); }
+    else if (templateLib.target === "metaTitlePromptTemplate") { setBulkMetaTitleTemplate(templateText); setUseCustomMetaTitleInstructions(true); }
     setTemplateLib((s) => ({ ...s, open: false }));
   }
 
   useEffect(() => {
     const templateSelection = readStoredProductPromptTemplateSelection();
-    setEditForm((current) => ({
-      ...current,
-      descriptionPromptTemplate:
-        current.descriptionPromptTemplate || templateSelection.descriptionPromptTemplate || "",
-      metaTitlePromptTemplate:
-        current.metaTitlePromptTemplate || templateSelection.metaTitlePromptTemplate || "",
-      metaDescriptionPromptTemplate:
-        current.metaDescriptionPromptTemplate || templateSelection.metaDescriptionPromptTemplate || "",
-    }));
+    if (templateSelection.descriptionPromptTemplate) setBulkDescTemplate(templateSelection.descriptionPromptTemplate);
+    if (templateSelection.metaTitlePromptTemplate) setBulkMetaTitleTemplate(templateSelection.metaTitlePromptTemplate);
+    if (templateSelection.metaDescriptionPromptTemplate) setBulkMetaDescTemplate(templateSelection.metaDescriptionPromptTemplate);
   }, []);
 
   useEffect(() => {
@@ -1512,134 +1280,6 @@ export default function ProductsPage() {
     setSearchValue(value || "");
   }, []);
 
-  const resetEditModalState = useCallback(() => {
-    setEditingProduct(null);
-    setModalOpen(false);
-    setEditForm(editInitialState);
-    setModalMessage(null);
-  }, []);
-
-  const openEditModal = useCallback((product) => {
-    const templateSelection = readStoredProductPromptTemplateSelection();
-    setEditingProduct(product);
-    setModalMessage(null);
-    setEditForm({
-      ...editInitialState,
-      aiProvider: defaultAiProvider,
-      title: product.title || "",
-      description: product.descriptionHtml || product.descriptionText || "",
-      seoTitle: product.seoTitleValue || "",
-      seoDescription: product.seoDescriptionValue || "",
-      descriptionPromptTemplate: templateSelection.descriptionPromptTemplate || "",
-      metaTitlePromptTemplate: templateSelection.metaTitlePromptTemplate || "",
-      metaDescriptionPromptTemplate: templateSelection.metaDescriptionPromptTemplate || "",
-    });
-    setModalOpen(true);
-  }, [defaultAiProvider]);
-
-  const updateEditField = useCallback((field, value) => {
-    setEditForm((current) => ({ ...current, [field]: value }));
-  }, []);
-
-  const appendKeywordChip = useCallback((chip) => {
-    setEditForm((current) => {
-      const currentValue = current.contextKeywords.trim();
-      const nextValue = currentValue ? `${currentValue} ${chip}` : chip;
-      return { ...current, contextKeywords: nextValue };
-    });
-  }, []);
-
-  const applyDescriptionCommand = useCallback(
-    (command, value) => {
-      const editor = descriptionEditorRef.current;
-      if (!editor || typeof document === "undefined") return;
-
-      editor.focus();
-      document.execCommand(command, false, value);
-      updateEditField("description", editor.innerHTML || "");
-    },
-    [updateEditField],
-  );
-
-  const handleDescriptionStyleChange = useCallback(
-    (styleValue) => {
-      updateEditField("descriptionStyle", styleValue || "Normal");
-
-      if (styleValue === "Heading") {
-        applyDescriptionCommand("formatBlock", "H2");
-        return;
-      }
-
-      if (styleValue === "Subheading") {
-        applyDescriptionCommand("formatBlock", "H3");
-        return;
-      }
-
-      applyDescriptionCommand("formatBlock", "P");
-    },
-    [applyDescriptionCommand, updateEditField],
-  );
-
-  const handleDescriptionLink = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const url = window.prompt("Enter link URL");
-    if (!url) return;
-    applyDescriptionCommand("createLink", url);
-  }, [applyDescriptionCommand]);
-
-  const submitEditAction = useCallback(
-    (intent) => {
-      if (!editingProduct?.id) return;
-
-      setModalMessage(null);
-      const payload = {
-        intent,
-        productId: editingProduct.id,
-        title: editForm.title,
-        description: editForm.description,
-        seoTitle: editForm.seoTitle,
-        seoDescription: editForm.seoDescription,
-        language: editForm.language,
-        tone: editForm.tone,
-        length: editForm.length,
-        format: editForm.format,
-        contextKeywords: editForm.contextKeywords,
-        descriptionPromptTemplate: editForm.descriptionPromptTemplate,
-        metaTitlePromptTemplate: editForm.metaTitlePromptTemplate,
-        metaDescriptionPromptTemplate: editForm.metaDescriptionPromptTemplate,
-        aiProvider: editForm.aiProvider,
-      };
-
-      if (intent === UPDATE_PRODUCT_INTENT) {
-        updateFetcher.submit(payload, { method: "post" });
-        return;
-      }
-
-      generateFetcher.submit(payload, { method: "post" });
-    },
-    [editForm, editingProduct, generateFetcher, updateFetcher],
-  );
-
-  const handleGenerateSeoTitle = useCallback(
-    () => submitEditAction(GENERATE_SEO_TITLE_INTENT),
-    [submitEditAction],
-  );
-
-  const handleGenerateSeoDescription = useCallback(
-    () => submitEditAction(GENERATE_SEO_DESCRIPTION_INTENT),
-    [submitEditAction],
-  );
-
-  const handleGenerate = useCallback(
-    () => submitEditAction(GENERATE_ALL_INTENT),
-    [submitEditAction],
-  );
-
-  const handleUpdateProduct = useCallback(
-    () => submitEditAction(UPDATE_PRODUCT_INTENT),
-    [submitEditAction],
-  );
-
   const handleBulkGenerate = useCallback(() => {
     if (selectedProducts.length === 0) {
       setBulkValidationMessage(MIN_BULK_PRODUCT_SELECTION_ERROR);
@@ -1669,68 +1309,23 @@ export default function ProductsPage() {
     payload.append("length", bulkSettings.length);
     payload.append("format", bulkSettings.format);
     payload.append("contextKeywords", contextKeywords);
-    payload.append("descriptionPromptTemplate", editForm.descriptionPromptTemplate || "");
-    payload.append("metaTitlePromptTemplate", editForm.metaTitlePromptTemplate || "");
-    payload.append("metaDescriptionPromptTemplate", editForm.metaDescriptionPromptTemplate || "");
+    payload.append("descriptionPromptTemplate", bulkDescTemplate || "");
+    payload.append("metaTitlePromptTemplate", bulkMetaTitleTemplate || "");
+    payload.append("metaDescriptionPromptTemplate", bulkMetaDescTemplate || "");
     payload.append("aiProvider", bulkSettings.aiProvider);
     bulkFetcher.submit(payload, { method: "post" });
   }, [
     bulkCustomKeywords,
+    bulkDescTemplate,
+    bulkMetaDescTemplate,
+    bulkMetaTitleTemplate,
     bulkFetcher,
     bulkSelectedKeywords,
     bulkSettings,
-    editForm.descriptionPromptTemplate,
-    editForm.metaDescriptionPromptTemplate,
-    editForm.metaTitlePromptTemplate,
     selectedProducts,
   ]);
 
-  const isGenerating = generateFetcher.state !== "idle";
-  const isUpdating = updateFetcher.state !== "idle";
   const isBulkGenerating = bulkFetcher.state !== "idle";
-  const canUpdateProduct = Boolean(editingProduct?.id) && !isGenerating && !isUpdating;
-
-  useEffect(() => {
-    const response = generateFetcher.data;
-    if (!response || response.productId !== editingProduct?.id) return;
-
-    if (!response.ok) {
-      setModalMessage({
-        tone: "critical",
-        text: response.error || "AI generation failed.",
-      });
-      return;
-    }
-
-    setEditForm((current) => ({
-      ...current,
-      description: response.content?.description ?? current.description,
-      seoTitle: response.content?.seoTitle ?? current.seoTitle,
-      seoDescription: response.content?.seoDescription ?? current.seoDescription,
-    }));
-
-    setModalMessage({
-      tone: "success",
-      text: response.message || "AI content generated successfully.",
-    });
-  }, [editingProduct?.id, generateFetcher.data]);
-
-  useEffect(() => {
-    const response = updateFetcher.data;
-    if (!response || response.productId !== editingProduct?.id) return;
-
-    if (!response.ok) {
-      setModalMessage({
-        tone: "critical",
-        text: response.error || "Product update failed.",
-      });
-      return;
-    }
-
-    revalidator.revalidate();
-    shopify.toast.show(response.message || "Product updated successfully.");
-    resetEditModalState();
-  }, [editingProduct?.id, revalidator, resetEditModalState, shopify, updateFetcher.data]);
 
   useEffect(() => {
     if (bulkFetcher.state !== "idle") {
@@ -1751,14 +1346,6 @@ export default function ProductsPage() {
     setBulkValidationMessage(response.error || "Bulk generation failed.");
   }, [bulkFetcher.state, bulkFetcher.data, revalidator, shopify]);
 
-  const seoTitleStatus = evaluateSeoTitle(editForm.seoTitle);
-  const seoDescriptionStatus = evaluateSeoDescription(editForm.seoDescription);
-  const isDescriptionEmpty = !stripHtml(editForm.description).trim();
-  const seoTitlePalette = toSeoPalette(seoTitleStatus.tone);
-  const seoDescriptionPalette = toSeoPalette(seoDescriptionStatus.tone);
-  const seoTitleLength = editForm.seoTitle.length;
-  const seoDescriptionLength = editForm.seoDescription.length;
-
   useEffect(() => {
     if (selectedProducts.length > MAX_BULK_ITEMS) {
       if (bulkValidationMessage !== MAX_BULK_PRODUCT_SELECTION_ERROR) {
@@ -1776,17 +1363,6 @@ export default function ProductsPage() {
       setBulkValidationMessage(null);
     }
   }, [bulkValidationMessage, selectedProducts.length]);
-
-  useEffect(() => {
-    if (!modalOpen || !editingProduct) return;
-    const editor = descriptionEditorRef.current;
-    if (!editor) return;
-
-    const nextHtml = editForm.description || "";
-    if (editor.innerHTML !== nextHtml) {
-      editor.innerHTML = nextHtml;
-    }
-  }, [editForm.description, editingProduct?.id, modalOpen]);
 
   const statusTabIndex = filters.status === "active" ? 1 : filters.status === "draft" ? 2 : 0;
   const statusTabs = [
@@ -1820,10 +1396,6 @@ export default function ProductsPage() {
   const toneSelectOptions = TONE_OPTIONS.map((t) => ({ label: t, value: t }));
   const lengthSelectOptions = LENGTH_OPTIONS.map((l) => ({ label: l, value: l }));
   const formatSelectOptions = FORMAT_OPTIONS.map((f) => ({ label: f, value: f }));
-  const descriptionStyleSelectOptions = DESCRIPTION_STYLE_OPTIONS.map((s) => ({
-    label: s,
-    value: s,
-  }));
 
   const collectionOptions = [
     { label: "All Collections", value: "" },
@@ -1902,63 +1474,6 @@ export default function ProductsPage() {
     />
   );
 
-  const rowMarkup = filteredProducts.map((product, index) => (
-    <IndexTable.Row id={product.id} key={product.id} position={index}>
-      <IndexTable.Cell>
-        <Checkbox
-          label={`Select ${product.title}`}
-          labelHidden
-          checked={selectedProductIds.includes(product.id)}
-          onChange={handleToggleProductSelection(product.id)}
-        />
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {product.imageUrl ? (
-          <Thumbnail
-            source={product.imageUrl}
-            alt={product.imageAlt}
-            size="small"
-          />
-        ) : (
-          <Thumbnail
-            source=""
-            alt={product.imageAlt}
-            size="small"
-          />
-        )}
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="medium" as="span">
-          {product.title}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {isBulkGenerating && selectedProductIds.includes(product.id) ? (
-          <InlineStack gap="100" blockAlign="center">
-            <Spinner size="small" />
-            <Text as="span" tone="subdued">Generating...</Text>
-          </InlineStack>
-        ) : (
-          renderBadge({ label: product.appStatus.label, tone: product.appStatus.tone })
-        )}
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text as="span" tone={product.generatedTime === "Not generated" ? "subdued" : undefined}>
-          {product.generatedTime}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {renderBadge({ label: product.seoTitle.label, tone: product.seoTitle.tone })}
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {renderBadge({ label: product.seoDescription.label, tone: product.seoDescription.tone })}
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Button onClick={() => openEditModal(product)}>Edit Content</Button>
-      </IndexTable.Cell>
-    </IndexTable.Row>
-  ));
-
   return (
     <Page fullWidth>
       {/* ── Hero Header ── */}
@@ -2001,7 +1516,7 @@ export default function ProductsPage() {
 
       <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", marginTop: "0" }}>
         {/* ── LEFT: Product List ── */}
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           {/* Instructions Card */}
           <div style={{ marginBottom: "16px" }}>
             <Card>
@@ -2145,12 +1660,9 @@ export default function ProductsPage() {
                             <Text as="span" tone="subdued">Generating...</Text>
                           </InlineStack>
                         ) : (
-                          <InlineStack gap="100" blockAlign="center">
-                            <Badge tone={toBadgeTone(product.status.tone)}>
-                              {product.status.label}
-                            </Badge>
-                            <Button size="micro" onClick={() => openEditModal(product)}>Edit</Button>
-                          </InlineStack>
+                          <Badge tone={toBadgeTone(product.status.tone)}>
+                            {product.status.label}
+                          </Badge>
                         )}
                       </IndexTable.Cell>
                     </IndexTable.Row>
@@ -2169,7 +1681,7 @@ export default function ProductsPage() {
         </div>
 
         {/* ── RIGHT: Bulk Settings Panel ── */}
-        <div style={{ flex: "0 0 360px", minWidth: "300px" }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           <Card padding="0">
             <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <BlockStack gap="100">
@@ -2251,8 +1763,8 @@ export default function ProductsPage() {
                     <TextField
                       label="Custom Prompt"
                       labelHidden
-                      value={editForm.descriptionPromptTemplate}
-                      onChange={(v) => updateEditField("descriptionPromptTemplate", v)}
+                      value={bulkDescTemplate}
+                      onChange={setBulkDescTemplate}
                       multiline={4}
                       placeholder="Enter custom instructions for description generation..."
                       autoComplete="off"
@@ -2260,7 +1772,7 @@ export default function ProductsPage() {
                     <div style={{ marginTop: "6px" }}>
                       <InlineStack gap="200" blockAlign="center">
                         <Button size="micro" onClick={() => openProductTemplateLib("description", "descriptionPromptTemplate")}>Browse Templates</Button>
-                        <Button size="micro" onClick={() => updateEditField("descriptionPromptTemplate", "")}>Reset to Default</Button>
+                        <Button size="micro" onClick={() => setBulkDescTemplate("")}>Reset to Default</Button>
                       </InlineStack>
                     </div>
                   </div>
@@ -2286,8 +1798,8 @@ export default function ProductsPage() {
                     <TextField
                       label="Custom Prompt"
                       labelHidden
-                      value={editForm.metaDescriptionPromptTemplate}
-                      onChange={(v) => updateEditField("metaDescriptionPromptTemplate", v)}
+                      value={bulkMetaDescTemplate}
+                      onChange={setBulkMetaDescTemplate}
                       multiline={4}
                       placeholder="Enter custom instructions for meta description generation..."
                       autoComplete="off"
@@ -2295,7 +1807,7 @@ export default function ProductsPage() {
                     <div style={{ marginTop: "6px" }}>
                       <InlineStack gap="200" blockAlign="center">
                         <Button size="micro" onClick={() => openProductTemplateLib("seo-description", "metaDescriptionPromptTemplate")}>Browse Templates</Button>
-                        <Button size="micro" onClick={() => updateEditField("metaDescriptionPromptTemplate", "")}>Reset to Default</Button>
+                        <Button size="micro" onClick={() => setBulkMetaDescTemplate("")}>Reset to Default</Button>
                       </InlineStack>
                     </div>
                   </div>
@@ -2321,8 +1833,8 @@ export default function ProductsPage() {
                     <TextField
                       label="Custom Prompt"
                       labelHidden
-                      value={editForm.metaTitlePromptTemplate}
-                      onChange={(v) => updateEditField("metaTitlePromptTemplate", v)}
+                      value={bulkMetaTitleTemplate}
+                      onChange={setBulkMetaTitleTemplate}
                       multiline={4}
                       placeholder="Enter custom instructions for meta title generation..."
                       autoComplete="off"
@@ -2330,7 +1842,7 @@ export default function ProductsPage() {
                     <div style={{ marginTop: "6px" }}>
                       <InlineStack gap="200" blockAlign="center">
                         <Button size="micro" onClick={() => openProductTemplateLib("seo-title", "metaTitlePromptTemplate")}>Browse Templates</Button>
-                        <Button size="micro" onClick={() => updateEditField("metaTitlePromptTemplate", "")}>Reset to Default</Button>
+                        <Button size="micro" onClick={() => setBulkMetaTitleTemplate("")}>Reset to Default</Button>
                       </InlineStack>
                     </div>
                   </div>
@@ -2460,402 +1972,55 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <style>{`.Polaris-Modal-Dialog__Modal { max-width: 66rem !important; }`}</style>
-      <Modal
-        open={modalOpen}
-        onClose={resetEditModalState}
-        title="Edit Product Content"
-        large
-        primaryAction={
-          editingProduct
-            ? {
-                content: isUpdating ? "Updating..." : "Update Product",
-                onAction: handleUpdateProduct,
-                disabled: !canUpdateProduct,
-                loading: isUpdating,
-              }
-            : undefined
-        }
-        secondaryActions={
-          editingProduct
-            ? [
-                {
-                  content: "Close",
-                  onAction: resetEditModalState,
-                },
-              ]
-            : [
-                {
-                  content: "Close",
-                  onAction: resetEditModalState,
-                },
-              ]
-        }
-      >
-        <Modal.Section>
-          {!editingProduct ? (
-            <Banner tone="info">
-              Select a product and click <strong>Edit Content</strong> to open editor.
-            </Banner>
-          ) : (
-            <BlockStack gap="400">
-              {modalMessage ? (
-                <Banner
-                  tone={modalMessage.tone === "critical" ? "critical" : "success"}
-                  onDismiss={() => setModalMessage(null)}
-                >
-                  {modalMessage.text}
-                </Banner>
-              ) : null}
-
-              <Grid>
-                {/* Left column: description + SEO fields */}
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 5, lg: 5, xl: 5 }}>
-                <Card>
-                  <BlockStack gap="400">
-                    <TextField
-                      label="Product Title"
-                      value={editForm.title}
-                      readOnly
-                      autoComplete="off"
-                      onChange={(value) => updateEditField("title", value || "")}
-                    />
-
-                    <BlockStack gap="200">
-                      <Text variant="headingSm" as="h3">
-                        Description
-                      </Text>
-
-                      <Box
-                        borderWidth="025"
-                        borderColor="border"
-                        borderRadius="150"
-                        background="bg-surface"
-                      >
-                        {/* Toolbar */}
-                        <Box
-                          padding="200"
-                          background="bg-surface-secondary"
-                          borderBlockEndWidth="025"
-                          borderColor="border"
-                        >
-                          <InlineStack gap="200" blockAlign="center" wrap>
-                          <Box minWidth="130px">
-                            <Select
-                              label="Description style"
-                              labelHidden
-                              options={descriptionStyleSelectOptions}
-                              value={editForm.descriptionStyle}
-                              onChange={handleDescriptionStyleChange}
-                            />
-                          </Box>
-                          <ButtonGroup>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("bold")}
-                              accessibilityLabel="Bold"
-                            >
-                              <strong>B</strong>
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("italic")}
-                              accessibilityLabel="Italic"
-                            >
-                              <em>I</em>
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("underline")}
-                              accessibilityLabel="Underline"
-                            >
-                              <span style={{ textDecoration: "underline" }}>U</span>
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("strikeThrough")}
-                              accessibilityLabel="Strikethrough"
-                            >
-                              <span style={{ textDecoration: "line-through" }}>S</span>
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={handleDescriptionLink}
-                              accessibilityLabel="Link"
-                            >
-                              Link
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("insertUnorderedList")}
-                              accessibilityLabel="Bullet list"
-                            >
-                              UL
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("insertOrderedList")}
-                              accessibilityLabel="Numbered list"
-                            >
-                              OL
-                            </Button>
-                            <Button
-                              size="slim"
-                              onClick={() => applyDescriptionCommand("removeFormat")}
-                              accessibilityLabel="Clear formatting"
-                            >
-                              Clear
-                            </Button>
-                          </ButtonGroup>
-                          </InlineStack>
-                        </Box>
-
-                        {/* Editor body */}
-                        <Box padding="300" background="bg-surface">
-                          <div style={{ position: "relative", minHeight: "120px" }}>
-                          {isDescriptionEmpty ? (
-                            <span
-                              style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                color: "var(--p-color-text-disabled)",
-                                fontSize: "14px",
-                                pointerEvents: "none",
-                              }}
-                            >
-                              Enter product description...
-                            </span>
-                          ) : null}
-                          <div
-                            ref={descriptionEditorRef}
-                            contentEditable
-                            suppressContentEditableWarning
-                            style={{
-                              minHeight: "360px",
-                              fontSize: "14px",
-                              lineHeight: 1.55,
-                              color: "var(--p-color-text)",
-                              outline: "none",
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                            }}
-                            role="textbox"
-                            aria-label="Description body"
-                            onInput={(event) =>
-                              updateEditField("description", event.currentTarget.innerHTML || "")
-                            }
-                          />
-                          </div>
-                        </Box>
-                      </Box>
-                    </BlockStack>
-
-                    <Divider />
-
-                    {/* SEO Title */}
-                    <BlockStack gap="200">
-                      <InlineStack gap="200" blockAlign="center">
-                        <Text variant="headingSm" as="h3">
-                          Meta Title
-                        </Text>
-                        <Badge tone={toBadgeTone(seoTitleStatus.tone)}>
-                          {seoTitleStatus.label}
-                        </Badge>
-                      </InlineStack>
-
-                      <TextField
-                          label="Meta Title"
-                          labelHidden
-                          value={editForm.seoTitle}
-                          maxLength={70}
-                          showCharacterCount
-                          placeholder="Enter meta title..."
-                          autoComplete="off"
-                          onChange={(value) => updateEditField("seoTitle", value || "")}
-                        />
-
-                      <Text as="p" tone="subdued" variant="bodySm">
-                        Optimal Meta Title length: 40 to 70 characters. (Too short: less than
-                        40, Too long: more than 70)
-                      </Text>
-
-                      <InlineStack align="end">
-                        <Button
-                          onClick={handleGenerateSeoTitle}
-                          loading={isGenerating}
-                          disabled={isGenerating || isUpdating}
-                        >
-                          {isGenerating ? "Generating..." : "Generate"}
-                        </Button>
-                      </InlineStack>
-                    </BlockStack>
-
-                    <Divider />
-
-                    {/* SEO Description */}
-                    <BlockStack gap="200">
-                      <InlineStack gap="200" blockAlign="center">
-                        <Text variant="headingSm" as="h3">
-                          Meta Description
-                        </Text>
-                        <Badge tone={toBadgeTone(seoDescriptionStatus.tone)}>
-                          {seoDescriptionStatus.label}
-                        </Badge>
-                      </InlineStack>
-
-                      <TextField
-                          label="Meta Description"
-                          labelHidden
-                          value={editForm.seoDescription}
-                          maxLength={160}
-                          showCharacterCount
-                          placeholder="Enter meta description..."
-                          multiline={4}
-                          autoComplete="off"
-                          onChange={(value) => updateEditField("seoDescription", value || "")}
-                        />
-
-                      <Text as="p" tone="subdued" variant="bodySm">
-                        Optimal Meta Description length: 140 to 160 characters. (Too short: less
-                        than 140, Too long: more than 160)
-                      </Text>
-
-                      <InlineStack align="end">
-                        <Button
-                          onClick={handleGenerateSeoDescription}
-                          loading={isGenerating}
-                          disabled={isGenerating || isUpdating}
-                        >
-                          {isGenerating ? "Generating..." : "Generate"}
-                        </Button>
-                      </InlineStack>
-                    </BlockStack>
-                  </BlockStack>
-                </Card>
-                </Grid.Cell>
-
-                {/* Right column: AI settings + generate */}
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 7, lg: 7, xl: 7 }}>
-                <Card>
-                  <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">AI Settings</Text>
-
-                    <Divider />
-
-                    <Select
-                      label="Language"
-                      options={languageSelectOptions}
-                      value={editForm.language}
-                      onChange={(value) => updateEditField("language", value || "")}
-                    />
-
-                    <Select
-                      label="Tone"
-                      options={toneSelectOptions}
-                      value={editForm.tone}
-                      onChange={(value) => updateEditField("tone", value || "")}
-                    />
-
-                    <Select
-                      label="Length (Words)"
-                      options={lengthSelectOptions}
-                      value={editForm.length}
-                      onChange={(value) => updateEditField("length", value || "")}
-                    />
-
-                    <Select
-                      label="Description Format"
-                      options={formatSelectOptions}
-                      value={editForm.format}
-                      onChange={(value) => updateEditField("format", value || "")}
-                    />
-
-                    <BlockStack gap="200">
-                      <TextField
-                        label="AI Context & Keywords"
-                        value={editForm.contextKeywords}
-                        placeholder="List product features or keywords"
-                        multiline={5}
-                        autoComplete="off"
-                        onChange={(value) =>
-                          updateEditField("contextKeywords", value || "")
-                        }
-                      />
-                      <InlineStack gap="200" wrap>
-                        {KEYWORD_CHIPS.map((chip) => (
-                          <Button
-                            key={chip}
-                            size="slim"
-                            onClick={() => appendKeywordChip(chip)}
-                          >
-                            {chip}
-                          </Button>
-                        ))}
-                      </InlineStack>
-                    </BlockStack>
-
-                    <Divider />
-
-                    <BlockStack gap="300">
-                      <Text as="h4" variant="headingSm">
-                        Product Prompt Templates
-                      </Text>
-                      <Text as="p" tone="subdued" variant="bodySm">
-                        Templates selected in the Template page are applied during generation. You can edit them here.
-                      </Text>
-
-                      <TextField
-                        label="Description Prompt Template"
-                        value={editForm.descriptionPromptTemplate}
-                        multiline={4}
-                        autoComplete="off"
-                        placeholder="No template selected"
-                        onChange={(value) =>
-                          updateEditField("descriptionPromptTemplate", value || "")
-                        }
-                      />
-
-                      <TextField
-                        label="Meta Title Prompt Template"
-                        value={editForm.metaTitlePromptTemplate}
-                        multiline={2}
-                        autoComplete="off"
-                        placeholder="No template selected"
-                        onChange={(value) =>
-                          updateEditField("metaTitlePromptTemplate", value || "")
-                        }
-                      />
-
-                      <TextField
-                        label="Meta Description Prompt Template"
-                        value={editForm.metaDescriptionPromptTemplate}
-                        multiline={3}
-                        autoComplete="off"
-                        placeholder="No template selected"
-                        onChange={(value) =>
-                          updateEditField("metaDescriptionPromptTemplate", value || "")
-                        }
-                      />
-                    </BlockStack>
-
-                    <Button
-                      variant="primary"
-                      fullWidth
-                      onClick={handleGenerate}
-                      loading={isGenerating}
-                      disabled={isGenerating || isUpdating}
-                    >
-                      {isGenerating ? "Generating..." : "Generate"}
-                    </Button>
-                  </BlockStack>
-                </Card>
-                </Grid.Cell>
-              </Grid>
-            </BlockStack>
-          )}
-        </Modal.Section>
-      </Modal>
+      {/* ── Generation Results Table ── */}
+      {bulkResult && bulkResult.results && bulkResult.results.length > 0 && (
+        <div style={{ marginTop: "24px" }}>
+          <Card padding="0">
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd" fontWeight="bold">Generation Results</Text>
+                <Badge tone={bulkResult.failed > 0 ? "warning" : "success"}>
+                  {bulkResult.succeeded}/{bulkResult.total} succeeded
+                </Badge>
+              </InlineStack>
+            </div>
+            <IndexTable
+              resourceName={{ singular: "product", plural: "products" }}
+              itemCount={bulkResult.results.length}
+              selectable={false}
+              headings={[
+                { title: "Product" },
+                { title: "Status" },
+                { title: "Meta Title" },
+                { title: "Meta Description" },
+              ]}
+            >
+              {bulkResult.results.map((r, index) => (
+                <IndexTable.Row id={r.id} key={r.id} position={index}>
+                  <IndexTable.Cell>
+                    <Text variant="bodyMd" fontWeight="medium" as="span">{r.title}</Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {r.status === "success"
+                      ? <Badge tone="success">Updated</Badge>
+                      : <Badge tone="critical">Failed</Badge>}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoTitle ? undefined : "subdued"}>
+                      {r.seoTitle ? r.seoTitle.slice(0, 60) + (r.seoTitle.length > 60 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoDescription ? undefined : "subdued"}>
+                      {r.seoDescription ? r.seoDescription.slice(0, 80) + (r.seoDescription.length > 80 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          </Card>
+        </div>
+      )}
 
       {/* Template Library Popup */}
       <TemplateLibraryModal

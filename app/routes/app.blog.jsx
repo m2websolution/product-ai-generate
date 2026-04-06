@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -23,12 +23,10 @@ import {
   Select,
   Banner,
   Badge,
-  Divider,
-  Box,
-  Grid,
-  Modal,
+  Checkbox,
   IndexTable,
   useIndexResourceState,
+  Spinner,
 } from "@shopify/polaris";
 
 // ─── GraphQL ─────────────────────────────────────────────────────────────────
@@ -75,69 +73,12 @@ const ARTICLES_QUERY = `#graphql
   }
 `;
 
-const ARTICLE_CREATE_MUTATION = `#graphql
-  mutation ArticleCreate($article: ArticleCreateInput!) {
-    articleCreate(article: $article) {
-      article {
-        id
-        title
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
 const ARTICLE_UPDATE_MUTATION = `#graphql
   mutation ArticleUpdate($id: ID!, $article: ArticleUpdateInput!) {
     articleUpdate(id: $id, article: $article) {
       article {
         id
         title
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-const STAGED_UPLOADS_CREATE = `#graphql
-  mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
-    stagedUploadsCreate(input: $input) {
-      stagedTargets {
-        url
-        resourceUrl
-        parameters {
-          name
-          value
-        }
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-const FILE_CREATE = `#graphql
-  mutation fileCreate($files: [FileCreateInput!]!) {
-    fileCreate(files: $files) {
-      files {
-        ... on MediaImage {
-          id
-          image {
-            url
-          }
-        }
-        ... on GenericFile {
-          id
-          url
-        }
       }
       userErrors {
         field
@@ -314,300 +255,107 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  if (intent === "generate_article_content") {
-    const articleId = formData.get("articleId") || "";
-    const blogId = formData.get("blogId") || "";
-    const articleType = formData.get("articleType") || "How-To Guide";
-    const title = formData.get("title") || "";
-    const body = formData.get("body") || "";
+  if (intent === "bulk_generate_blog") {
+    let bulkArticles;
+    try {
+      bulkArticles = JSON.parse(formData.get("articles") || "[]");
+    } catch {
+      return { success: false, intent, error: "Invalid articles payload." };
+    }
+    if (!Array.isArray(bulkArticles) || bulkArticles.length === 0) {
+      return { success: false, intent, error: "No articles selected." };
+    }
     const language = formData.get("language") || "en";
-    const tone = formData.get("tone") || "";
-    const length = formData.get("length") || "";
-    const format = formData.get("format") || "";
-    const contextKeywords = formData.get("contextKeywords") || "";
-    const articleBodyPromptTemplate = formData.get("articleBodyPromptTemplate") || "";
-    const articleMetaTitlePromptTemplate = formData.get("articleMetaTitlePromptTemplate") || "";
-    const articleMetaDescriptionPromptTemplate =
-      formData.get("articleMetaDescriptionPromptTemplate") || "";
+    const tone = formData.get("tone") || "professional";
+    const length = formData.get("length") || "medium (around 600 words)";
+    const format = formData.get("format") || "headings and paragraphs";
+    const articleType = formData.get("articleType") || "How-To Guide";
+    const bodyPromptTemplate = formData.get("bodyPromptTemplate") || "";
+    const metaTitlePromptTemplate = formData.get("metaTitlePromptTemplate") || "";
+    const metaDescriptionPromptTemplate = formData.get("metaDescriptionPromptTemplate") || "";
     const aiProvider = formData.get("aiProvider") || "auto";
-
     const shopData = await db.shop.findUnique({
       where: { shop: session.shop },
       select: { openaiApiKey: true, anthropicApiKey: true },
     });
 
-    try {
-      const input = buildGenerationPrompt({
-        articleType,
-        title,
-        body,
-        language,
-        tone,
-        length,
-        format,
-        contextKeywords,
-        bodyPromptTemplate: articleBodyPromptTemplate,
-        metaTitlePromptTemplate: articleMetaTitlePromptTemplate,
-        metaDescriptionPromptTemplate: articleMetaDescriptionPromptTemplate,
-      });
-      const raw = await generateContent(input, {
-        aiProvider,
-        shopOpenaiKey: shopData?.openaiApiKey,
-        shopAnthropicKey: shopData?.anthropicApiKey,
-      });
-
-      let parsed = { articleTitle: "", articleBody: "", excerpt: "", seoTitle: "", seoDescription: "" };
-      try {
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-      } catch {
-        parsed.articleBody = raw;
-      }
-
-      // Only upsert in edit mode (articleId exists)
-      if (articleId) {
-        await upsertBlogArticleContent({
-          shop: session.shop,
-          articleId,
-          blogId: blogId || null,
-          articleTitle: parsed.articleTitle || title || null,
-          articleType: articleType || null,
-          language: language || null,
-          tone: tone || null,
-          lengthOption: length || null,
-          formatOption: format || null,
-          contextKeywords: contextKeywords || null,
-          aiModel: aiProvider || null,
-          bodyHtml: parsed.articleBody || null,
-          seoTitle: parsed.seoTitle || null,
-          seoDescription: parsed.seoDescription || null,
-          isPublished: false,
-          appliedToShopify: false,
+    const results = await Promise.allSettled(
+      bulkArticles.map(async (a) => {
+        const input = buildGenerationPrompt({
+          articleType,
+          title: a.title || "",
+          body: a.body || "",
+          language,
+          tone,
+          length,
+          format,
+          contextKeywords: "",
+          bodyPromptTemplate,
+          metaTitlePromptTemplate,
+          metaDescriptionPromptTemplate,
         });
-      }
-
-      return { success: true, intent, ...parsed };
-    } catch (err) {
-      return { success: false, intent, error: err.message };
-    }
-  }
-
-  if (intent === "create_article") {
-    const blogId = formData.get("blogId");
-    const authorName = formData.get("authorName") || "Admin";
-    const title = formData.get("title") || "";
-    const body = formData.get("body") || "";
-    const seoTitle = formData.get("seoTitle") || "";
-    const seoDescription = formData.get("seoDescription") || "";
-    const isPublished = formData.get("isPublished") === "true";
-    const articleType = formData.get("articleType") || "";
-    const language = formData.get("language") || "";
-    const tone = formData.get("tone") || "";
-    const length = formData.get("length") || "";
-    const format = formData.get("format") || "";
-    const contextKeywords = formData.get("contextKeywords") || "";
-
-    try {
-      const metafields = [];
-      if (seoTitle) metafields.push({ namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" });
-      if (seoDescription) metafields.push({ namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" });
-
-      const response = await admin.graphql(ARTICLE_CREATE_MUTATION, {
-        variables: {
-          article: { blogId, author: { name: authorName }, title, body, isPublished, metafields },
-        },
-      });
-      const json = await response.json();
-      const userErrors = json.data?.articleCreate?.userErrors || [];
-      if (userErrors.length > 0) {
-        return { success: false, intent, error: userErrors.map((e) => e.message).join(", ") };
-      }
-
-      const newArticleId = json.data?.articleCreate?.article?.id;
-      if (newArticleId) {
-        await upsertBlogArticleContent({
-          shop: session.shop,
-          articleId: newArticleId,
-          blogId: blogId || null,
-          articleTitle: title || null,
-          articleType: articleType || null,
-          authorName: authorName || null,
-          language: language || null,
-          tone: tone || null,
-          lengthOption: length || null,
-          formatOption: format || null,
-          contextKeywords: contextKeywords || null,
-          aiModel: null,
-          bodyHtml: body || null,
-          seoTitle: seoTitle || null,
-          seoDescription: seoDescription || null,
-          isPublished,
-          appliedToShopify: true,
+        const raw = await generateContent(input, {
+          aiProvider,
+          shopOpenaiKey: shopData?.openaiApiKey,
+          shopAnthropicKey: shopData?.anthropicApiKey,
         });
-      }
+        let parsed = { articleTitle: "", articleBody: "", seoTitle: "", seoDescription: "" };
+        try {
+          const match = raw.match(/\{[\s\S]*\}/);
+          if (match) parsed = JSON.parse(match[0]);
+        } catch { parsed.articleBody = raw; }
 
-      return { success: true, intent, message: "Article created successfully!" };
-    } catch (err) {
-      return { success: false, intent, error: err.message };
-    }
-  }
+        const nextBody = parsed.articleBody || a.body || "";
+        const nextSeoTitle = parsed.seoTitle || "";
+        const nextSeoDescription = parsed.seoDescription || "";
 
-  if (intent === "update_article") {
-    const articleId = formData.get("articleId");
-    const blogId = formData.get("blogId") || "";
-    const title = formData.get("title") || "";
-    const body = formData.get("body") || "";
-    const seoTitle = formData.get("seoTitle") || "";
-    const seoDescription = formData.get("seoDescription") || "";
-    const isPublished = formData.get("isPublished") === "true";
-    const articleType = formData.get("articleType") || "";
-    const language = formData.get("language") || "";
-    const tone = formData.get("tone") || "";
-    const length = formData.get("length") || "";
-    const format = formData.get("format") || "";
-    const contextKeywords = formData.get("contextKeywords") || "";
-
-    try {
-      const response = await admin.graphql(ARTICLE_UPDATE_MUTATION, {
-        variables: {
-          id: articleId,
-          article: {
-            title,
-            body,
-            isPublished,
-            metafields: [
-              { namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" },
-              { namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" },
-            ],
-          },
-        },
-      });
-      const json = await response.json();
-      const userErrors = json.data?.articleUpdate?.userErrors || [];
-      if (userErrors.length > 0) {
-        return { success: false, intent, error: userErrors.map((e) => e.message).join(", ") };
-      }
-
-      await upsertBlogArticleContent({
-        shop: session.shop,
-        articleId,
-        blogId: blogId || null,
-        articleTitle: title || null,
-        articleType: articleType || null,
-        language: language || null,
-        tone: tone || null,
-        lengthOption: length || null,
-        formatOption: format || null,
-        contextKeywords: contextKeywords || null,
-        aiModel: null,
-        bodyHtml: body || null,
-        seoTitle: seoTitle || null,
-        seoDescription: seoDescription || null,
-        isPublished,
-        appliedToShopify: true,
-      });
-
-      return { success: true, intent, message: "Article updated successfully!" };
-    } catch (err) {
-      return { success: false, intent, error: err.message };
-    }
-  }
-
-  if (intent === "upload_blog_image") {
-    const file = formData.get("file");
-    if (!file || typeof file === "string") {
-      return { success: false, intent, error: "No file received." };
-    }
-    const filename = file.name;
-    const mimeType = file.type || "image/jpeg";
-    const fileSize = file.size;
-
-    try {
-      // 1. Create staged upload target
-      const stagedRes = await admin.graphql(STAGED_UPLOADS_CREATE, {
-        variables: {
-          input: [{
-            resource: "IMAGE",
-            filename,
-            mimeType,
-            fileSize: String(fileSize),
-            httpMethod: "POST",
-          }],
-        },
-      });
-      const stagedJson = await stagedRes.json();
-      const userErrors = stagedJson.data?.stagedUploadsCreate?.userErrors || [];
-      if (userErrors.length > 0) {
-        return { success: false, intent, error: userErrors.map((e) => e.message).join(", ") };
-      }
-      const target = stagedJson.data?.stagedUploadsCreate?.stagedTargets?.[0];
-      if (!target) return { success: false, intent, error: "Failed to create staged upload." };
-
-      // 2. Upload file to staged URL (multipart)
-      const uploadForm = new FormData();
-      for (const param of target.parameters) {
-        uploadForm.append(param.name, param.value);
-      }
-      uploadForm.append("file", file);
-      const uploadRes = await fetch(target.url, { method: "POST", body: uploadForm });
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text();
-        return { success: false, intent, error: `Staging upload failed: ${errText.slice(0, 200)}` };
-      }
-
-      // 3. Create file in Shopify Files
-      const fileRes = await admin.graphql(FILE_CREATE, {
-        variables: {
-          files: [{ alt: filename, contentType: "IMAGE", originalSource: target.resourceUrl }],
-        },
-      });
-      const fileJson = await fileRes.json();
-      const fileErrors = fileJson.data?.fileCreate?.userErrors || [];
-      if (fileErrors.length > 0) {
-        return { success: false, intent, error: fileErrors.map((e) => e.message).join(", ") };
-      }
-      const created = fileJson.data?.fileCreate?.files?.[0];
-      let imageUrl = created?.image?.url || created?.url || null;
-      const createdFileId = created?.id;
-
-      // Shopify processes files asynchronously — poll up to 4× (1.2 s apart) for the final URL
-      if (!imageUrl && createdFileId) {
-        for (let attempt = 0; attempt < 4; attempt++) {
-          await new Promise((r) => setTimeout(r, 1200));
-          const pollRes = await admin.graphql(`#graphql
-            query GetFiles($query: String!) {
-              files(first: 1, query: $query) {
-                edges {
-                  node {
-                    ... on MediaImage { image { url } }
-                    ... on GenericFile  { url }
-                  }
-                }
-              }
-            }
-          `, { variables: { query: `id:${createdFileId}` } });
-          const pollJson = await pollRes.json();
-          const node = pollJson.data?.files?.edges?.[0]?.node;
-          imageUrl = node?.image?.url || node?.url || null;
-          if (imageUrl) break;
+        if (a.id) {
+          const metafields = [];
+          if (nextSeoTitle) metafields.push({ namespace: "global", key: "title_tag", value: nextSeoTitle, type: "single_line_text_field" });
+          if (nextSeoDescription) metafields.push({ namespace: "global", key: "description_tag", value: nextSeoDescription, type: "single_line_text_field" });
+          await admin.graphql(ARTICLE_UPDATE_MUTATION, {
+            variables: { id: a.id, article: { body: nextBody, metafields } },
+          });
+          await upsertBlogArticleContent({
+            shop: session.shop,
+            articleId: a.id,
+            blogId: a.blogId || null,
+            articleTitle: a.title || null,
+            articleType: articleType || null,
+            language: language || null,
+            tone: tone || null,
+            lengthOption: length || null,
+            formatOption: format || null,
+            contextKeywords: null,
+            aiModel: aiProvider || null,
+            bodyHtml: nextBody || null,
+            seoTitle: nextSeoTitle || null,
+            seoDescription: nextSeoDescription || null,
+            isPublished: false,
+            appliedToShopify: true,
+          });
         }
-      }
+        return { id: a.id, title: a.title, seoTitle: nextSeoTitle, seoDescription: nextSeoDescription };
+      }),
+    );
 
-      if (!imageUrl) {
-        return { success: false, intent, error: "Image was uploaded but Shopify is still processing it. Please try again in a moment." };
-      }
-
-      return { success: true, intent, imageUrl, filename };
-    } catch (err) {
-      return { success: false, intent, error: err.message };
-    }
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const itemResults = results.map((r, i) => ({
+      id: bulkArticles[i].id,
+      title: bulkArticles[i].title,
+      status: r.status === "fulfilled" ? "success" : "failed",
+      error: r.status === "rejected" ? r.reason?.message : null,
+      seoTitle: r.status === "fulfilled" ? r.value.seoTitle : null,
+      seoDescription: r.status === "fulfilled" ? r.value.seoDescription : null,
+    }));
+    return { success: true, intent, succeeded, failed, total: bulkArticles.length, results: itemResults };
   }
 
   return { success: false, error: "Unknown action." };
 };
 
 // ─── Options ─────────────────────────────────────────────────────────────────
-
 
 const ARTICLE_TYPE_OPTIONS = [
   { label: "How-To Guide", value: "How-To Guide" },
@@ -659,52 +407,36 @@ const FORMAT_OPTIONS = [
   { label: "HTML with proper tags", value: "HTML with proper tags" },
 ];
 
-const PUBLISH_OPTIONS = [
-  { label: "Save as Draft", value: "false" },
-  { label: "Publish Immediately", value: "true" },
-];
-
-const KEYWORD_CHIPS = ["Brand Name", "Products", "Sale", "Location", "Free Shipping", "Discount", "New Arrival"];
-
-// ─── Edit initial state ───────────────────────────────────────────────────────
-
-const editInitialState = {
-  articleId: "",
-  blogId: "",
-  authorName: "",
-  title: "",
-  body: "",
-  seoTitle: "",
-  seoDescription: "",
-  isPublished: "false",
-  aiProvider: "auto",
-  articleType: "How-To Guide",
-  language: "en",
-  tone: "professional",
-  length: "medium (around 600 words)",
-  format: "headings and paragraphs",
-  contextKeywords: "",
-  articleBodyPromptTemplate: "",
-  articleMetaTitlePromptTemplate: "",
-  articleMetaDescriptionPromptTemplate: "",
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BlogPage() {
   const { blogs, articles, defaultAiProvider } = useLoaderData();
   const navigate = useNavigate();
-  const generateFetcher = useFetcher();
-  const saveFetcher = useFetcher();
-  const isGenerating = generateFetcher.state !== "idle";
-  const isSaving = saveFetcher.state !== "idle";
+  const bulkFetcher = useFetcher();
+  const isBulkGenerating = bulkFetcher.state !== "idle";
 
   const shopify = useAppBridge();
-  const [editModal, setEditModal] = useState(false);
-  const [isCreateMode, setIsCreateMode] = useState(false);
-  const [editState, setEditState] = useState(editInitialState);
-  const [generationError, setGenerationError] = useState(null);
   const [templateLib, setTemplateLib] = useState({ open: false, tab: "description", target: "articleBodyPromptTemplate" });
+
+  // ── Bulk state ──────────────────────────────────────────────────────────────
+  const [bulkContentTypes, setBulkContentTypes] = useState(["body", "meta_description", "meta_title"]);
+  const [bulkSettings, setBulkSettings] = useState({
+    language: "en",
+    tone: "professional",
+    length: "medium (around 600 words)",
+    format: "headings and paragraphs",
+    articleType: "How-To Guide",
+    aiProvider: defaultAiProvider || "auto",
+  });
+  const [useCustomBodyInstructions, setUseCustomBodyInstructions] = useState(false);
+  const [useCustomMetaDescInstructions, setUseCustomMetaDescInstructions] = useState(false);
+  const [useCustomMetaTitleInstructions, setUseCustomMetaTitleInstructions] = useState(false);
+  const [bulkBodyPromptTemplate, setBulkBodyPromptTemplate] = useState("");
+  const [bulkMetaDescPromptTemplate, setBulkMetaDescPromptTemplate] = useState("");
+  const [bulkMetaTitlePromptTemplate, setBulkMetaTitlePromptTemplate] = useState("");
+  const [bulkValidationMessage, setBulkValidationMessage] = useState(null);
+  const [bulkResult, setBulkResult] = useState(null);
+  const [showAdvancedBulk, setShowAdvancedBulk] = useState(false);
 
   const blogTemplatesByTab = {
     description: BLOG_BODY_TEMPLATES,
@@ -720,22 +452,26 @@ export default function BlogPage() {
     setTemplateLib({ open: true, tab, target });
   }
   function handleBlogUseTemplate(templateText) {
-    setEditState((s) => ({ ...s, [templateLib.target]: templateText }));
+    const target = templateLib.target;
+    if (target === "bulk_body") {
+      setBulkBodyPromptTemplate(templateText);
+      setUseCustomBodyInstructions(true);
+    } else if (target === "bulk_meta_desc") {
+      setBulkMetaDescPromptTemplate(templateText);
+      setUseCustomMetaDescInstructions(true);
+    } else if (target === "bulk_meta_title") {
+      setBulkMetaTitlePromptTemplate(templateText);
+      setUseCustomMetaTitleInstructions(true);
+    }
     setTemplateLib((s) => ({ ...s, open: false }));
   }
+
   const [filterBlogId, setFilterBlogId] = useState("all");
-  const [uploadedImages, setUploadedImages] = useState([]);
-  const imageFetcher = useFetcher();
-  const fileInputRef = useRef(null);
-  const pendingImageIdRef = useRef(null);
-  const isUploading = imageFetcher.state !== "idle";
 
   const blogFilterOptions = [
     { label: "All Blogs", value: "all" },
     ...blogs.map((b) => ({ label: b.title, value: b.id })),
   ];
-
-  const blogSelectOptions = blogs.map((b) => ({ label: b.title, value: b.id }));
 
   const filteredArticles =
     filterBlogId === "all"
@@ -745,194 +481,58 @@ export default function BlogPage() {
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(filteredArticles);
 
+  const selectedArticles = filteredArticles.filter((a) => selectedResources.includes(a.id));
+
+  function handleBulkGenerate() {
+    if (selectedArticles.length === 0) {
+      setBulkValidationMessage("Select at least one article.");
+      return;
+    }
+    if (selectedArticles.length > 50) {
+      setBulkValidationMessage("You can bulk generate up to 50 articles at a time.");
+      return;
+    }
+    setBulkValidationMessage(null);
+    setBulkResult(null);
+    const payload = new FormData();
+    payload.append("intent", "bulk_generate_blog");
+    payload.append("articles", JSON.stringify(
+      selectedArticles.map((a) => ({
+        id: a.id,
+        blogId: a.blog?.id || "",
+        title: a.title || "",
+        body: a.body || "",
+      }))
+    ));
+    payload.append("language", bulkSettings.language);
+    payload.append("tone", bulkSettings.tone);
+    payload.append("length", bulkSettings.length);
+    payload.append("format", bulkSettings.format);
+    payload.append("articleType", bulkSettings.articleType);
+    payload.append("aiProvider", bulkSettings.aiProvider);
+    payload.append("bodyPromptTemplate", bulkBodyPromptTemplate);
+    payload.append("metaTitlePromptTemplate", bulkMetaTitlePromptTemplate);
+    payload.append("metaDescriptionPromptTemplate", bulkMetaDescPromptTemplate);
+    bulkFetcher.submit(payload, { method: "post" });
+  }
+
+  useEffect(() => {
+    const data = bulkFetcher.data;
+    if (!data || bulkFetcher.state !== "idle") return;
+    if (data.success) {
+      setBulkResult(data);
+      shopify.toast.show(`Generated ${data.succeeded}/${data.total} articles successfully.`);
+    } else {
+      setBulkValidationMessage(data.error || "Bulk generation failed.");
+    }
+  }, [bulkFetcher.data, bulkFetcher.state]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const templateSelection = readStoredBlogPromptTemplateSelection();
-    setEditState((current) => ({
-      ...current,
-      articleBodyPromptTemplate:
-        current.articleBodyPromptTemplate || templateSelection.bodyPromptTemplate || "",
-      articleMetaTitlePromptTemplate:
-        current.articleMetaTitlePromptTemplate || templateSelection.metaTitlePromptTemplate || "",
-      articleMetaDescriptionPromptTemplate:
-        current.articleMetaDescriptionPromptTemplate ||
-        templateSelection.metaDescriptionPromptTemplate ||
-        "",
-    }));
+    if (templateSelection.bodyPromptTemplate) setBulkBodyPromptTemplate(templateSelection.bodyPromptTemplate);
+    if (templateSelection.metaTitlePromptTemplate) setBulkMetaTitlePromptTemplate(templateSelection.metaTitlePromptTemplate);
+    if (templateSelection.metaDescriptionPromptTemplate) setBulkMetaDescPromptTemplate(templateSelection.metaDescriptionPromptTemplate);
   }, []);
-
-  function openCreateModal() {
-    const templateSelection = readStoredBlogPromptTemplateSelection();
-    setEditState({
-      ...editInitialState,
-      aiProvider: defaultAiProvider,
-      blogId: blogs[0]?.id || "",
-      articleBodyPromptTemplate: templateSelection.bodyPromptTemplate || "",
-      articleMetaTitlePromptTemplate: templateSelection.metaTitlePromptTemplate || "",
-      articleMetaDescriptionPromptTemplate: templateSelection.metaDescriptionPromptTemplate || "",
-    });
-    setIsCreateMode(true);
-    setGenerationError(null);
-    setUploadedImages([]);
-    setEditModal(true);
-  }
-
-  function openEditModal(article) {
-    const templateSelection = readStoredBlogPromptTemplateSelection();
-    setEditState({
-      ...editInitialState,
-      aiProvider: defaultAiProvider,
-      articleId: article.id,
-      blogId: article.blog?.id || "",
-      title: article.title || "",
-      body: article.body || "",
-      seoTitle: article.seo?.title || "",
-      seoDescription: article.seo?.description || "",
-      isPublished: article.publishedAt ? "true" : "false",
-      articleBodyPromptTemplate: templateSelection.bodyPromptTemplate || "",
-      articleMetaTitlePromptTemplate: templateSelection.metaTitlePromptTemplate || "",
-      articleMetaDescriptionPromptTemplate: templateSelection.metaDescriptionPromptTemplate || "",
-    });
-    setIsCreateMode(false);
-    setGenerationError(null);
-    setUploadedImages([]);
-    setEditModal(true);
-  }
-
-  function closeModal() {
-    // Free memory for local preview URLs
-    uploadedImages.forEach((img) => {
-      if (img.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(img.previewUrl);
-    });
-    setEditModal(false);
-    setGenerationError(null);
-  }
-
-  function setField(field) {
-    return (value) => setEditState((s) => ({ ...s, [field]: value }));
-  }
-
-  function handleImageFileChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Show instant local preview while uploading
-    const previewUrl = URL.createObjectURL(file);
-    const id = `img_${Date.now()}`;
-    pendingImageIdRef.current = id;
-    setUploadedImages((prev) => [
-      ...prev,
-      { id, previewUrl, realUrl: null, name: file.name, status: "uploading" },
-    ]);
-    const fd = new FormData();
-    fd.append("intent", "upload_blog_image");
-    fd.append("file", file);
-    imageFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
-    e.target.value = "";
-  }
-
-  function insertImageToBody(img) {
-    if (img.status !== "done") return;
-    const imgTag = `\n<img src="${img.realUrl}" alt="${img.name || ""}" style="max-width:100%;height:auto;" />\n`;
-    setEditState((s) => ({ ...s, body: s.body + imgTag }));
-  }
-
-  function appendKeyword(kw) {
-    setEditState((s) => ({
-      ...s,
-      contextKeywords: s.contextKeywords ? `${s.contextKeywords}, ${kw}` : kw,
-    }));
-  }
-
-  function handleGenerate() {
-    setGenerationError(null);
-    const fd = new FormData();
-    fd.append("intent", "generate_article_content");
-    fd.append("articleId", editState.articleId);
-    fd.append("blogId", editState.blogId);
-    fd.append("articleType", editState.articleType);
-    fd.append("title", editState.title);
-    fd.append("body", editState.body);
-    fd.append("language", editState.language);
-    fd.append("tone", editState.tone);
-    fd.append("length", editState.length);
-    fd.append("format", editState.format);
-    fd.append("contextKeywords", editState.contextKeywords);
-    fd.append("articleBodyPromptTemplate", editState.articleBodyPromptTemplate);
-    fd.append("articleMetaTitlePromptTemplate", editState.articleMetaTitlePromptTemplate);
-    fd.append(
-      "articleMetaDescriptionPromptTemplate",
-      editState.articleMetaDescriptionPromptTemplate,
-    );
-    fd.append("aiProvider", editState.aiProvider);
-    generateFetcher.submit(fd, { method: "post" });
-  }
-
-  function handleSave() {
-    const fd = new FormData();
-    fd.append("intent", isCreateMode ? "create_article" : "update_article");
-    if (!isCreateMode) fd.append("articleId", editState.articleId);
-    fd.append("blogId", editState.blogId);
-    if (isCreateMode) fd.append("authorName", editState.authorName || "Admin");
-    fd.append("title", editState.title);
-    fd.append("body", editState.body);
-    fd.append("seoTitle", editState.seoTitle);
-    fd.append("seoDescription", editState.seoDescription);
-    fd.append("isPublished", editState.isPublished);
-    fd.append("articleType", editState.articleType);
-    fd.append("language", editState.language);
-    fd.append("tone", editState.tone);
-    fd.append("length", editState.length);
-    fd.append("format", editState.format);
-    fd.append("contextKeywords", editState.contextKeywords);
-    saveFetcher.submit(fd, { method: "post" });
-  }
-
-  useEffect(() => {
-    const data = generateFetcher.data;
-    if (!data) return;
-    if (data.success) {
-      setEditState((s) => ({
-        ...s,
-        title: data.articleTitle || s.title,
-        body: data.articleBody || s.body,
-        seoTitle: data.seoTitle || s.seoTitle,
-        seoDescription: data.seoDescription || s.seoDescription,
-      }));
-      setGenerationError(null);
-    } else {
-      setGenerationError(data.error || "Generation failed.");
-    }
-  }, [generateFetcher.data]);
-
-  useEffect(() => {
-    const data = saveFetcher.data;
-    if (!data) return;
-    if (data.success) {
-      const msg = data.intent === "create_article" ? "Article created successfully!" : "Article updated successfully!";
-      shopify.toast.show(msg);
-      closeModal();
-    } else {
-      setGenerationError(data.error || "Save failed.");
-    }
-  }, [saveFetcher.data]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const data = imageFetcher.data;
-    if (!data || data.intent !== "upload_blog_image") return;
-    const id = pendingImageIdRef.current;
-    if (data.success) {
-      setUploadedImages((prev) =>
-        prev.map((img) =>
-          img.id === id ? { ...img, realUrl: data.imageUrl, status: "done" } : img
-        )
-      );
-    } else {
-      setUploadedImages((prev) =>
-        prev.map((img) => (img.id === id ? { ...img, status: "error" } : img))
-      );
-      setGenerationError(data.error || "Image upload failed.");
-    }
-    pendingImageIdRef.current = null;
-  }, [imageFetcher.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rowMarkup = filteredArticles.map((article, index) => (
     <IndexTable.Row
@@ -964,9 +564,6 @@ export default function BlogPage() {
             : "—"}
         </Text>
       </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Button size="slim" onClick={() => openEditModal(article)}>Edit Content</Button>
-      </IndexTable.Cell>
     </IndexTable.Row>
   ));
 
@@ -997,392 +594,353 @@ export default function BlogPage() {
               onClick={() => navigate("/app")}
               style={{ padding: "7px 16px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
             >← Dashboard</button>
-            {blogs.length > 0 && (
-              <button
-                onClick={openCreateModal}
-                style={{ padding: "7px 16px", borderRadius: "6px", border: "none", background: "linear-gradient(135deg, #ec4899, #a855f7)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
-              >+ New Article</button>
-            )}
           </div>
         </div>
       </div>
 
-      <BlockStack gap="400">
-        {articles.length === 0 && (
-          <Banner tone="info">
-            <p>
-              No blog articles found. Create a blog in Shopify Admin first, then click{" "}
-              <strong>New Article</strong> to get started.
-            </p>
-          </Banner>
-        )}
+      <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
 
-        {blogs.length > 0 && (
-          <InlineStack gap="300" blockAlign="center">
-            <Text variant="bodySm" as="span">Filter:</Text>
-            <div style={{ minWidth: "220px" }}>
+        {/* ── LEFT: Article List ── */}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          {articles.length === 0 && (
+            <Banner tone="info">
+              <p>
+                No blog articles found. Create a blog in Shopify Admin first to get started.
+              </p>
+            </Banner>
+          )}
+
+          {blogs.length > 0 && (
+            <div style={{ marginBottom: "12px" }}>
+              <InlineStack gap="300" blockAlign="center">
+                <Text variant="bodySm" as="span">Filter:</Text>
+                <div style={{ minWidth: "220px" }}>
+                  <Select
+                    label="Filter by blog"
+                    labelHidden
+                    options={blogFilterOptions}
+                    value={filterBlogId}
+                    onChange={setFilterBlogId}
+                  />
+                </div>
+              </InlineStack>
+            </div>
+          )}
+
+          <Card padding="0">
+            <IndexTable
+              resourceName={{ singular: "article", plural: "articles" }}
+              itemCount={filteredArticles.length}
+              selectedItemsCount={allResourcesSelected ? "All" : selectedResources.length}
+              onSelectionChange={handleSelectionChange}
+              headings={[
+                { title: "Title" },
+                { title: "Blog" },
+                { title: "Status" },
+                { title: "SEO" },
+                { title: "Generated" },
+              ]}
+            >
+              {rowMarkup}
+            </IndexTable>
+            <div style={{ padding: "8px 16px", borderTop: "1px solid var(--p-color-border)" }}>
+              <Text as="span" tone="subdued" variant="bodySm">
+                {filteredArticles.length} article{filteredArticles.length !== 1 ? "s" : ""}
+              </Text>
+            </div>
+          </Card>
+        </div>
+
+        {/* ── RIGHT: Bulk Settings Panel ── */}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <Card padding="0">
+            {/* Header */}
+            <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd" fontWeight="bold">Blog Bulk Settings</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {selectedArticles.length > 0
+                    ? `Body, Meta Descriptions, Meta Titles will be generated for ${selectedArticles.length} article${selectedArticles.length !== 1 ? "s" : ""}`
+                    : "Select articles from the list to bulk generate content"}
+                </Text>
+              </BlockStack>
+            </div>
+
+            {/* Content Type Pills */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {[
+                  { id: "body", label: "Body" },
+                  { id: "meta_description", label: "Meta Description" },
+                  { id: "meta_title", label: "Meta Title" },
+                ].map((type) => {
+                  const isActive = bulkContentTypes.includes(type.id);
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => setBulkContentTypes((prev) =>
+                        prev.includes(type.id) ? prev.filter((t) => t !== type.id) : [...prev, type.id]
+                      )}
+                      style={{
+                        padding: "6px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                        border: isActive ? "2px solid #1a1a1a" : "1px solid #d1d5db",
+                        background: isActive ? "#1a1a1a" : "#f9fafb",
+                        color: isActive ? "#fff" : "#374151",
+                        display: "flex", alignItems: "center", gap: "6px",
+                      }}
+                    >
+                      {isActive && <span>✓</span>}
+                      {type.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Output Language */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
               <Select
-                label="Filter by blog"
-                labelHidden
-                options={blogFilterOptions}
-                value={filterBlogId}
-                onChange={setFilterBlogId}
+                label="Output Language"
+                options={LANGUAGE_OPTIONS}
+                value={bulkSettings.language}
+                onChange={(v) => setBulkSettings((s) => ({ ...s, language: v }))}
               />
             </div>
-          </InlineStack>
-        )}
 
-        <Card padding="0">
-          <IndexTable
-            resourceName={{ singular: "article", plural: "articles" }}
-            itemCount={filteredArticles.length}
-            selectedItemsCount={allResourcesSelected ? "All" : selectedResources.length}
-            onSelectionChange={handleSelectionChange}
-            headings={[
-              { title: "Title" },
-              { title: "Blog" },
-              { title: "Status" },
-              { title: "SEO" },
-              { title: "Generated" },
-              { title: "Action" },
-            ]}
-          >
-            {rowMarkup}
-          </IndexTable>
-        </Card>
-      </BlockStack>
-
-      {/* Edit / Create Modal */}
-      <style>{".Polaris-Modal-Dialog__Modal { max-width: 66rem !important; }"}</style>
-      <Modal
-        open={editModal}
-        onClose={closeModal}
-        title={isCreateMode ? "Create New Blog Article" : `Edit: ${editState.title || "Article"}`}
-        primaryAction={{
-          content: isCreateMode ? (isSaving ? "Creating…" : "Create Article") : (isSaving ? "Updating…" : "Update Article"),
-          onAction: handleSave,
-          loading: isSaving,
-        }}
-        secondaryActions={[{ content: "Cancel", onAction: closeModal }]}
-      >
-        <Modal.Section>
-          {generationError && (
-            <Box paddingBlockEnd="400">
-              <Banner tone="critical" onDismiss={() => setGenerationError(null)}>
-                <p>{generationError}</p>
-              </Banner>
-            </Box>
-          )}
-          <Grid>
-            {/* Left 40% — content editor */}
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 8, lg: 8, xl: 8 }}>
-              <BlockStack gap="400">
-                {isCreateMode && blogSelectOptions.length > 0 && (
-                  <Select
-                    label="Post to Blog"
-                    options={blogSelectOptions}
-                    value={editState.blogId}
-                    onChange={setField("blogId")}
+            {/* Body Template Section */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Body</Text>
+              <div style={{ marginTop: "10px" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Checkbox
+                    label={<span>Use custom instructions <span style={{ fontSize: "14px" }}>✨</span></span>}
+                    checked={useCustomBodyInstructions}
+                    onChange={setUseCustomBodyInstructions}
                   />
-                )}
-
-                {isCreateMode && (
-                  <TextField
-                    label="Author Name"
-                    value={editState.authorName}
-                    onChange={setField("authorName")}
-                    autoComplete="off"
-                    placeholder="e.g. John Smith"
-                    helpText="Required by Shopify for new articles."
-                  />
-                )}
-
-                <TextField
-                  label="Article Title"
-                  value={editState.title}
-                  onChange={setField("title")}
-                  autoComplete="off"
-                  placeholder="Enter article title…"
-                />
-
-                <TextField
-                  label="Article Body (HTML)"
-                  value={editState.body}
-                  onChange={setField("body")}
-                  multiline={10}
-                  autoComplete="off"
-                  helpText="HTML is supported. This is the full article content."
-                />
-
-                {/* ── Blog Images ── */}
-                <BlockStack gap="300">
-                  <Text variant="headingSm" as="h3">Blog Images</Text>
-                  <Text variant="bodySm" tone="subdued" as="p">
-                    Upload images to your Shopify Files, then click <strong>Insert</strong> to add them to the article body.
-                  </Text>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={handleImageFileChange}
-                  />
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    loading={isUploading}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? "Uploading…" : "Upload Image"}
-                  </Button>
-
-                  {uploadedImages.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                      {uploadedImages.map((img) => (
-                        <div
-                          key={img.id}
-                          style={{
-                            position: "relative",
-                            border: `1px solid ${img.status === "error" ? "#d82c0d" : "#ddd"}`,
-                            borderRadius: "6px",
-                            overflow: "hidden",
-                            width: "90px",
-                          }}
-                        >
-                          {/* Local preview — shown immediately */}
-                          <img
-                            src={img.previewUrl}
-                            alt={img.name}
-                            style={{ width: "90px", height: "90px", objectFit: "cover", display: "block" }}
-                          />
-
-                          {/* Uploading overlay */}
-                          {img.status === "uploading" && (
-                            <div style={{
-                              position: "absolute", inset: 0,
-                              background: "rgba(0,0,0,0.5)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              color: "#fff", fontSize: "10px", fontWeight: 600,
-                            }}>
-                              Uploading…
-                            </div>
-                          )}
-
-                          {/* Error overlay */}
-                          {img.status === "error" && (
-                            <div style={{
-                              position: "absolute", inset: 0,
-                              background: "rgba(216,44,13,0.7)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              color: "#fff", fontSize: "10px", fontWeight: 600, textAlign: "center",
-                              padding: "4px",
-                            }}>
-                              Failed
-                            </div>
-                          )}
-
-                          <div style={{ padding: "4px", background: "#f6f6f7" }}>
-                            <button
-                              onClick={() => insertImageToBody(img)}
-                              disabled={img.status !== "done"}
-                              style={{
-                                width: "100%",
-                                background: img.status === "done"
-                                  ? "linear-gradient(135deg, #ec4899, #a855f7)"
-                                  : "#ccc",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: img.status === "done" ? "pointer" : "not-allowed",
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                padding: "3px 0",
-                              }}
-                            >
-                              {img.status === "uploading" ? "…" : img.status === "error" ? "✗" : "Insert"}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                  <Button size="slim" onClick={() => openBlogTemplateLib("description", "bulk_body")}>Browse Templates</Button>
+                </InlineStack>
+                {useCustomBodyInstructions && (
+                  <div style={{ marginTop: "10px" }}>
+                    <Text as="p" variant="bodySm" tone="subdued">Custom Prompt</Text>
+                    <TextField
+                      label="Body custom prompt" labelHidden
+                      value={bulkBodyPromptTemplate}
+                      onChange={setBulkBodyPromptTemplate}
+                      multiline={4} autoComplete="off"
+                      placeholder="Enter custom instructions for body generation..."
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="micro" onClick={() => openBlogTemplateLib("description", "bulk_body")}>Browse Templates</Button>
+                        <Button size="micro" onClick={() => setBulkBodyPromptTemplate("")}>Reset to Default</Button>
+                      </InlineStack>
                     </div>
-                  )}
-                </BlockStack>
+                  </div>
+                )}
+              </div>
+            </div>
 
-                <Divider />
-
-                <Text variant="headingSm" as="h3">SEO</Text>
-
-                <TextField
-                  label="SEO Meta Title"
-                  value={editState.seoTitle}
-                  onChange={setField("seoTitle")}
-                  autoComplete="off"
-                  maxLength={60}
-                  showCharacterCount
-                  helpText="Recommended: 50–60 characters"
-                />
-
-                <TextField
-                  label="SEO Meta Description"
-                  value={editState.seoDescription}
-                  onChange={setField("seoDescription")}
-                  multiline={3}
-                  autoComplete="off"
-                  maxLength={160}
-                  showCharacterCount
-                  helpText="Recommended: 120–160 characters"
-                />
-
-                <Select
-                  label="Publish Status"
-                  options={PUBLISH_OPTIONS}
-                  value={editState.isPublished}
-                  onChange={setField("isPublished")}
-                />
-              </BlockStack>
-            </Grid.Cell>
-
-            {/* Right 60% — AI settings */}
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-              <BlockStack gap="400">
-                <Text variant="headingSm" as="h3">AI Content Generation</Text>
-
-
-                <Select
-                  label="Article Type"
-                  options={ARTICLE_TYPE_OPTIONS}
-                  value={editState.articleType}
-                  onChange={setField("articleType")}
-                />
-
-                <Select
-                  label="Language"
-                  options={LANGUAGE_OPTIONS}
-                  value={editState.language}
-                  onChange={setField("language")}
-                />
-
-                <Select
-                  label="Tone"
-                  options={TONE_OPTIONS}
-                  value={editState.tone}
-                  onChange={setField("tone")}
-                />
-
-                <Select
-                  label="Length"
-                  options={LENGTH_OPTIONS}
-                  value={editState.length}
-                  onChange={setField("length")}
-                />
-
-                <Select
-                  label="Format"
-                  options={FORMAT_OPTIONS}
-                  value={editState.format}
-                  onChange={setField("format")}
-                />
-
-                <BlockStack gap="200">
-                  <TextField
-                    label="Keywords / Context"
-                    value={editState.contextKeywords}
-                    onChange={setField("contextKeywords")}
-                    multiline={2}
-                    autoComplete="off"
-                    placeholder="e.g. summer sale, eco-friendly, UK delivery"
+            {/* Meta Description Template Section */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Description</Text>
+              <div style={{ marginTop: "10px" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Checkbox
+                    label={<span>Use custom instructions <span style={{ fontSize: "14px" }}>✨</span></span>}
+                    checked={useCustomMetaDescInstructions}
+                    onChange={setUseCustomMetaDescInstructions}
                   />
-                  <InlineStack gap="200" wrap>
-                    {KEYWORD_CHIPS.map((kw) => (
-                      <Button key={kw} size="micro" onClick={() => appendKeyword(kw)}>
-                        + {kw}
-                      </Button>
-                    ))}
-                  </InlineStack>
-                </BlockStack>
+                  <Button size="slim" onClick={() => openBlogTemplateLib("seo-description", "bulk_meta_desc")}>Browse Templates</Button>
+                </InlineStack>
+                {useCustomMetaDescInstructions && (
+                  <div style={{ marginTop: "10px" }}>
+                    <Text as="p" variant="bodySm" tone="subdued">Custom Prompt</Text>
+                    <TextField
+                      label="Meta description custom prompt" labelHidden
+                      value={bulkMetaDescPromptTemplate}
+                      onChange={setBulkMetaDescPromptTemplate}
+                      multiline={4} autoComplete="off"
+                      placeholder="Enter custom instructions for meta description generation..."
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="micro" onClick={() => openBlogTemplateLib("seo-description", "bulk_meta_desc")}>Browse Templates</Button>
+                        <Button size="micro" onClick={() => setBulkMetaDescPromptTemplate("")}>Reset to Default</Button>
+                      </InlineStack>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-                <Divider />
+            {/* Meta Title Template Section */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Title</Text>
+              <div style={{ marginTop: "10px" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Checkbox
+                    label={<span>Use custom instructions <span style={{ fontSize: "14px" }}>✨</span></span>}
+                    checked={useCustomMetaTitleInstructions}
+                    onChange={setUseCustomMetaTitleInstructions}
+                  />
+                  <Button size="slim" onClick={() => openBlogTemplateLib("seo-title", "bulk_meta_title")}>Browse Templates</Button>
+                </InlineStack>
+                {useCustomMetaTitleInstructions && (
+                  <div style={{ marginTop: "10px" }}>
+                    <Text as="p" variant="bodySm" tone="subdued">Custom Prompt</Text>
+                    <TextField
+                      label="Meta title custom prompt" labelHidden
+                      value={bulkMetaTitlePromptTemplate}
+                      onChange={setBulkMetaTitlePromptTemplate}
+                      multiline={4} autoComplete="off"
+                      placeholder="Enter custom instructions for meta title generation..."
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="micro" onClick={() => openBlogTemplateLib("seo-title", "bulk_meta_title")}>Browse Templates</Button>
+                        <Button size="micro" onClick={() => setBulkMetaTitlePromptTemplate("")}>Reset to Default</Button>
+                      </InlineStack>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
+            {/* Advanced Settings Toggle */}
+            <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <button
+                onClick={() => setShowAdvancedBulk((v) => !v)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#374151", display: "flex", alignItems: "center", gap: "6px", padding: "0", fontWeight: 500 }}
+              >
+                <span>{showAdvancedBulk ? "▲" : "▼"}</span>
+                {showAdvancedBulk ? "Hide" : "Show"} Advanced Settings
+              </button>
+            </div>
+
+            {showAdvancedBulk && (
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
                 <BlockStack gap="300">
-                  <Text variant="headingSm" as="h4">Blog Prompt Templates</Text>
-
-                  {/* Body */}
-                  <BlockStack gap="100">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text variant="bodySm" fontWeight="semibold" as="span">Body</Text>
-                      <Button size="micro" onClick={() => openBlogTemplateLib("description", "articleBodyPromptTemplate")}>Browse Templates</Button>
-                    </InlineStack>
-                    <TextField
-                      label="Article Body Prompt Template"
-                      labelHidden
-                      value={editState.articleBodyPromptTemplate}
-                      onChange={setField("articleBodyPromptTemplate")}
-                      multiline={3}
-                      autoComplete="off"
-                      placeholder="No template selected — click Browse Templates"
-                    />
-                    {editState.articleBodyPromptTemplate && (
-                      <Button size="micro" onClick={() => setEditState((s) => ({ ...s, articleBodyPromptTemplate: "" }))}>Reset to Default</Button>
-                    )}
-                  </BlockStack>
-
-                  {/* Meta Title */}
-                  <BlockStack gap="100">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text variant="bodySm" fontWeight="semibold" as="span">Meta Title</Text>
-                      <Button size="micro" onClick={() => openBlogTemplateLib("seo-title", "articleMetaTitlePromptTemplate")}>Browse Templates</Button>
-                    </InlineStack>
-                    <TextField
-                      label="Meta Title Prompt Template"
-                      labelHidden
-                      value={editState.articleMetaTitlePromptTemplate}
-                      onChange={setField("articleMetaTitlePromptTemplate")}
-                      multiline={2}
-                      autoComplete="off"
-                      placeholder="No template selected — click Browse Templates"
-                    />
-                    {editState.articleMetaTitlePromptTemplate && (
-                      <Button size="micro" onClick={() => setEditState((s) => ({ ...s, articleMetaTitlePromptTemplate: "" }))}>Reset to Default</Button>
-                    )}
-                  </BlockStack>
-
-                  {/* Meta Description */}
-                  <BlockStack gap="100">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text variant="bodySm" fontWeight="semibold" as="span">Meta Description</Text>
-                      <Button size="micro" onClick={() => openBlogTemplateLib("seo-description", "articleMetaDescriptionPromptTemplate")}>Browse Templates</Button>
-                    </InlineStack>
-                    <TextField
-                      label="Meta Description Prompt Template"
-                      labelHidden
-                      value={editState.articleMetaDescriptionPromptTemplate}
-                      onChange={setField("articleMetaDescriptionPromptTemplate")}
-                      multiline={2}
-                      autoComplete="off"
-                      placeholder="No template selected — click Browse Templates"
-                    />
-                    {editState.articleMetaDescriptionPromptTemplate && (
-                      <Button size="micro" onClick={() => setEditState((s) => ({ ...s, articleMetaDescriptionPromptTemplate: "" }))}>Reset to Default</Button>
-                    )}
-                  </BlockStack>
+                  <Select
+                    label="Article Type"
+                    options={ARTICLE_TYPE_OPTIONS}
+                    value={bulkSettings.articleType}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, articleType: v }))}
+                  />
+                  <Select
+                    label="Tone"
+                    options={TONE_OPTIONS}
+                    value={bulkSettings.tone}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, tone: v }))}
+                  />
+                  <Select
+                    label="Length"
+                    options={LENGTH_OPTIONS}
+                    value={bulkSettings.length}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, length: v }))}
+                  />
+                  <Select
+                    label="AI Provider"
+                    options={[
+                      { label: "Auto", value: "auto" },
+                      { label: "OpenAI", value: "openai" },
+                      { label: "Anthropic", value: "anthropic" },
+                    ]}
+                    value={bulkSettings.aiProvider}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, aiProvider: v }))}
+                  />
                 </BlockStack>
+              </div>
+            )}
 
-                <Divider />
+            {/* Validation / Result */}
+            {bulkValidationMessage && (
+              <div style={{ padding: "8px 16px" }}>
+                <Banner tone="warning"><p>{bulkValidationMessage}</p></Banner>
+              </div>
+            )}
+            {bulkResult && (
+              <div style={{ padding: "8px 16px" }}>
+                <Banner tone={bulkResult.failed === 0 ? "success" : "warning"}>
+                  <p>Generated {bulkResult.succeeded}/{bulkResult.total} articles{bulkResult.failed > 0 ? ` (${bulkResult.failed} failed)` : ""}.</p>
+                </Banner>
+              </div>
+            )}
 
-                <Button
-                  variant="primary"
-                  onClick={handleGenerate}
-                  loading={isGenerating}
-                  disabled={isGenerating}
-                >
-                  Generate Content
-                </Button>
-              </BlockStack>
-            </Grid.Cell>
-          </Grid>
-        </Modal.Section>
-      </Modal>
+            {/* Generate Button */}
+            <div style={{ padding: "12px 16px" }}>
+              {isBulkGenerating && (
+                <div style={{ marginBottom: "8px" }}>
+                  <InlineStack align="center" blockAlign="center" gap="200">
+                    <Spinner size="small" />
+                    <Text variant="bodySm" tone="subdued">Generating for {selectedArticles.length} articles...</Text>
+                  </InlineStack>
+                </div>
+              )}
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleBulkGenerate}
+                disabled={isBulkGenerating || selectedArticles.length === 0}
+              >
+                {isBulkGenerating
+                  ? "Generating..."
+                  : `Generate ${selectedArticles.length} item${selectedArticles.length !== 1 ? "s" : ""} (${selectedArticles.length} article${selectedArticles.length !== 1 ? "s" : ""} × ${bulkContentTypes.length} type${bulkContentTypes.length !== 1 ? "s" : ""})`
+                }
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
 
-      <Box paddingBlockEnd="800" />
+      {/* ── Generation Results Table ── */}
+      {bulkResult && bulkResult.results && bulkResult.results.length > 0 && (
+        <div style={{ marginTop: "24px" }}>
+          <Card padding="0">
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd" fontWeight="bold">Generation Results</Text>
+                <Badge tone={bulkResult.failed === 0 ? "success" : "warning"}>
+                  {bulkResult.succeeded}/{bulkResult.total} succeeded
+                </Badge>
+              </InlineStack>
+            </div>
+            <IndexTable
+              resourceName={{ singular: "article", plural: "articles" }}
+              itemCount={bulkResult.results.length}
+              selectable={false}
+              headings={[
+                { title: "Article" },
+                { title: "Status" },
+                { title: "Meta Title" },
+                { title: "Meta Description" },
+              ]}
+            >
+              {bulkResult.results.map((r, index) => (
+                <IndexTable.Row id={r.id} key={r.id} position={index}>
+                  <IndexTable.Cell>
+                    <Text variant="bodyMd" fontWeight="medium" as="span">{r.title}</Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {r.status === "success"
+                      ? <Badge tone="success">Updated</Badge>
+                      : <Badge tone="critical">Failed</Badge>}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoTitle ? undefined : "subdued"}>
+                      {r.seoTitle ? r.seoTitle.slice(0, 60) + (r.seoTitle.length > 60 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoDescription ? undefined : "subdued"}>
+                      {r.seoDescription ? r.seoDescription.slice(0, 80) + (r.seoDescription.length > 80 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          </Card>
+        </div>
+      )}
 
       {/* Template Library Popup */}
       <TemplateLibraryModal

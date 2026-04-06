@@ -23,10 +23,7 @@ import {
   Select,
   Banner,
   Badge,
-  Divider,
-  Box,
-  Grid,
-  Modal,
+  Checkbox,
   IndexTable,
   useIndexResourceState,
   Spinner,
@@ -235,19 +232,18 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  if (intent === "generate_page_content") {
-    const pageId = formData.get("pageId") || "";
-    const pageTitle = formData.get("pageTitle") || "";
-    const pageType = formData.get("pageType") || "About Us";
-    const body = formData.get("body") || "";
+  if (intent === "bulk_generate_pages") {
+    const pagesJson = formData.get("pages") || "[]";
+    const bulkPages = JSON.parse(pagesJson);
     const language = formData.get("language") || "en";
-    const tone = formData.get("tone") || "";
-    const length = formData.get("length") || "";
-    const format = formData.get("format") || "";
+    const tone = formData.get("tone") || "professional";
+    const length = formData.get("length") || "medium";
+    const format = formData.get("format") || "paragraphs";
+    const pageType = formData.get("pageType") || "About Us";
     const contextKeywords = formData.get("contextKeywords") || "";
-    const pageBodyPromptTemplate = formData.get("pageBodyPromptTemplate") || "";
-    const pageMetaTitlePromptTemplate = formData.get("pageMetaTitlePromptTemplate") || "";
-    const pageMetaDescriptionPromptTemplate = formData.get("pageMetaDescriptionPromptTemplate") || "";
+    const bodyPromptTemplate = formData.get("bodyPromptTemplate") || "";
+    const metaTitlePromptTemplate = formData.get("metaTitlePromptTemplate") || "";
+    const metaDescriptionPromptTemplate = formData.get("metaDescriptionPromptTemplate") || "";
     const aiProvider = formData.get("aiProvider") || "auto";
 
     const shopData = await db.shop.findUnique({
@@ -255,39 +251,53 @@ export const action = async ({ request }) => {
       select: { openaiApiKey: true, anthropicApiKey: true },
     });
 
-    try {
-      const input = buildGenerationPrompt({
-        pageTitle,
-        pageType,
-        body,
-        language,
-        tone,
-        length,
-        format,
-        contextKeywords,
-        bodyPromptTemplate: pageBodyPromptTemplate,
-        metaTitlePromptTemplate: pageMetaTitlePromptTemplate,
-        metaDescriptionPromptTemplate: pageMetaDescriptionPromptTemplate,
-      });
-      const raw = await generateContent(input, {
-        aiProvider,
-        shopOpenaiKey: shopData?.openaiApiKey,
-        shopAnthropicKey: shopData?.anthropicApiKey,
-      });
+    const results = await Promise.allSettled(
+      bulkPages.map(async (p) => {
+        const input = buildGenerationPrompt({
+          pageTitle: p.title,
+          pageType,
+          body: p.body || "",
+          language,
+          tone,
+          length,
+          format,
+          contextKeywords,
+          bodyPromptTemplate,
+          metaTitlePromptTemplate,
+          metaDescriptionPromptTemplate,
+        });
+        const raw = await generateContent(input, {
+          aiProvider,
+          shopOpenaiKey: shopData?.openaiApiKey,
+          shopAnthropicKey: shopData?.anthropicApiKey,
+        });
 
-      let parsed = { pageBody: "", seoTitle: "", seoDescription: "" };
-      try {
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-      } catch {
-        parsed.pageBody = raw;
-      }
+        let parsed = { pageBody: "", seoTitle: "", seoDescription: "" };
+        try {
+          const match = raw.match(/\{[\s\S]*\}/);
+          if (match) parsed = JSON.parse(match[0]);
+        } catch { parsed.pageBody = raw; }
 
-      if (pageId) {
+        const response = await admin.graphql(PAGE_UPDATE_MUTATION, {
+          variables: {
+            id: p.id,
+            page: {
+              body: parsed.pageBody || p.body || "",
+              metafields: [
+                { namespace: "global", key: "title_tag", value: parsed.seoTitle || "", type: "single_line_text_field" },
+                { namespace: "global", key: "description_tag", value: parsed.seoDescription || "", type: "single_line_text_field" },
+              ],
+            },
+          },
+        });
+        const json = await response.json();
+        const userErrors = json.data?.pageUpdate?.userErrors || [];
+        if (userErrors.length > 0) throw new Error(userErrors.map((e) => e.message).join(", "));
+
         await upsertPageContent({
           shop: session.shop,
-          pageId,
-          pageTitle: pageTitle || null,
+          pageId: p.id,
+          pageTitle: p.title || null,
           pageType: pageType || null,
           language: language || null,
           tone: tone || null,
@@ -298,14 +308,24 @@ export const action = async ({ request }) => {
           bodyHtml: parsed.pageBody || null,
           seoTitle: parsed.seoTitle || null,
           seoDescription: parsed.seoDescription || null,
-          appliedToPage: false,
+          appliedToPage: true,
         });
-      }
 
-      return { success: true, intent, ...parsed };
-    } catch (err) {
-      return { success: false, intent, error: err.message };
-    }
+        return { id: p.id, title: p.title, seoTitle: parsed.seoTitle, seoDescription: parsed.seoDescription };
+      })
+    );
+
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const itemResults = results.map((r, i) => ({
+      id: bulkPages[i].id,
+      title: bulkPages[i].title,
+      status: r.status === "fulfilled" ? "success" : "failed",
+      error: r.status === "rejected" ? r.reason?.message : null,
+      seoTitle: r.status === "fulfilled" ? r.value.seoTitle : null,
+      seoDescription: r.status === "fulfilled" ? r.value.seoDescription : null,
+    }));
+    return { success: true, intent, succeeded, failed, total: bulkPages.length, results: itemResults };
   }
 
   if (intent === "update_page") {
@@ -368,7 +388,6 @@ export const action = async ({ request }) => {
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
-
 const PAGE_TYPE_OPTIONS = [
   { label: "About Us", value: "About Us" },
   { label: "Contact", value: "Contact" },
@@ -418,42 +437,34 @@ const FORMAT_OPTIONS = [
   { label: "HTML", value: "HTML" },
 ];
 
-const KEYWORD_CHIPS = ["Brand Name", "Products", "Location", "Offer", "Discount", "Free Shipping"];
-
-// ─── Edit modal initial state ─────────────────────────────────────────────────
-
-const editInitialState = {
-  pageId: "",
-  title: "",
-  body: "",
-  seoTitle: "",
-  seoDescription: "",
-  aiProvider: "auto",
-  pageType: "About Us",
-  language: "en",
-  tone: "professional",
-  length: "medium",
-  format: "paragraphs",
-  contextKeywords: "",
-  pageBodyPromptTemplate: "",
-  pageMetaTitlePromptTemplate: "",
-  pageMetaDescriptionPromptTemplate: "",
-};
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function PagesPage() {
   const { pages, defaultAiProvider } = useLoaderData();
   const navigate = useNavigate();
-  const generateFetcher = useFetcher();
-  const saveFetcher = useFetcher();
-  const isGenerating = generateFetcher.state !== "idle";
-  const isSaving = saveFetcher.state !== "idle";
-
   const shopify = useAppBridge();
-  const [editModal, setEditModal] = useState(false);
-  const [editState, setEditState] = useState(editInitialState);
-  const [generationError, setGenerationError] = useState(null);
+
+  const bulkFetcher = useFetcher();
+  const isBulkGenerating = bulkFetcher.state !== "idle";
+
+  const [bulkSettings, setBulkSettings] = useState({
+    language: "en",
+    tone: "professional",
+    length: "medium",
+    format: "paragraphs",
+    pageType: "About Us",
+    aiProvider: defaultAiProvider || "auto",
+  });
+  const [bulkResult, setBulkResult] = useState(null);
+  const [bulkValidationMessage, setBulkValidationMessage] = useState(null);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [bulkBodyTemplate, setBulkBodyTemplate] = useState("");
+  const [bulkMetaTitleTemplate, setBulkMetaTitleTemplate] = useState("");
+  const [bulkMetaDescTemplate, setBulkMetaDescTemplate] = useState("");
+  const [useCustomBodyInstructions, setUseCustomBodyInstructions] = useState(false);
+  const [useCustomMetaTitleInstructions, setUseCustomMetaTitleInstructions] = useState(false);
+  const [useCustomMetaDescInstructions, setUseCustomMetaDescInstructions] = useState(false);
+
   const [templateLib, setTemplateLib] = useState({ open: false, tab: "description", target: "pageBodyPromptTemplate" });
 
   const pageTemplatesByTab = {
@@ -470,7 +481,9 @@ export default function PagesPage() {
     setTemplateLib({ open: true, tab, target });
   }
   function handlePageUseTemplate(templateText) {
-    setEditState((s) => ({ ...s, [templateLib.target]: templateText }));
+    if (templateLib.target === "pageBodyPromptTemplate") { setBulkBodyTemplate(templateText); setUseCustomBodyInstructions(true); }
+    else if (templateLib.target === "pageMetaTitlePromptTemplate") { setBulkMetaTitleTemplate(templateText); setUseCustomMetaTitleInstructions(true); }
+    else if (templateLib.target === "pageMetaDescriptionPromptTemplate") { setBulkMetaDescTemplate(templateText); setUseCustomMetaDescInstructions(true); }
     setTemplateLib((s) => ({ ...s, open: false }));
   }
 
@@ -479,156 +492,45 @@ export default function PagesPage() {
 
   useEffect(() => {
     const templateSelection = readStoredPagePromptTemplateSelection();
-    setEditState((current) => ({
-      ...current,
-      pageBodyPromptTemplate:
-        current.pageBodyPromptTemplate || templateSelection.bodyPromptTemplate || "",
-      pageMetaTitlePromptTemplate:
-        current.pageMetaTitlePromptTemplate || templateSelection.metaTitlePromptTemplate || "",
-      pageMetaDescriptionPromptTemplate:
-        current.pageMetaDescriptionPromptTemplate ||
-        templateSelection.metaDescriptionPromptTemplate ||
-        "",
-    }));
+    if (templateSelection.bodyPromptTemplate) setBulkBodyTemplate(templateSelection.bodyPromptTemplate);
+    if (templateSelection.metaTitlePromptTemplate) setBulkMetaTitleTemplate(templateSelection.metaTitlePromptTemplate);
+    if (templateSelection.metaDescriptionPromptTemplate) setBulkMetaDescTemplate(templateSelection.metaDescriptionPromptTemplate);
   }, []);
 
-  function openEditModal(page) {
-    const templateSelection = readStoredPagePromptTemplateSelection();
-    setEditState({
-      ...editInitialState,
-      aiProvider: defaultAiProvider,
-      pageId: page.id,
-      title: page.title || "",
-      body: page.body || "",
-      seoTitle: page.seo?.title || "",
-      seoDescription: page.seo?.description || "",
-      pageBodyPromptTemplate: templateSelection.bodyPromptTemplate || "",
-      pageMetaTitlePromptTemplate: templateSelection.metaTitlePromptTemplate || "",
-      pageMetaDescriptionPromptTemplate: templateSelection.metaDescriptionPromptTemplate || "",
-    });
-    setGenerationError(null);
-    setEditModal(true);
-  }
-
-  function closeEditModal() {
-    setEditModal(false);
-    setGenerationError(null);
-  }
-
-  function setField(field) {
-    return (value) => setEditState((s) => ({ ...s, [field]: value }));
-  }
-
-  function appendKeyword(kw) {
-    setEditState((s) => ({
-      ...s,
-      contextKeywords: s.contextKeywords ? `${s.contextKeywords}, ${kw}` : kw,
-    }));
-  }
-
-  function handleGenerate() {
-    setGenerationError(null);
+  function handleBulkGenerate() {
+    if (selectedResources.length === 0) {
+      setBulkValidationMessage("Select at least one page to generate content for.");
+      return;
+    }
+    setBulkValidationMessage(null);
+    setBulkResult(null);
+    const selectedPages = pages.filter((p) => selectedResources.includes(p.id));
     const fd = new FormData();
-    fd.append("intent", "generate_page_content");
-    fd.append("pageId", editState.pageId);
-    fd.append("pageTitle", editState.title);
-    fd.append("pageType", editState.pageType);
-    fd.append("body", editState.body);
-    fd.append("language", editState.language);
-    fd.append("tone", editState.tone);
-    fd.append("length", editState.length);
-    fd.append("format", editState.format);
-    fd.append("contextKeywords", editState.contextKeywords);
-    fd.append("pageBodyPromptTemplate", editState.pageBodyPromptTemplate);
-    fd.append("pageMetaTitlePromptTemplate", editState.pageMetaTitlePromptTemplate);
-    fd.append("pageMetaDescriptionPromptTemplate", editState.pageMetaDescriptionPromptTemplate);
-    fd.append("aiProvider", editState.aiProvider);
-    generateFetcher.submit(fd, { method: "post" });
-  }
-
-  function handleSave() {
-    const fd = new FormData();
-    fd.append("intent", "update_page");
-    fd.append("pageId", editState.pageId);
-    fd.append("pageTitle", editState.title);
-    fd.append("pageType", editState.pageType);
-    fd.append("language", editState.language);
-    fd.append("tone", editState.tone);
-    fd.append("length", editState.length);
-    fd.append("format", editState.format);
-    fd.append("contextKeywords", editState.contextKeywords);
-    fd.append("body", editState.body);
-    fd.append("seoTitle", editState.seoTitle);
-    fd.append("seoDescription", editState.seoDescription);
-    saveFetcher.submit(fd, { method: "post" });
+    fd.append("intent", "bulk_generate_pages");
+    fd.append("pages", JSON.stringify(selectedPages.map((p) => ({ id: p.id, title: p.title, body: p.body || "" }))));
+    fd.append("language", bulkSettings.language);
+    fd.append("tone", bulkSettings.tone);
+    fd.append("length", bulkSettings.length);
+    fd.append("format", bulkSettings.format);
+    fd.append("pageType", bulkSettings.pageType);
+    fd.append("contextKeywords", "");
+    fd.append("bodyPromptTemplate", bulkBodyTemplate || "");
+    fd.append("metaTitlePromptTemplate", bulkMetaTitleTemplate || "");
+    fd.append("metaDescriptionPromptTemplate", bulkMetaDescTemplate || "");
+    fd.append("aiProvider", bulkSettings.aiProvider);
+    bulkFetcher.submit(fd, { method: "post" });
   }
 
   useEffect(() => {
-    const data = generateFetcher.data;
-    if (!data) return;
+    const data = bulkFetcher.data;
+    if (!data || bulkFetcher.state !== "idle") return;
     if (data.success) {
-      setEditState((s) => ({
-        ...s,
-        body: data.pageBody || s.body,
-        seoTitle: data.seoTitle || s.seoTitle,
-        seoDescription: data.seoDescription || s.seoDescription,
-      }));
-      setGenerationError(null);
+      setBulkResult(data);
+      shopify.toast.show(`Generated ${data.succeeded}/${data.total} pages successfully.`);
     } else {
-      setGenerationError(data.error || "Generation failed.");
+      setBulkValidationMessage(data.error || "Bulk generation failed.");
     }
-  }, [generateFetcher.data]);
-
-  useEffect(() => {
-    const data = saveFetcher.data;
-    if (!data) return;
-    if (data.success) {
-      shopify.toast.show("Page updated successfully!");
-      closeEditModal();
-    } else {
-      setGenerationError(data.error || "Save failed.");
-    }
-  }, [saveFetcher.data]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const rowMarkup = pages.map((page, index) => (
-    <IndexTable.Row
-      id={page.id}
-      key={page.id}
-      selected={selectedResources.includes(page.id)}
-      position={index}
-    >
-      <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span">{page.title}</Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <div className="pages-summary-cell">
-          <Text variant="bodySm" tone="subdued" as="span">
-            {page.bodySummary ? page.bodySummary.slice(0, 45) + "…" : "—"}
-          </Text>
-        </div>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {page.seo?.title
-          ? <Badge tone="success">Set</Badge>
-          : <Badge tone="attention">Missing</Badge>}
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {page.seo?.description
-          ? <Badge tone="success">Set</Badge>
-          : <Badge tone="attention">Missing</Badge>}
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text variant="bodySm" tone="subdued" as="span">
-          {page.generatedAt
-            ? new Date(page.generatedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
-            : "—"}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Button size="slim" onClick={() => openEditModal(page)}>Edit Content</Button>
-      </IndexTable.Cell>
-    </IndexTable.Row>
-  ));
+  }, [bulkFetcher.data, bulkFetcher.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Page fullWidth>
@@ -659,15 +561,15 @@ export default function PagesPage() {
         </div>
       </div>
 
-      <BlockStack gap="400">
-        {pages.length === 0 && (
-          <Banner tone="info">
-            <p>No pages found in your store. Create pages in Shopify Admin first.</p>
-          </Banner>
-        )}
-
-        <Card padding="0">
-          <div className="pages-table-wrap">
+      <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
+        {/* LEFT: Pages Table */}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          {pages.length === 0 && (
+            <Banner tone="info">
+              <p>No pages found in your store. Create pages in Shopify Admin first.</p>
+            </Banner>
+          )}
+          <Card padding="0">
             <IndexTable
               resourceName={{ singular: "page", plural: "pages" }}
               itemCount={pages.length}
@@ -675,231 +577,309 @@ export default function PagesPage() {
               onSelectionChange={handleSelectionChange}
               headings={[
                 { title: "Title" },
-                { title: "Summary" },
                 { title: "SEO Title" },
                 { title: "SEO Description" },
                 { title: "Generated" },
-                { title: "Action" },
               ]}
             >
-              {rowMarkup}
+              {pages.map((page, index) => (
+                <IndexTable.Row
+                  id={page.id}
+                  key={page.id}
+                  selected={selectedResources.includes(page.id)}
+                  position={index}
+                >
+                  <IndexTable.Cell>
+                    <Text variant="bodyMd" fontWeight="bold" as="span">{page.title}</Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {page.seo?.title
+                      ? <Badge tone="success">Set</Badge>
+                      : <Badge tone="attention">Missing</Badge>}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {page.seo?.description
+                      ? <Badge tone="success">Set</Badge>
+                      : <Badge tone="attention">Missing</Badge>}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text variant="bodySm" tone="subdued" as="span">
+                      {page.generatedAt
+                        ? new Date(page.generatedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
             </IndexTable>
-          </div>
-        </Card>
-      </BlockStack>
+          </Card>
+        </div>
 
-      {/* Edit Modal */}
-      <style>{`
-        .Polaris-Modal-Dialog__Modal { max-width: 66rem !important; }
-        .pages-table-wrap .pages-summary-cell {
-          width: 180px;
-          max-width: 180px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-      `}</style>
-      <Modal
-        open={editModal}
-        onClose={closeEditModal}
-        title={editState.title ? `Edit: ${editState.title}` : "Edit Page Content"}
-        primaryAction={{ content: isSaving ? "Updating…" : "Update Page", onAction: handleSave, loading: isSaving }}
-        secondaryActions={[{ content: "Cancel", onAction: closeEditModal }]}
-      >
-        <Modal.Section>
-          {generationError && (
-            <Box paddingBlockEnd="400">
-              <Banner tone="critical" onDismiss={() => setGenerationError(null)}>
-                <p>{generationError}</p>
-              </Banner>
-            </Box>
-          )}
-          <Grid>
-            {/* Left column — 40% — content editor */}
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 8, lg: 8, xl: 8 }}>
-              <BlockStack gap="400">
-                <Text variant="headingSm" as="h3">Page Content</Text>
-
-                <TextField
-                  label="Body Content (HTML)"
-                  value={editState.body}
-                  onChange={setField("body")}
-                  multiline={10}
-                  autoComplete="off"
-                  helpText="HTML is supported. This will replace your current page body."
-                />
-
-                <Divider />
-
-                <Text variant="headingSm" as="h3">SEO</Text>
-
-                <TextField
-                  label="SEO Meta Title"
-                  value={editState.seoTitle}
-                  onChange={setField("seoTitle")}
-                  autoComplete="off"
-                  maxLength={60}
-                  showCharacterCount
-                  helpText="Recommended: 50–60 characters"
-                />
-
-                <TextField
-                  label="SEO Meta Description"
-                  value={editState.seoDescription}
-                  onChange={setField("seoDescription")}
-                  multiline={3}
-                  autoComplete="off"
-                  maxLength={160}
-                  showCharacterCount
-                  helpText="Recommended: 120–160 characters"
-                />
+        {/* RIGHT: Bulk Settings Panel */}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <Card padding="0">
+            <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd" fontWeight="bold">Page Bulk Settings</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {selectedResources.length > 0
+                    ? `Content will be generated for ${selectedResources.length} page${selectedResources.length !== 1 ? "s" : ""}`
+                    : "Select pages from the list to generate content"}
+                </Text>
               </BlockStack>
-            </Grid.Cell>
+            </div>
 
-            {/* Right column — 60% — AI settings */}
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-              <BlockStack gap="400">
-                <Text variant="headingSm" as="h3">AI Content Generation</Text>
+            {/* Page Type */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Select
+                label="Page Type"
+                options={PAGE_TYPE_OPTIONS}
+                value={bulkSettings.pageType}
+                onChange={(v) => setBulkSettings((s) => ({ ...s, pageType: v }))}
+              />
+            </div>
 
-                <Select
-                  label="Page Type"
-                  options={PAGE_TYPE_OPTIONS}
-                  value={editState.pageType}
-                  onChange={setField("pageType")}
-                />
+            {/* Output Language */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Select
+                label="Output Language"
+                options={LANGUAGE_OPTIONS}
+                value={bulkSettings.language}
+                onChange={(v) => setBulkSettings((s) => ({ ...s, language: v }))}
+              />
+            </div>
 
-                <Select
-                  label="Language"
-                  options={LANGUAGE_OPTIONS}
-                  value={editState.language}
-                  onChange={setField("language")}
-                />
-
-                <Select
-                  label="Tone"
-                  options={TONE_OPTIONS}
-                  value={editState.tone}
-                  onChange={setField("tone")}
-                />
-
-                <Select
-                  label="Length"
-                  options={LENGTH_OPTIONS}
-                  value={editState.length}
-                  onChange={setField("length")}
-                />
-
-                <Select
-                  label="Format"
-                  options={FORMAT_OPTIONS}
-                  value={editState.format}
-                  onChange={setField("format")}
-                />
-
-                <BlockStack gap="200">
-                  <TextField
-                    label="Keywords / Context"
-                    value={editState.contextKeywords}
-                    onChange={setField("contextKeywords")}
-                    multiline={2}
-                    autoComplete="off"
-                    placeholder="e.g. eco-friendly, handmade, UK"
+            {/* Body Template Section */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Body</Text>
+              <div style={{ marginTop: "10px" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Checkbox
+                    label={<span>Use custom instructions <span style={{ fontSize: "14px" }}>✨</span></span>}
+                    checked={useCustomBodyInstructions}
+                    onChange={setUseCustomBodyInstructions}
                   />
-                  <InlineStack gap="200" wrap>
-                    {KEYWORD_CHIPS.map((kw) => (
-                      <Button key={kw} size="micro" onClick={() => appendKeyword(kw)}>
-                        + {kw}
-                      </Button>
-                    ))}
-                  </InlineStack>
-                </BlockStack>
-
-                <Divider />
-
-                <BlockStack gap="300">
-                  <Text variant="headingSm" as="h4">Page Prompt Templates</Text>
-
-                  {/* Body */}
-                  <BlockStack gap="100">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text variant="bodySm" fontWeight="semibold" as="span">Body</Text>
-                      <Button size="micro" onClick={() => openPageTemplateLib("description", "pageBodyPromptTemplate")}>Browse Templates</Button>
-                    </InlineStack>
-                    <TextField
-                      label="Body Prompt Template"
-                      labelHidden
-                      value={editState.pageBodyPromptTemplate}
-                      onChange={setField("pageBodyPromptTemplate")}
-                      multiline={3}
-                      autoComplete="off"
-                      placeholder="No template selected — click Browse Templates"
-                    />
-                    {editState.pageBodyPromptTemplate && (
-                      <Button size="micro" onClick={() => setEditState((s) => ({ ...s, pageBodyPromptTemplate: "" }))}>Reset to Default</Button>
-                    )}
-                  </BlockStack>
-
-                  {/* Meta Title */}
-                  <BlockStack gap="100">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text variant="bodySm" fontWeight="semibold" as="span">Meta Title</Text>
-                      <Button size="micro" onClick={() => openPageTemplateLib("seo-title", "pageMetaTitlePromptTemplate")}>Browse Templates</Button>
-                    </InlineStack>
-                    <TextField
-                      label="Meta Title Prompt Template"
-                      labelHidden
-                      value={editState.pageMetaTitlePromptTemplate}
-                      onChange={setField("pageMetaTitlePromptTemplate")}
-                      multiline={2}
-                      autoComplete="off"
-                      placeholder="No template selected — click Browse Templates"
-                    />
-                    {editState.pageMetaTitlePromptTemplate && (
-                      <Button size="micro" onClick={() => setEditState((s) => ({ ...s, pageMetaTitlePromptTemplate: "" }))}>Reset to Default</Button>
-                    )}
-                  </BlockStack>
-
-                  {/* Meta Description */}
-                  <BlockStack gap="100">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text variant="bodySm" fontWeight="semibold" as="span">Meta Description</Text>
-                      <Button size="micro" onClick={() => openPageTemplateLib("seo-description", "pageMetaDescriptionPromptTemplate")}>Browse Templates</Button>
-                    </InlineStack>
-                    <TextField
-                      label="Meta Description Prompt Template"
-                      labelHidden
-                      value={editState.pageMetaDescriptionPromptTemplate}
-                      onChange={setField("pageMetaDescriptionPromptTemplate")}
-                      multiline={2}
-                      autoComplete="off"
-                      placeholder="No template selected — click Browse Templates"
-                    />
-                    {editState.pageMetaDescriptionPromptTemplate && (
-                      <Button size="micro" onClick={() => setEditState((s) => ({ ...s, pageMetaDescriptionPromptTemplate: "" }))}>Reset to Default</Button>
-                    )}
-                  </BlockStack>
-                </BlockStack>
-
-                <Divider />
-
-                <InlineStack gap="300" align="start">
-                  <Button
-                    variant="primary"
-                    onClick={handleGenerate}
-                    loading={isGenerating}
-                    disabled={isGenerating}
-                  >
-                    Generate Content
-                  </Button>
-                  {isGenerating && <Spinner size="small" />}
+                  <Button size="slim" onClick={() => openPageTemplateLib("description", "pageBodyPromptTemplate")}>Browse Templates</Button>
                 </InlineStack>
-              </BlockStack>
-            </Grid.Cell>
-          </Grid>
-        </Modal.Section>
-      </Modal>
+                {useCustomBodyInstructions && (
+                  <div style={{ marginTop: "10px" }}>
+                    <TextField
+                      label="Body custom prompt" labelHidden
+                      value={bulkBodyTemplate}
+                      onChange={setBulkBodyTemplate}
+                      multiline={4} autoComplete="off"
+                      placeholder="Enter custom instructions for body generation..."
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="micro" onClick={() => openPageTemplateLib("description", "pageBodyPromptTemplate")}>Browse Templates</Button>
+                        <Button size="micro" onClick={() => setBulkBodyTemplate("")}>Reset to Default</Button>
+                      </InlineStack>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-      <Box paddingBlockEnd="800" />
+            {/* Meta Title Template Section */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Title</Text>
+              <div style={{ marginTop: "10px" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Checkbox
+                    label={<span>Use custom instructions <span style={{ fontSize: "14px" }}>✨</span></span>}
+                    checked={useCustomMetaTitleInstructions}
+                    onChange={setUseCustomMetaTitleInstructions}
+                  />
+                  <Button size="slim" onClick={() => openPageTemplateLib("seo-title", "pageMetaTitlePromptTemplate")}>Browse Templates</Button>
+                </InlineStack>
+                {useCustomMetaTitleInstructions && (
+                  <div style={{ marginTop: "10px" }}>
+                    <TextField
+                      label="Meta title custom prompt" labelHidden
+                      value={bulkMetaTitleTemplate}
+                      onChange={setBulkMetaTitleTemplate}
+                      multiline={4} autoComplete="off"
+                      placeholder="Enter custom instructions for meta title generation..."
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="micro" onClick={() => openPageTemplateLib("seo-title", "pageMetaTitlePromptTemplate")}>Browse Templates</Button>
+                        <Button size="micro" onClick={() => setBulkMetaTitleTemplate("")}>Reset to Default</Button>
+                      </InlineStack>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Meta Description Template Section */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Meta Description</Text>
+              <div style={{ marginTop: "10px" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Checkbox
+                    label={<span>Use custom instructions <span style={{ fontSize: "14px" }}>✨</span></span>}
+                    checked={useCustomMetaDescInstructions}
+                    onChange={setUseCustomMetaDescInstructions}
+                  />
+                  <Button size="slim" onClick={() => openPageTemplateLib("seo-description", "pageMetaDescriptionPromptTemplate")}>Browse Templates</Button>
+                </InlineStack>
+                {useCustomMetaDescInstructions && (
+                  <div style={{ marginTop: "10px" }}>
+                    <TextField
+                      label="Meta description custom prompt" labelHidden
+                      value={bulkMetaDescTemplate}
+                      onChange={setBulkMetaDescTemplate}
+                      multiline={4} autoComplete="off"
+                      placeholder="Enter custom instructions for meta description generation..."
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="micro" onClick={() => openPageTemplateLib("seo-description", "pageMetaDescriptionPromptTemplate")}>Browse Templates</Button>
+                        <Button size="micro" onClick={() => setBulkMetaDescTemplate("")}>Reset to Default</Button>
+                      </InlineStack>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Advanced Settings Toggle */}
+            <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <button
+                onClick={() => setShowAdvancedSettings((v) => !v)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#374151", display: "flex", alignItems: "center", gap: "6px", padding: "0", fontWeight: 500 }}
+              >
+                <span>{showAdvancedSettings ? "▲" : "▼"}</span>
+                {showAdvancedSettings ? "Hide" : "Show"} Advanced Settings
+              </button>
+            </div>
+
+            {showAdvancedSettings && (
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+                <BlockStack gap="300">
+                  <Select
+                    label="Tone"
+                    options={TONE_OPTIONS}
+                    value={bulkSettings.tone}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, tone: v }))}
+                  />
+                  <Select
+                    label="Length"
+                    options={LENGTH_OPTIONS}
+                    value={bulkSettings.length}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, length: v }))}
+                  />
+                  <Select
+                    label="Format"
+                    options={FORMAT_OPTIONS}
+                    value={bulkSettings.format}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, format: v }))}
+                  />
+                  <Select
+                    label="AI Provider"
+                    options={[
+                      { label: "Auto", value: "auto" },
+                      { label: "OpenAI", value: "openai" },
+                      { label: "Anthropic", value: "anthropic" },
+                    ]}
+                    value={bulkSettings.aiProvider}
+                    onChange={(v) => setBulkSettings((s) => ({ ...s, aiProvider: v }))}
+                  />
+                </BlockStack>
+              </div>
+            )}
+
+            {bulkValidationMessage && (
+              <div style={{ padding: "8px 16px" }}>
+                <Banner tone="warning"><p>{bulkValidationMessage}</p></Banner>
+              </div>
+            )}
+
+            {bulkResult && (
+              <div style={{ padding: "8px 16px" }}>
+                <Banner tone={bulkResult.failed === 0 ? "success" : "warning"}>
+                  <p>Generated {bulkResult.succeeded}/{bulkResult.total} pages{bulkResult.failed > 0 ? ` (${bulkResult.failed} failed)` : ""}.</p>
+                </Banner>
+              </div>
+            )}
+
+            {/* Generate Button */}
+            <div style={{ padding: "12px 16px" }}>
+              {isBulkGenerating && (
+                <div style={{ marginBottom: "8px" }}>
+                  <InlineStack align="center" blockAlign="center" gap="200">
+                    <Spinner size="small" />
+                    <Text variant="bodySm" tone="subdued">Generating for {selectedResources.length} pages...</Text>
+                  </InlineStack>
+                </div>
+              )}
+              <Button
+                fullWidth
+                variant="primary"
+                onClick={handleBulkGenerate}
+                disabled={isBulkGenerating || selectedResources.length === 0}
+                tone="success"
+              >
+                {isBulkGenerating
+                  ? "Generating..."
+                  : `Generate ${selectedResources.length} page${selectedResources.length !== 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* ── Generation Results Table ── */}
+      {bulkResult && bulkResult.results && bulkResult.results.length > 0 && (
+        <div style={{ marginTop: "24px" }}>
+          <Card padding="0">
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd" fontWeight="bold">Generation Results</Text>
+                <Badge tone={bulkResult.failed > 0 ? "warning" : "success"}>
+                  {bulkResult.succeeded}/{bulkResult.total} succeeded
+                </Badge>
+              </InlineStack>
+            </div>
+            <IndexTable
+              resourceName={{ singular: "page", plural: "pages" }}
+              itemCount={bulkResult.results.length}
+              selectable={false}
+              headings={[
+                { title: "Page" },
+                { title: "Status" },
+                { title: "Meta Title" },
+                { title: "Meta Description" },
+              ]}
+            >
+              {bulkResult.results.map((r, index) => (
+                <IndexTable.Row id={r.id} key={r.id} position={index}>
+                  <IndexTable.Cell>
+                    <Text variant="bodyMd" fontWeight="medium" as="span">{r.title}</Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {r.status === "success"
+                      ? <Badge tone="success">Updated</Badge>
+                      : <Badge tone="critical">Failed</Badge>}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoTitle ? undefined : "subdued"}>
+                      {r.seoTitle ? r.seoTitle.slice(0, 60) + (r.seoTitle.length > 60 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" tone={r.seoDescription ? undefined : "subdued"}>
+                      {r.seoDescription ? r.seoDescription.slice(0, 80) + (r.seoDescription.length > 80 ? "…" : "") : "—"}
+                    </Text>
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          </Card>
+        </div>
+      )}
 
       {/* Template Library Popup */}
       <TemplateLibraryModal
