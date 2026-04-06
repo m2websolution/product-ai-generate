@@ -1,0 +1,2 @@
+ALTER TABLE `shop`
+    ADD COLUMN IF NOT EXISTS `defaultAiModel` VARCHAR(100) NULL DEFAULT 'gpt-4o-mini';

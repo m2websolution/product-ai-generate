@@ -5,10 +5,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import {
   Page,
-  Button,
-  TextField,
   Banner,
-  Badge,
   Box,
   Select,
 } from "@shopify/polaris";
@@ -17,12 +14,9 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
-    select: { openaiApiKey: true, anthropicApiKey: true, defaultAiProvider: true, defaultAiModel: true },
+    select: { defaultAiModel: true },
   });
   return {
-    hasOpenaiKey: !!shopData?.openaiApiKey,
-    hasAnthropicKey: !!shopData?.anthropicApiKey,
-    defaultAiProvider: shopData?.defaultAiProvider || "openai",
     defaultAiModel: shopData?.defaultAiModel || "gpt-4o-mini",
   };
 };
@@ -33,38 +27,14 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  if (intent === "save_api_keys") {
-    const openaiApiKey = formData.get("openaiApiKey")?.trim();
-    const anthropicApiKey = formData.get("anthropicApiKey")?.trim();
-    const defaultAiProvider = formData.get("defaultAiProvider")?.trim() || "openai";
+  if (intent === "save_settings") {
     const defaultAiModel = formData.get("defaultAiModel")?.trim() || "gpt-4o-mini";
-    const updateData = { defaultAiProvider, defaultAiModel };
-    if (openaiApiKey) updateData.openaiApiKey = openaiApiKey;
-    if (anthropicApiKey) updateData.anthropicApiKey = anthropicApiKey;
     await db.shop.upsert({
       where: { shop },
-      update: updateData,
-      create: { shop, installed: true, ...updateData },
+      update: { defaultAiModel },
+      create: { shop, installed: true, defaultAiModel },
     });
     return { success: true, message: "Settings saved successfully!" };
-  }
-
-  if (intent === "clear_openai_key") {
-    await db.shop.upsert({
-      where: { shop },
-      update: { openaiApiKey: null },
-      create: { shop, installed: true },
-    });
-    return { success: true, message: "OpenAI API key removed." };
-  }
-
-  if (intent === "clear_anthropic_key") {
-    await db.shop.upsert({
-      where: { shop },
-      update: { anthropicApiKey: null },
-      create: { shop, installed: true },
-    });
-    return { success: true, message: "Anthropic API key removed." };
   }
 
   return { success: false, message: "Unknown action." };
@@ -280,80 +250,6 @@ function StatCard({ value, label, icon }) {
   );
 }
 
-function ProviderCard({ label, logo, desc, selected, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        flex: 1,
-        padding: "18px",
-        borderRadius: "6px",
-        border: selected ? "2.5px solid #008060" : "2px solid #e8eaed",
-        background: selected
-          ? "linear-gradient(135deg, rgba(0,128,96,0.08) 0%, rgba(0,179,116,0.04) 100%)"
-          : "#fff",
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-        position: "relative",
-        boxShadow: selected
-          ? "0 0 0 3px rgba(0,128,96,0.15), 0 4px 12px rgba(0,128,96,0.1)"
-          : "0 1px 3px rgba(0,0,0,0.04)",
-      }}
-    >
-      {/* Selected badge */}
-      <div
-        style={{
-          position: "absolute",
-          top: "10px",
-          right: "10px",
-          width: "22px",
-          height: "22px",
-          borderRadius: "50%",
-          background: selected ? "#008060" : "#e8eaed",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: selected ? "#fff" : "transparent",
-          fontSize: "13px",
-          fontWeight: 800,
-          transition: "all 0.2s ease",
-          flexShrink: 0,
-        }}
-      >
-        ✓
-      </div>
-
-      <div style={{ fontSize: "28px", marginBottom: "8px" }}>{logo}</div>
-      <div
-        style={{
-          fontSize: "14px",
-          fontWeight: 700,
-          color: selected ? "#008060" : "#0d1117",
-          marginBottom: "4px",
-          transition: "color 0.2s ease",
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontSize: "12px", color: "#6b7280" }}>{desc}</div>
-
-      {/* Bottom indicator bar */}
-      {selected && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "3px",
-            background: "linear-gradient(90deg, #008060, #00b374)",
-            borderRadius: "0 0 6px 6px",
-          }}
-        />
-      )}
-    </div>
-  );
-}
 
 const AI_MODELS = [
   { label: "Claude Haiku 4.5", value: "claude-haiku-4.5" },
@@ -365,16 +261,11 @@ const AI_MODELS = [
 ];
 
 export default function Index() {
-  const { hasOpenaiKey, hasAnthropicKey, defaultAiProvider, defaultAiModel } = useLoaderData();
+  const { defaultAiModel } = useLoaderData();
   const actionData = useActionData();
   const navigation = useNavigation();
   const isSaving = navigation.state === "submitting";
 
-  const [openaiKey, setOpenaiKey] = useState("");
-  const [anthropicKey, setAnthropicKey] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState(
-    () => (typeof defaultAiProvider === "string" && defaultAiProvider.trim()) ? defaultAiProvider.trim() : "openai"
-  );
   const [selectedModel, setSelectedModel] = useState(
     () => (typeof defaultAiModel === "string" && defaultAiModel.trim()) ? defaultAiModel.trim() : "gpt-4o-mini"
   );
@@ -528,7 +419,7 @@ export default function Index() {
           {/* Analytics card fills the left slot */}
           <FeatureCard {...ANALYTICS_CARD} />
 
-          {/* AI Provider Settings fills the right slot */}
+          {/* AI Model Settings fills the right slot */}
           <div>
             {actionData && (
               <div style={{ marginBottom: "16px" }}>
@@ -542,8 +433,7 @@ export default function Index() {
             )}
 
             <Form method="post">
-              <input type="hidden" name="intent" value="save_api_keys" />
-              <input type="hidden" name="defaultAiProvider" value={selectedProvider} />
+              <input type="hidden" name="intent" value="save_settings" />
               <input type="hidden" name="defaultAiModel" value={selectedModel} />
 
               <div
@@ -555,51 +445,22 @@ export default function Index() {
                   boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                 }}
               >
-                {/* Provider Picker */}
-                <div style={{ padding: "24px", borderBottom: "1px solid #f3f4f6" }}>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      color: "#374151",
-                      marginBottom: "12px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                    }}
-                  >
-                    Choose Default Provider
-                  </div>
-                  <div style={{ display: "flex", gap: "12px" }}>
-                    <ProviderCard
-                      label="ChatGPT / OpenAI"
-                      logo="🤖"
-                      desc="GPT-4o-mini model"
-                      selected={selectedProvider === "openai"}
-                      onClick={() => setSelectedProvider("openai")}
-                    />
-                    <ProviderCard
-                      label="Claude / Anthropic"
-                      logo="🧠"
-                      desc="Claude Haiku model"
-                      selected={selectedProvider === "anthropic"}
-                      onClick={() => setSelectedProvider("anthropic")}
-                    />
-                  </div>
-                </div>
-
                 {/* AI Model Selector */}
-                <div style={{ padding: "24px", borderBottom: "1px solid #f3f4f6" }}>
+                <div style={{ padding: "24px" }}>
                   <div
                     style={{
                       fontSize: "13px",
                       fontWeight: 700,
                       color: "#374151",
-                      marginBottom: "12px",
+                      marginBottom: "4px",
                       textTransform: "uppercase",
                       letterSpacing: "0.5px",
                     }}
                   >
-                    Select AI Model
+                    Default AI Model
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "14px" }}>
+                    Choose the AI model used for all content generation across your store.
                   </div>
                   <Select
                     label="AI Model"
@@ -608,109 +469,6 @@ export default function Index() {
                     value={selectedModel}
                     onChange={setSelectedModel}
                   />
-                  <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px" }}>
-                    Choose your preferred AI model for content generation. API keys are configured separately above.
-                  </div>
-                </div>
-
-                {/* API Key Section */}
-                <div style={{ padding: "24px" }}>
-                  {selectedProvider === "openai" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "14px", fontWeight: 700, color: "#0d1117" }}>
-                            OpenAI API Key
-                          </span>
-                          {hasOpenaiKey && <Badge tone="success">Configured</Badge>}
-                        </div>
-                        {hasOpenaiKey && (
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="clear_openai_key" />
-                            <Button variant="plain" tone="critical" submit size="slim">
-                              Remove key
-                            </Button>
-                          </Form>
-                        )}
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                        Get your key at{" "}
-                        <a
-                          href="https://platform.openai.com/api-keys"
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "#008060", fontWeight: 600 }}
-                        >
-                          platform.openai.com
-                        </a>
-                      </div>
-                      <TextField
-                        label="OpenAI API Key"
-                        labelHidden
-                        type="password"
-                        name="openaiApiKey"
-                        value={openaiKey}
-                        onChange={setOpenaiKey}
-                        placeholder={hasOpenaiKey ? "•••••••••••• (saved)" : "sk-proj-..."}
-                        autoComplete="off"
-                      />
-                    </div>
-                  )}
-
-                  {selectedProvider === "anthropic" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "14px", fontWeight: 700, color: "#0d1117" }}>
-                            Anthropic API Key
-                          </span>
-                          {hasAnthropicKey && <Badge tone="success">Configured</Badge>}
-                        </div>
-                        {hasAnthropicKey && (
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="clear_anthropic_key" />
-                            <Button variant="plain" tone="critical" submit size="slim">
-                              Remove key
-                            </Button>
-                          </Form>
-                        )}
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                        Get your key at{" "}
-                        <a
-                          href="https://console.anthropic.com/settings/keys"
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "#008060", fontWeight: 600 }}
-                        >
-                          console.anthropic.com
-                        </a>
-                      </div>
-                      <TextField
-                        label="Anthropic API Key"
-                        labelHidden
-                        type="password"
-                        name="anthropicApiKey"
-                        value={anthropicKey}
-                        onChange={setAnthropicKey}
-                        placeholder={hasAnthropicKey ? "•••••••••••• (saved)" : "sk-ant-..."}
-                        autoComplete="off"
-                      />
-                    </div>
-                  )}
-
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
                     <button
                       type="submit"
