@@ -2119,8 +2119,8 @@ export default function ProductsPage() {
                           </InlineStack>
                         ) : (
                           <InlineStack gap="100" blockAlign="center">
-                            <Badge tone={product.status === "ACTIVE" ? "success" : "attention"}>
-                              {product.status === "ACTIVE" ? "ACTIVE" : product.status || "DRAFT"}
+                            <Badge tone={toBadgeTone(product.status.tone)}>
+                              {product.status.label}
                             </Badge>
                             <Button size="micro" onClick={() => openEditModal(product)}>Edit</Button>
                           </InlineStack>
