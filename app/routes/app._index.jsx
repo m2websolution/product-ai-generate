@@ -10,18 +10,20 @@ import {
   Banner,
   Badge,
   Box,
+  Select,
 } from "@shopify/polaris";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
-    select: { openaiApiKey: true, anthropicApiKey: true, defaultAiProvider: true },
+    select: { openaiApiKey: true, anthropicApiKey: true, defaultAiProvider: true, defaultAiModel: true },
   });
   return {
     hasOpenaiKey: !!shopData?.openaiApiKey,
     hasAnthropicKey: !!shopData?.anthropicApiKey,
     defaultAiProvider: shopData?.defaultAiProvider || "openai",
+    defaultAiModel: shopData?.defaultAiModel || "gpt-4o-mini",
   };
 };
 
@@ -35,7 +37,8 @@ export const action = async ({ request }) => {
     const openaiApiKey = formData.get("openaiApiKey")?.trim();
     const anthropicApiKey = formData.get("anthropicApiKey")?.trim();
     const defaultAiProvider = formData.get("defaultAiProvider")?.trim() || "openai";
-    const updateData = { defaultAiProvider };
+    const defaultAiModel = formData.get("defaultAiModel")?.trim() || "gpt-4o-mini";
+    const updateData = { defaultAiProvider, defaultAiModel };
     if (openaiApiKey) updateData.openaiApiKey = openaiApiKey;
     if (anthropicApiKey) updateData.anthropicApiKey = anthropicApiKey;
     await db.shop.upsert({
@@ -352,8 +355,17 @@ function ProviderCard({ label, logo, desc, selected, onClick }) {
   );
 }
 
+const AI_MODELS = [
+  { label: "Claude Haiku 4.5", value: "claude-haiku-4.5" },
+  { label: "Claude Sonnet 4.6", value: "claude-sonnet-4.6" },
+  { label: "GPT-4o mini", value: "gpt-4o-mini" },
+  { label: "Gemini Flash-Lite", value: "gemini-flash-lite" },
+  { label: "DeepSeek V3.2", value: "deepseek-v3.2" },
+  { label: "Cohere Command R+", value: "cohere-command-r-plus" },
+];
+
 export default function Index() {
-  const { hasOpenaiKey, hasAnthropicKey, defaultAiProvider } = useLoaderData();
+  const { hasOpenaiKey, hasAnthropicKey, defaultAiProvider, defaultAiModel } = useLoaderData();
   const actionData = useActionData();
   const navigation = useNavigation();
   const isSaving = navigation.state === "submitting";
@@ -362,6 +374,9 @@ export default function Index() {
   const [anthropicKey, setAnthropicKey] = useState("");
   const [selectedProvider, setSelectedProvider] = useState(
     () => (typeof defaultAiProvider === "string" && defaultAiProvider.trim()) ? defaultAiProvider.trim() : "openai"
+  );
+  const [selectedModel, setSelectedModel] = useState(
+    () => (typeof defaultAiModel === "string" && defaultAiModel.trim()) ? defaultAiModel.trim() : "gpt-4o-mini"
   );
 
   return (
@@ -529,6 +544,7 @@ export default function Index() {
             <Form method="post">
               <input type="hidden" name="intent" value="save_api_keys" />
               <input type="hidden" name="defaultAiProvider" value={selectedProvider} />
+              <input type="hidden" name="defaultAiModel" value={selectedModel} />
 
               <div
                 style={{
@@ -568,6 +584,32 @@ export default function Index() {
                       selected={selectedProvider === "anthropic"}
                       onClick={() => setSelectedProvider("anthropic")}
                     />
+                  </div>
+                </div>
+
+                {/* AI Model Selector */}
+                <div style={{ padding: "24px", borderBottom: "1px solid #f3f4f6" }}>
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "#374151",
+                      marginBottom: "12px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Select AI Model
+                  </div>
+                  <Select
+                    label="AI Model"
+                    labelHidden
+                    options={AI_MODELS}
+                    value={selectedModel}
+                    onChange={setSelectedModel}
+                  />
+                  <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px" }}>
+                    Choose your preferred AI model for content generation. API keys are configured separately above.
                   </div>
                 </div>
 
