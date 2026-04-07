@@ -136,13 +136,13 @@ function FeatureCard({ gradient, glow, icon, title, desc, url, tag }) {
         style={{
           background: "#ffffff",
           borderRadius: "6px",
-          padding: "18px",
+          padding: "14px",
           border: `1px solid ${hovered ? "transparent" : "#e8eaed"}`,
           boxShadow: hovered
-            ? `0 8px 32px ${glow}, 0 2px 8px rgba(0,0,0,0.08)`
-            : "0 1px 4px rgba(0,0,0,0.04)",
+            ? `0 6px 24px ${glow}, 0 2px 6px rgba(0,0,0,0.06)`
+            : "0 1px 3px rgba(0,0,0,0.04)",
           transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
-          transform: hovered ? "translateY(-4px)" : "translateY(0)",
+          transform: hovered ? "translateY(-3px)" : "translateY(0)",
           cursor: "pointer",
           height: "100%",
           boxSizing: "border-box",
@@ -187,16 +187,16 @@ function FeatureCard({ gradient, glow, icon, title, desc, url, tag }) {
         {/* Icon */}
         <div
           style={{
-            width: "42px",
-            height: "42px",
+            width: "34px",
+            height: "34px",
             borderRadius: "6px",
             background: gradient,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "20px",
-            marginBottom: "12px",
-            boxShadow: `0 4px 12px ${glow}`,
+            fontSize: "16px",
+            marginBottom: "10px",
+            boxShadow: `0 3px 8px ${glow}`,
           }}
         >
           {icon}
@@ -204,20 +204,20 @@ function FeatureCard({ gradient, glow, icon, title, desc, url, tag }) {
 
         <div
           style={{
-            fontSize: "15px",
+            fontSize: "13px",
             fontWeight: 700,
             color: "#0d1117",
-            marginBottom: "6px",
+            marginBottom: "4px",
           }}
         >
           {title}
         </div>
         <div
           style={{
-            fontSize: "12px",
+            fontSize: "11px",
             color: "#6b7280",
             lineHeight: "1.5",
-            marginBottom: "14px",
+            marginBottom: "10px",
           }}
         >
           {desc}
@@ -253,24 +253,25 @@ function StatCard({ value, label, icon }) {
         background: "rgba(255,255,255,0.1)",
         backdropFilter: "blur(10px)",
         borderRadius: "6px",
-        padding: "18px 20px",
+        padding: "10px 12px",
         border: "1px solid rgba(255,255,255,0.2)",
         textAlign: "center",
+        minWidth: "80px",
       }}
     >
-      <div style={{ fontSize: "22px", marginBottom: "4px" }}>{icon}</div>
+      <div style={{ fontSize: "16px", marginBottom: "2px" }}>{icon}</div>
       <div
         style={{
-          fontSize: "28px",
+          fontSize: "20px",
           fontWeight: 800,
           color: "#ffffff",
           lineHeight: 1,
-          marginBottom: "4px",
+          marginBottom: "2px",
         }}
       >
         {value}
       </div>
-      <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>
+      <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>
         {label}
       </div>
     </div>
@@ -299,14 +300,14 @@ export default function Index() {
 
   return (
     <Page fullWidth>
-      <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
         {/* ── Hero ── */}
         <div
           style={{
             background: "linear-gradient(135deg, #0a1628 0%, #0d2a4a 40%, #0a3d2e 100%)",
             borderRadius: "6px",
-            padding: "48px 40px 36px",
+            padding: "28px 28px 22px",
             position: "relative",
             overflow: "hidden",
           }}
@@ -370,11 +371,11 @@ export default function Index() {
 
           <div
             style={{
-              fontSize: "clamp(20px, 2.5vw, 28px)",
+              fontSize: "clamp(16px, 2vw, 22px)",
               fontWeight: 800,
               color: "#ffffff",
               lineHeight: 1.15,
-              marginBottom: "14px",
+              marginBottom: "10px",
               maxWidth: "100%",
             }}
           >
@@ -393,9 +394,9 @@ export default function Index() {
 
           <div
             style={{
-              fontSize: "13px",
+              fontSize: "12px",
               color: "rgba(255,255,255,0.65)",
-              marginBottom: "36px",
+              marginBottom: "20px",
               maxWidth: "100%",
               lineHeight: "1.6",
             }}
@@ -404,7 +405,7 @@ export default function Index() {
           </div>
 
           {/* Stats row */}
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {STATS.map((s) => (
               <StatCard key={s.label} {...s} />
             ))}
@@ -413,11 +414,11 @@ export default function Index() {
 
         {/* ── Feature Cards (4 cards, fixed 4-col grid) ── */}
         <div>
-          <div style={{ marginBottom: "20px" }}>
-            <div style={{ fontSize: "20px", fontWeight: 700, color: "#0d1117", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#0d1117", marginBottom: "2px" }}>
               Generate Content
             </div>
-            <div style={{ fontSize: "13px", color: "#6b7280" }}>
+            <div style={{ fontSize: "12px", color: "#6b7280" }}>
               Pick a content type to get started
             </div>
           </div>
@@ -425,7 +426,7 @@ export default function Index() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "16px",
+              gap: "12px",
             }}
           >
             {FEATURE_CARDS.map((card) => (
@@ -476,7 +477,7 @@ export default function Index() {
                 }}
               >
                 {/* AI Model Selector */}
-                <div style={{ padding: "24px" }}>
+                <div style={{ padding: "16px" }}>
                   <div
                     style={{
                       fontSize: "13px",

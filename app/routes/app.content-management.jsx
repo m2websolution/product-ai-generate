@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { useFetcher, useLoaderData, useNavigate, useRevalidator } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import {
   Badge,
   Banner,
@@ -13,7 +13,6 @@ import {
   InlineStack,
   Modal,
   Page,
-  Spinner,
   Tabs,
   Text,
   TextField,
@@ -120,6 +119,15 @@ const PAGE_UPDATE_MUTATION = `#graphql
   mutation PageUpdate($id: ID!, $page: PageUpdateInput!) {
     pageUpdate(id: $id, page: $page) {
       page { id title body }
+      userErrors { field message }
+    }
+  }
+`;
+
+const METAFIELDS_SET_MUTATION = `#graphql
+  mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      metafields { key value }
       userErrors { field message }
     }
   }
@@ -330,8 +338,8 @@ function buildPrompt(contentType, item) {
   const base = {
     language: "English",
     tone: "Neutral",
-    lengthOption: "50 - 150 words",
-    format: "Single paragraph",
+    lengthOption: "150 - 300 words",
+    format: "Multiple sections with headings and paragraphs",
     contextKeywords: "",
     descriptionPromptTemplate: "",
     metaTitlePromptTemplate: "",
@@ -361,7 +369,7 @@ function buildPrompt(contentType, item) {
     return buildPageContentPrompt({
       pageTitle: item.title,
       pageType: "General",
-      body: stripHtml(item.body || ""),
+      body: stripHtml(item.descriptionHtml || item.body || ""),
       language: "English",
       tone: "Neutral",
       length: "Medium",
@@ -376,7 +384,7 @@ function buildPrompt(contentType, item) {
     return buildBlogContentPrompt({
       articleType: "General",
       title: item.title,
-      body: stripHtml(item.body || ""),
+      body: stripHtml(item.descriptionHtml || item.body || ""),
       language: "English",
       tone: "Neutral",
       length: "Medium",
@@ -602,6 +610,18 @@ export const action = async ({ request }) => {
         const json = await res.json();
         const errors = json?.data?.pageUpdate?.userErrors || [];
         if (errors.length > 0) throw new Error(errors.map((e) => e.message).join(", "));
+        // Save SEO metafields for page
+        if (seoTitle || seoDescription) {
+          const metafields = [];
+          if (seoTitle) metafields.push({ ownerId: item.id, namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" });
+          if (seoDescription) metafields.push({ ownerId: item.id, namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" });
+          if (metafields.length > 0) {
+            const mfRes = await admin.graphql(METAFIELDS_SET_MUTATION, { variables: { metafields } });
+            const mfJson = await mfRes.json();
+            const mfErrors = mfJson?.data?.metafieldsSet?.userErrors || [];
+            if (mfErrors.length > 0) throw new Error(mfErrors.map((e) => e.message).join(", "));
+          }
+        }
       } else if (contentType === "blog") {
         const res = await admin.graphql(ARTICLE_UPDATE_MUTATION, {
           variables: { id: item.id, article: { body: descHtml } },
@@ -609,6 +629,18 @@ export const action = async ({ request }) => {
         const json = await res.json();
         const errors = json?.data?.articleUpdate?.userErrors || [];
         if (errors.length > 0) throw new Error(errors.map((e) => e.message).join(", "));
+        // Save SEO metafields for blog article
+        if (seoTitle || seoDescription) {
+          const metafields = [];
+          if (seoTitle) metafields.push({ ownerId: item.id, namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" });
+          if (seoDescription) metafields.push({ ownerId: item.id, namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" });
+          if (metafields.length > 0) {
+            const mfRes = await admin.graphql(METAFIELDS_SET_MUTATION, { variables: { metafields } });
+            const mfJson = await mfRes.json();
+            const mfErrors = mfJson?.data?.metafieldsSet?.userErrors || [];
+            if (mfErrors.length > 0) throw new Error(mfErrors.map((e) => e.message).join(", "));
+          }
+        }
       }
 
       // Deduct credits
@@ -686,6 +718,16 @@ export const action = async ({ request }) => {
         const json = await res.json();
         const errors = json?.data?.pageUpdate?.userErrors || [];
         if (errors.length > 0) throw new Error(errors.map((e) => e.message).join(", "));
+        // Save SEO metafields for page
+        const pageMetafields = [];
+        if (seoTitle) pageMetafields.push({ ownerId: itemId, namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" });
+        if (seoDescription) pageMetafields.push({ ownerId: itemId, namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" });
+        if (pageMetafields.length > 0) {
+          const mfRes = await admin.graphql(METAFIELDS_SET_MUTATION, { variables: { metafields: pageMetafields } });
+          const mfJson = await mfRes.json();
+          const mfErrors = mfJson?.data?.metafieldsSet?.userErrors || [];
+          if (mfErrors.length > 0) throw new Error(mfErrors.map((e) => e.message).join(", "));
+        }
       } else if (contentType === "blog") {
         const res = await admin.graphql(ARTICLE_UPDATE_MUTATION, {
           variables: { id: itemId, article: { body: descriptionHtml } },
@@ -693,6 +735,16 @@ export const action = async ({ request }) => {
         const json = await res.json();
         const errors = json?.data?.articleUpdate?.userErrors || [];
         if (errors.length > 0) throw new Error(errors.map((e) => e.message).join(", "));
+        // Save SEO metafields for blog article
+        const blogMetafields = [];
+        if (seoTitle) blogMetafields.push({ ownerId: itemId, namespace: "global", key: "title_tag", value: seoTitle, type: "single_line_text_field" });
+        if (seoDescription) blogMetafields.push({ ownerId: itemId, namespace: "global", key: "description_tag", value: seoDescription, type: "single_line_text_field" });
+        if (blogMetafields.length > 0) {
+          const mfRes = await admin.graphql(METAFIELDS_SET_MUTATION, { variables: { metafields: blogMetafields } });
+          const mfJson = await mfRes.json();
+          const mfErrors = mfJson?.data?.metafieldsSet?.userErrors || [];
+          if (mfErrors.length > 0) throw new Error(mfErrors.map((e) => e.message).join(", "));
+        }
       }
       return { ok: true, intent, itemId, descriptionHtml, seoTitle, seoDescription };
     } catch (err) {
@@ -1133,11 +1185,88 @@ function shortContentBadge(content) {
   return <Badge tone="success">Good</Badge>;
 }
 
+// ─── Credit Breakdown Info ────────────────────────────────────────────────────
+const CREDIT_BREAKDOWN = {
+  products: [
+    { label: "Product Description", cost: 1 },
+    { label: "Meta Title", cost: 1 },
+    { label: "Meta Description", cost: 1 },
+  ],
+  collections: [
+    { label: "Collection Description", cost: 1 },
+    { label: "Meta Title", cost: 1 },
+    { label: "Meta Description", cost: 1 },
+  ],
+  pages: [
+    { label: "Page Content", cost: 1 },
+    { label: "Meta Title", cost: 1 },
+    { label: "Meta Description", cost: 1 },
+  ],
+  blog: [
+    { label: "Blog Content", cost: 1 },
+    { label: "Meta Title", cost: 1 },
+    { label: "Meta Description", cost: 1 },
+  ],
+};
+
+function CreditBreakdownBanner({ tab, availableCredits }) {
+  const items = CREDIT_BREAKDOWN[tab] || CREDIT_BREAKDOWN.products;
+  const total = items.reduce((s, i) => s + i.cost, 0);
+  const canAfford = availableCredits >= total;
+
+  return (
+    <div
+      style={{
+        background: "#f9fafb",
+        border: "1px solid #e4e5e7",
+        borderRadius: "8px",
+        padding: "12px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill={canAfford ? "#108043" : "#b98900"}>
+          <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z"/>
+        </svg>
+        <span style={{ fontSize: "12px", fontWeight: 700, color: "#202223" }}>
+          Regenerate All = {total} Credits
+        </span>
+        <span style={{ fontSize: "11px", color: "#6d7175" }}>
+          (You have {availableCredits} credits)
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+        {items.map((item) => (
+          <span
+            key={item.label}
+            style={{
+              fontSize: "11px",
+              background: "#ffffff",
+              border: "1px solid #c9cccf",
+              borderRadius: "4px",
+              padding: "2px 8px",
+              color: "#202223",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            {item.label}
+            <span style={{ fontWeight: 700, color: "#2c6ecb" }}>{item.cost} cr</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ContentManagementPage() {
   const { tab, filter, items, credits, defaultAiProvider } = useLoaderData();
   const navigate = useNavigate();
-  const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const generateFetcher = useFetcher();
   const saveFetcher = useFetcher();
@@ -1273,7 +1402,7 @@ export default function ContentManagementPage() {
     { title: "Description" },
     { title: "SEO Description" },
     { title: "Last Updated" },
-    { title: "Specific Generate" },
+    { title: "AI Regenerate" },
   ];
 
   const rowMarkup = localItems.map((item, idx) => {
@@ -1380,6 +1509,8 @@ export default function ContentManagementPage() {
         <IndexTable.Cell>
           <Button
             size="slim"
+            variant="primary"
+            tone="success"
             icon={
               <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z" />
@@ -1389,7 +1520,7 @@ export default function ContentManagementPage() {
             loading={isGenerating}
             disabled={isGenerating || localCredits < CREDITS_PER_GENERATION}
           >
-            Specific Generate
+            Regenerate All ({CREDITS_PER_GENERATION} cr)
           </Button>
         </IndexTable.Cell>
       </IndexTable.Row>
@@ -1423,6 +1554,9 @@ export default function ContentManagementPage() {
       }
     >
       <BlockStack gap="400">
+        {/* Credit breakdown banner */}
+        <CreditBreakdownBanner tab={tab} availableCredits={localCredits} />
+
         {/* Error / Success banners */}
         {errorMessage && (
           <Banner tone="critical" onDismiss={() => setErrorMessage(null)}>
@@ -1438,7 +1572,7 @@ export default function ContentManagementPage() {
         {localCredits < CREDITS_PER_GENERATION && (
           <Banner tone="warning">
             <Text as="p">
-              You have {localCredits} credit{localCredits !== 1 ? "s" : ""} remaining. Each generation costs {CREDITS_PER_GENERATION} credits.
+              You have {localCredits} credit{localCredits !== 1 ? "s" : ""} remaining. Each regeneration costs {CREDITS_PER_GENERATION} credits ({CREDIT_BREAKDOWN[tab]?.map(i => `${i.label} (${i.cost} cr)`).join(" + ")}).
             </Text>
           </Banner>
         )}
@@ -1491,7 +1625,7 @@ export default function ContentManagementPage() {
         {/* Credit info footer */}
         <Box paddingBlockEnd="400">
           <Text variant="bodySm" as="p" tone="subdued" alignment="center">
-            Each AI generation costs {CREDITS_PER_GENERATION} credits (description + SEO title + SEO description). Clicking a description or SEO cell opens the editor — saves are free.
+            Regenerate All costs {CREDITS_PER_GENERATION} credits: {CREDIT_BREAKDOWN[tab]?.map(i => `${i.label} (${i.cost} cr)`).join(" + ")}. Click any description or SEO cell to open the editor — manual saves are free.
           </Text>
         </Box>
       </BlockStack>
