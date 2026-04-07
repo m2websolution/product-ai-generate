@@ -988,10 +988,12 @@ export default function AnalyticsPage() {
                   {actions.length === 0 ? (
                     <Text variant="bodySm" tone="success">All content has SEO data!</Text>
                   ) : actions.slice(0, 4).map((item, i) => (
-                    <InlineStack key={i} gap="200" blockAlign="center" wrap={false}>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", borderRadius: "6px", border: "1px solid #e4e5e7", background: "#ffffff", cursor: "pointer" }}>
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#C9201F", flexShrink: 0 }} />
-                      <Button variant="plain" url={item.url} size="slim">{item.label}</Button>
-                    </InlineStack>
+                      <a href={item.url} style={{ fontSize: "14px", fontWeight: 500, color: "#1a1a1a", textDecoration: "none", flex: 1 }}>
+                        {item.label}
+                      </a>
+                    </div>
                   ))}
                 </BlockStack>
               </BlockStack>
