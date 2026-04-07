@@ -321,15 +321,15 @@ function TemplateCard({ template, active, showResource, isCustom, isLoading, onP
           </Text>
 
           <InlineStack gap="150" align="start">
-            <Button size="micro" onClick={onPreview} disabled={isLoading}>
+            <Button size="slim" onClick={onPreview} disabled={isLoading}>
               Preview
             </Button>
             {isCustom && (
               <>
-                <Button size="micro" onClick={onEdit} disabled={isLoading}>
+                <Button size="slim" onClick={onEdit} disabled={isLoading}>
                   Edit
                 </Button>
-                <Button size="micro" tone="critical" onClick={onDelete} disabled={isLoading}>
+                <Button size="slim" tone="critical" onClick={onDelete} disabled={isLoading}>
                   Delete
                 </Button>
               </>
@@ -888,24 +888,6 @@ export default function TemplatePage() {
         open={Boolean(previewData)}
         onClose={() => setPreviewData(null)}
         title={previewData?.name || "Template Preview"}
-        primaryAction={{
-          content: "Use Template",
-          onAction: () => {
-            if (!previewData) return;
-            applyTemplate(previewData, previewData.resourceId, previewData.filterId);
-            setPreviewData(null);
-          },
-          disabled: isLoading,
-        }}
-        secondaryActions={[
-          {
-            content: "Copy",
-            onAction: () =>
-              copyText(previewData?.template || "", previewData?.name || "Template"),
-            disabled: isLoading,
-          },
-          { content: "Close", onAction: () => setPreviewData(null), disabled: isLoading },
-        ]}
       >
         <Modal.Section>
           <BlockStack gap="300">
@@ -913,7 +895,7 @@ export default function TemplatePage() {
               {previewData?.resource && <ResourceBadge resource={previewData.resource} />}
               <Badge>{typeLabel(previewData?.filterId || "description")}</Badge>
             </InlineStack>
-            <Text as="p" variant="bodySm" tone="subdued">
+            <Text as="p" variant="bodyMd" tone="subdued">
               {previewData?.description}
             </Text>
             <Card>
@@ -921,9 +903,8 @@ export default function TemplatePage() {
                 <div
                   style={{
                     whiteSpace: "pre-wrap",
-                    lineHeight: 1.65,
-                    fontSize: 13,
-                    fontFamily: "var(--p-font-family-mono, monospace)",
+                    lineHeight: 1.6,
+                    fontSize: 14,
                     color: "var(--p-color-text)",
                   }}
                 >
@@ -931,6 +912,30 @@ export default function TemplatePage() {
                 </div>
               </Box>
             </Card>
+            <InlineStack align="end" gap="200">
+              <Button size="slim" onClick={() => setPreviewData(null)} disabled={isLoading}>
+                Close
+              </Button>
+              <Button
+                size="slim"
+                onClick={() => copyText(previewData?.template || "", previewData?.name || "Template")}
+                disabled={isLoading}
+              >
+                Copy
+              </Button>
+              <Button
+                size="slim"
+                variant="primary"
+                onClick={() => {
+                  if (!previewData) return;
+                  applyTemplate(previewData, previewData.resourceId, previewData.filterId);
+                  setPreviewData(null);
+                }}
+                disabled={isLoading}
+              >
+                Use Template
+              </Button>
+            </InlineStack>
           </BlockStack>
         </Modal.Section>
       </Modal>
