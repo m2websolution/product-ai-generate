@@ -454,7 +454,7 @@ export default function Index() {
             </InlineStack>
 
             <Grid columns={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2 }}>
-              {/* Card 1: Book a Free 30-Minute Setup Call */}
+              {/* Row 1: Setup Call & Quick Help */}
               <Grid.Cell>
                 <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", height: "100%", background: "#ffffff" }}>
                   <BlockStack gap="300">
@@ -471,7 +471,6 @@ export default function Index() {
                 </div>
               </Grid.Cell>
 
-              {/* Card 2: Need Quick Help? */}
               <Grid.Cell>
                 <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", height: "100%", background: "#ffffff" }}>
                   <BlockStack gap="300">
@@ -485,9 +484,9 @@ export default function Index() {
                 </div>
               </Grid.Cell>
 
-              {/* Card 3: Support */}
+              {/* Row 2: Support (Full Width) */}
               <Grid.Cell>
-                <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", height: "100%", background: "#ffffff" }}>
+                <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", height: "100%", background: "#ffffff", gridColumn: "span 1" }}>
                   <BlockStack gap="300">
                     <Text variant="headingSm" as="h3" fontWeight="bold">Support</Text>
                     <Grid columns={{ xs: 2, sm: 2, md: 2, lg: 2, xl: 2 }} gap="200">
@@ -518,7 +517,7 @@ export default function Index() {
                 </div>
               </Grid.Cell>
 
-              {/* Card 4: Motivate our team */}
+              {/* Row 3: Motivate our team */}
               <Grid.Cell>
                 <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", height: "100%", background: "#ffffff", textAlign: "center" }}>
                   <BlockStack gap="300" align="center">
