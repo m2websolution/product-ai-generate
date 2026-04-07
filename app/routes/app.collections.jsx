@@ -8,6 +8,7 @@ import {
   useRevalidator,
 } from "react-router";
 import {
+  Autocomplete,
   Badge,
   Banner,
   BlockStack,
@@ -20,6 +21,7 @@ import {
   Page,
   Select,
   Spinner,
+  Tag,
   Tabs,
   Text,
   TextField,
@@ -60,6 +62,23 @@ const OPENAI_RATE_LIMIT_ERROR_PATTERN = /rate limit|too many requests|429/i;
 const OPENAI_OLLAMA_FALLBACK_ERROR_PATTERN =
   /quota|billing|insufficient_quota|OPENAI_API_KEY is missing|does not exist|do not have access|rate limit|too many requests|429/i;
 const ENABLED_ENV_VALUE_PATTERN = /^(1|true|yes)$/i;
+
+const TONE_OPTIONS = [
+  { label: "Professional", value: "professional" },
+  { label: "Friendly", value: "friendly" },
+  { label: "Casual", value: "casual" },
+  { label: "Formal", value: "formal" },
+  { label: "Enthusiastic", value: "enthusiastic" },
+  { label: "Informative", value: "informative" },
+];
+
+const LENGTH_OPTIONS = [
+  { label: "Short (50-150 words)", value: "short (50-150 words)" },
+  { label: "Medium (150-300 words)", value: "medium (150-300 words)" },
+  { label: "Long (300-500 words)", value: "long (300-500 words)" },
+  { label: "Very Long (500+ words)", value: "very long (500+ words)" },
+];
+
 const COLLECTION_UPDATE_MUTATION_INPUT = `#graphql
   mutation CollectionUpdateInput($input: CollectionInput!) {
     collectionUpdate(input: $input) {
@@ -1090,6 +1109,9 @@ export default function CollectionsPage() {
   const [bulkDescKeywords, setBulkDescKeywords] = useState(() => readGlobalSettings().collectionDescKeywords || "");
   const [bulkMetaTitleKeywords, setBulkMetaTitleKeywords] = useState(() => readGlobalSettings().collectionMetaTitleKeywords || "");
   const [bulkMetaDescKeywords, setBulkMetaDescKeywords] = useState(() => readGlobalSettings().collectionMetaDescKeywords || "");
+  const [bulkSelectedKeywords, setBulkSelectedKeywords] = useState([]);
+  const [bulkCustomKeywordInput, setBulkCustomKeywordInput] = useState("");
+  const [bulkKeywordTags, setBulkKeywordTags] = useState([]);
 
   useEffect(() => {
     const templateSelection = readStoredCollectionPromptTemplateSelection();
@@ -1268,6 +1290,62 @@ export default function CollectionsPage() {
 
   const updateBulkField = (field) => (value) =>
     setBulkSettings((prev) => ({ ...prev, [field]: value }));
+
+  const bulkKeywordOptions = useMemo(() => {
+    return [
+      { label: "Product Description", value: "product-description" },
+      { label: "Meta Title", value: "meta-title" },
+      { label: "Meta Description", value: "meta-description" },
+      { label: "SEO Keywords", value: "seo-keywords" },
+      { label: "Category", value: "category" },
+    ].filter(
+      (option) =>
+        !bulkSelectedKeywords.includes(option.value) &&
+        !bulkKeywordTags.includes(option.label)
+    );
+  }, [bulkSelectedKeywords, bulkKeywordTags]);
+
+  const bulkKeywordTextField = useMemo(
+    () => ({
+      onChange: (value) => setBulkCustomKeywordInput(value),
+      label: "Search keywords",
+      placeholder: "Search keywords",
+      value: bulkCustomKeywordInput,
+      autoComplete: "off",
+    }),
+    [bulkCustomKeywordInput]
+  );
+
+  const handleBulkKeywordSelect = useCallback(
+    (selected) => {
+      setBulkSelectedKeywords(selected);
+      const selectedLabels = selected
+        .map((val) => TONE_OPTIONS.find((opt) => opt.value === val)?.label || val)
+        .concat(
+          bulkKeywordOptions
+            .filter((opt) => selected.includes(opt.value))
+            .map((opt) => opt.label)
+        );
+      setBulkKeywordTags([...new Set([...bulkKeywordTags, ...selectedLabels])]);
+    },
+    [bulkKeywordTags, bulkKeywordOptions]
+  );
+
+  const handleAddBulkCustomKeyword = useCallback(() => {
+    const trimmed = bulkCustomKeywordInput.trim();
+    if (trimmed && !bulkKeywordTags.includes(trimmed)) {
+      setBulkKeywordTags((prev) => [...prev, trimmed]);
+      setBulkCustomKeywordInput("");
+    }
+  }, [bulkCustomKeywordInput, bulkKeywordTags]);
+
+  const handleRemoveBulkKeyword = useCallback((keyword) => {
+    setBulkKeywordTags((prev) => prev.filter((k) => k !== keyword));
+    const foundOption = bulkKeywordOptions.find((opt) => opt.label === keyword);
+    if (foundOption) {
+      setBulkSelectedKeywords((prev) => prev.filter((k) => k !== foundOption.value));
+    }
+  }, [bulkKeywordOptions]);
 
 
   const allVisibleSelected =
@@ -1604,13 +1682,13 @@ export default function CollectionsPage() {
                 <BlockStack gap="300">
                   <Select
                     label="Tone"
-                    options={toneSelectOptions}
+                    options={TONE_OPTIONS}
                     value={bulkSettings.tone}
                     onChange={updateBulkField("tone")}
                   />
                   <Select
                     label="Length"
-                    options={lengthSelectOptions}
+                    options={LENGTH_OPTIONS}
                     value={bulkSettings.length}
                     onChange={updateBulkField("length")}
                   />
