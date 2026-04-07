@@ -453,7 +453,7 @@ export default function Index() {
               <Text variant="headingMd" as="h2">We're Here to Help You Succeed</Text>
             </InlineStack>
 
-            <Grid columns={{ xs: 1, sm: 1, md: 2, lg: 4, xl: 4 }}>
+            <Grid columns={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2 }}>
               {/* Card 1: Book a Free 30-Minute Setup Call */}
               <Grid.Cell>
                 <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", height: "100%", background: "#ffffff" }}>
