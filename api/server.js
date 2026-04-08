@@ -7,7 +7,16 @@ const requestListener = createRequestListener({
 });
 
 export default async function handler(request) {
-  const url = new URL(request.url);
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch {
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const host = request.headers.get("host");
+    const base = `${forwardedProto || "https"}://${forwardedHost || host || "localhost"}`;
+    url = new URL(request.url, base);
+  }
 
   // Avoid routing /assets/* through React Router when a stale hashed asset is requested.
   // This prevents noisy "No route matches URL /assets/..." server errors.
