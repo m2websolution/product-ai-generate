@@ -1905,28 +1905,7 @@ function GenerateTemplateModal({
   const [editablePreviewHtml, setEditablePreviewHtml] = useState("");
   const [editableMetaText, setEditableMetaText] = useState("");
   const isHydratedRef = useRef(false);
-
-  useEffect(() => {
-    isHydratedRef.current = true;
-  }, []);
-
-  if (!open || !item) return null;
-
   const config = getGenerateTemplateConfig(contentType);
-  if (!config) return null;
-
-  const mainOptions = [
-    { label: `Default (${config.mainLabel})`, value: "" },
-    ...config.mainTemplates.map((template) => ({ label: template.name, value: template.id })),
-  ];
-  const metaTitleOptions = [
-    { label: "Default (Meta Title)", value: "" },
-    ...config.metaTitleTemplates.map((template) => ({ label: template.name, value: template.id })),
-  ];
-  const metaDescriptionOptions = [
-    { label: "Default (Meta Description)", value: "" },
-    ...config.metaDescriptionTemplates.map((template) => ({ label: template.name, value: template.id })),
-  ];
   const showMain = generateScope === "all" || generateScope === "main";
   const showMetaTitle = generateScope === "all" || generateScope === "meta_title";
   const showMetaDescription = generateScope === "all" || generateScope === "meta_description";
@@ -1934,6 +1913,23 @@ function GenerateTemplateModal({
   const scopeLabel = getScopeDisplayLabel(contentType, generateScope);
   const itemTypeLabel = getContentTypeDisplayLabel(contentType);
   const titleScope = scopeLabel === "All" ? "content" : scopeLabel.toLowerCase();
+
+  useEffect(() => {
+    isHydratedRef.current = true;
+  }, []);
+
+  const mainOptions = [
+    { label: `Default (${config?.mainLabel || "Template"})`, value: "" },
+    ...(config?.mainTemplates || []).map((template) => ({ label: template.name, value: template.id })),
+  ];
+  const metaTitleOptions = [
+    { label: "Default (Meta Title)", value: "" },
+    ...(config?.metaTitleTemplates || []).map((template) => ({ label: template.name, value: template.id })),
+  ];
+  const metaDescriptionOptions = [
+    { label: "Default (Meta Description)", value: "" },
+    ...(config?.metaDescriptionTemplates || []).map((template) => ({ label: template.name, value: template.id })),
+  ];
   useEffect(() => {
     if (!isHydratedRef.current || !open || !item) return;
     if (showMain) {
@@ -1981,6 +1977,8 @@ function GenerateTemplateModal({
       : !showMain
         ? `Generated ${scopeLabel} will appear here`
         : "";
+
+  if (!open || !item || !config) return null;
 
   return (
     <Modal
@@ -2528,40 +2526,54 @@ export default function ContentManagementPage() {
 
         {/* Generate button */}
         <IndexTable.Cell>
-          <Popover
-            active={isPopoverOpen}
-            activator={
+          <InlineStack gap="100" wrap={false}>
+            <Button
+              size="slim"
+              icon={
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z" />
+                </svg>
+              }
+              onClick={() => handleGenerate(item, "all")}
+              loading={isGenerating}
+              disabled={isGenerating || localCredits < CREDITS_PER_GENERATION}
+            >
+              Generate
+            </Button>
+            <Popover
+              active={isPopoverOpen}
+              activator={
               <Button
                 size="slim"
-                disclosure
                 icon={
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z" />
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M5.5 7.5L10 12L14.5 7.5" />
                   </svg>
                 }
                 onClick={() => setOpenGeneratePopoverId((prev) => (prev === item.id ? null : item.id))}
-                loading={isGenerating}
                 disabled={isGenerating || localCredits < 1}
-              >
-                Generate
-              </Button>
-            }
-            onClose={() => setOpenGeneratePopoverId(null)}
-          >
-            <ActionList
-              items={scopeOptions.map((option) => {
-                const optionCredits = creditsForGenerateScope(option.value);
-                return {
-                  content: `${option.label} (${optionCredits} credit${optionCredits === 1 ? "" : "s"})`,
-                  disabled: localCredits < optionCredits,
-                  onAction: () => {
-                    setOpenGeneratePopoverId(null);
-                    handleGenerate(item, option.value);
-                  },
-                };
-              })}
-            />
-          </Popover>
+                accessibilityLabel="More generate options"
+              />
+              }
+              onClose={() => setOpenGeneratePopoverId(null)}
+            >
+              <ActionList
+                items={scopeOptions
+                  .filter((option) => option.value !== "all")
+                  .map((option) => {
+                    const optionCredits = creditsForGenerateScope(option.value);
+                    return {
+                      content: `${option.label} (${optionCredits} credit${optionCredits === 1 ? "" : "s"})`,
+                      disabled: localCredits < optionCredits,
+                      onAction: () => {
+                        setOpenGeneratePopoverId(null);
+                        handleGenerate(item, option.value);
+                      },
+                    };
+                  })}
+              />
+            </Popover>
+          </InlineStack>
         </IndexTable.Cell>
       </IndexTable.Row>
     );
