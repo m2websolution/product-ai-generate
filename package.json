@@ -72,5 +72,6 @@
   "overrides": {
     "p-map": "^4.0.0"
   },
-  "author": "BALVANT"
+  "author": "Pryxo Tech PVT LTD",
+  "license": "MIT"
 }

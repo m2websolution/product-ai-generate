@@ -4,7 +4,7 @@ client_id = "3c547ccca21c77a2e4894a02c124a7b4"
 name = "Content AI – SEO Generator"
 application_url = "https://product-ai-generate.vercel.app"
 embedded = true
-
+handle = "content-ai-seo-generator"
 [build]
 automatically_update_urls_on_dev = true
 
