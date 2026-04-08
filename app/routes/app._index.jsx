@@ -14,7 +14,6 @@ import {
   Button,
   ButtonGroup,
   Select,
-  Divider,
   Box,
   Badge,
   Icon,
@@ -497,7 +496,7 @@ export default function Index() {
               <div className="support-help-box support-help-box--large" style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "20px", minHeight: "300px", background: "#ffffff" }}>
                 <BlockStack gap="400">
                   <Text variant="headingSm" as="h3" fontWeight="bold">Support</Text>
-                  <Grid columns={{ xs: 2, sm: 2, md: 2, lg: 2, xl: 2 }} gap="200">
+                  <Grid columns={{ xs: 1, sm: 1, md: 3, lg: 3, xl: 3 }} gap="200">
                     <Grid.Cell>
                       <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "16px", textAlign: "center", background: "#fafafa" }}>
                         <BlockStack gap="100" align="center">
@@ -520,14 +519,18 @@ export default function Index() {
                         </BlockStack>
                       </div>
                     </Grid.Cell>
+                    <Grid.Cell>
+                      <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "16px", textAlign: "center", background: "#fafafa" }}>
+                        <BlockStack gap="100" align="center">
+                          <Text variant="bodySm" fontWeight="semibold" as="span">Need Quick Help?</Text>
+                          <InlineStack gap="200" distribute="center">
+                            <Button url="#" variant="primary" size="slim">WhatsApp</Button>
+                          </InlineStack>
+                          <Text variant="bodySm" tone="subdued">Quick connect with our support team.</Text>
+                        </BlockStack>
+                      </div>
+                    </Grid.Cell>
                   </Grid>
-                  <Divider />
-                  <BlockStack gap="200" align="center">
-                    <Text variant="bodySm" fontWeight="semibold">Need Quick Help?</Text>
-                    <InlineStack gap="200" distribute="center">
-                      <Button url="#" variant="primary" size="slim">WhatsApp</Button>
-                    </InlineStack>
-                  </BlockStack>
                 </BlockStack>
               </div>
 
