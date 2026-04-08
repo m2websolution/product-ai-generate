@@ -35,12 +35,17 @@ import {
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
+  const envDefaultAiModel =
+    (process.env.AI_MODEL || "").trim() ||
+    (process.env.OPENAI_MODEL || "").trim() ||
+    "gpt-4o-mini";
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
     select: { defaultAiModel: true },
   });
   return {
-    defaultAiModel: shopData?.defaultAiModel || "gpt-4o-mini",
+    defaultAiModel: shopData?.defaultAiModel || envDefaultAiModel,
+    envDefaultAiModel,
   };
 };
 
@@ -51,7 +56,11 @@ export const action = async ({ request }) => {
   const intent = formData.get("intent");
 
   if (intent === "save_settings") {
-    const defaultAiModel = formData.get("defaultAiModel")?.trim() || "gpt-4o-mini";
+    const envDefaultAiModel =
+      (process.env.AI_MODEL || "").trim() ||
+      (process.env.OPENAI_MODEL || "").trim() ||
+      "gpt-4o-mini";
+    const defaultAiModel = formData.get("defaultAiModel")?.trim() || envDefaultAiModel;
     await db.shop.upsert({
       where: { shop },
       update: { defaultAiModel },
@@ -71,6 +80,21 @@ const AI_MODELS = [
   { label: "DeepSeek V3.2", value: "deepseek-v3.2" },
   { label: "Cohere Command R+", value: "cohere-command-r-plus" },
 ];
+
+function toModelLabel(model) {
+  return String(model || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getAiModelOptions(envModel) {
+  const value = String(envModel || "").trim();
+  if (!value) return AI_MODELS;
+  if (AI_MODELS.some((item) => item.value === value)) return AI_MODELS;
+  return [{ label: `${toModelLabel(value)} (ENV)`, value }, ...AI_MODELS];
+}
 
 const CONTENT_FEATURES = [
   {
@@ -203,7 +227,7 @@ function FeatureCard({ icon, color, bg, border, title, desc, url, badge, badgeTo
 }
 
 export default function Index() {
-  const { defaultAiModel } = useLoaderData();
+  const { defaultAiModel, envDefaultAiModel } = useLoaderData();
   const layoutData = useRouteLoaderData("routes/app");
   const credits = layoutData?.credits ?? 0;
   const actionData = useActionData();
@@ -215,6 +239,7 @@ export default function Index() {
   const [selectedModel, setSelectedModel] = useState(
     () => (typeof defaultAiModel === "string" && defaultAiModel.trim()) ? defaultAiModel.trim() : "gpt-4o-mini"
   );
+  const aiModelOptions = getAiModelOptions(envDefaultAiModel || defaultAiModel);
 
   return (
     <Page fullWidth>
@@ -385,7 +410,7 @@ export default function Index() {
                     <Select
                       label="AI Model"
                       labelHidden
-                      options={AI_MODELS}
+                      options={aiModelOptions}
                       value={selectedModel}
                       onChange={setSelectedModel}
                     />

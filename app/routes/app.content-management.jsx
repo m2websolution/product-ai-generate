@@ -66,6 +66,16 @@ const OPENAI_MODEL_ACCESS_ERROR_PATTERN = /does not exist|do not have access|not
 const OPENAI_OLLAMA_FALLBACK_ERROR_PATTERN =
   /quota|billing|insufficient_quota|OPENAI_API_KEY is missing|does not exist|do not have access|rate limit|too many requests|429/i;
 const ENABLED_ENV_VALUE_PATTERN = /^(1|true|yes)$/i;
+const BASE_AI_MODEL_OPTIONS = [
+  { label: "GPT-4.1 Mini", value: "gpt-4.1-mini" },
+  { label: "GPT-4.1", value: "gpt-4.1" },
+  { label: "GPT-4o Mini", value: "gpt-4o-mini" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "Claude Haiku 4.5", value: "claude-haiku-4-5-20251001" },
+  { label: "Claude Sonnet 4", value: "claude-sonnet-4-20250514" },
+  { label: "Claude Sonnet 4.6", value: "claude-sonnet-4-6" },
+  { label: "Ollama Llama 3.2 1B", value: "llama3.2:1b" },
+];
 
 function creditsForGenerateScope(scope) {
   return scope === "all" ? CREDITS_PER_GENERATION : 1;
@@ -82,16 +92,70 @@ function getGenerateScopeOptions(contentType) {
 }
 
 const LANGUAGE_OPTIONS = [
-  { label: "English (US)", value: "English (US)" },
-  { label: "English (UK)", value: "English (UK)" },
-  { label: "Hindi", value: "Hindi" },
-];
+  "English",
+  "English (British)",
+  "English (US)",
+  "Arabic",
+  "Bengali",
+  "Bulgarian",
+  "Chinese",
+  "Chinese (Simplified)",
+  "Chinese (Traditional)",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "Finnish",
+  "French",
+  "German",
+  "Greek",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Korean",
+  "Malay",
+  "Norwegian",
+  "Polish",
+  "Portuguese",
+  "Romanian",
+  "Russian",
+  "Spanish",
+  "Swedish",
+  "Tamil",
+  "Telugu",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Urdu",
+  "Vietnamese",
+].map((language) => ({ label: language, value: language }));
 
-const AI_MODEL_OPTIONS = [
-  { label: "GPT-4.1 Mini", value: "gpt-4.1-mini" },
-  { label: "GPT-4.1", value: "gpt-4.1" },
-  { label: "Claude Sonnet 4", value: "claude-sonnet-4-20250514" },
-];
+function resolveEnvDefaultAiModel() {
+  return (
+    (process.env.AI_MODEL || "").trim() ||
+    (process.env.OPENAI_MODEL || "").trim() ||
+    (process.env.OLLAMA_MODEL || "").trim() ||
+    DEFAULT_AI_MODEL
+  );
+}
+
+function toModelLabel(model) {
+  return model
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getAiModelOptions(envModel) {
+  const model = String(envModel || "").trim();
+  if (!model) return BASE_AI_MODEL_OPTIONS;
+  if (BASE_AI_MODEL_OPTIONS.some((option) => option.value === model)) return BASE_AI_MODEL_OPTIONS;
+  return [{ label: `${toModelLabel(model)} (ENV)`, value: model }, ...BASE_AI_MODEL_OPTIONS];
+}
 
 function getScopeDisplayLabel(contentType, scope) {
   const mainLabel = contentType === "pages" || contentType === "blog" ? "Content" : "Description";
@@ -351,8 +415,8 @@ async function generateContentWithAnthropic(prompt, apiKey, preferredModel = nul
   return parseGenerationContent(data?.content?.[0]?.text, data?.model || model);
 }
 
-async function generateContentWithOllama(prompt) {
-  const model = process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
+async function generateContentWithOllama(prompt, preferredModel = null) {
+  const model = preferredModel || process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
   const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
   const res = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
@@ -379,18 +443,19 @@ async function runGeneration(
   const anthropicKey = shopAnthropicKey || process.env.ANTHROPIC_API_KEY;
 
   if (aiProvider === "anthropic") return generateContentWithAnthropic(prompt, anthropicKey, preferredModel);
+  if (aiProvider === "ollama") return generateContentWithOllama(prompt, preferredModel);
   if (aiProvider === "openai") {
     try { return await generateContentWithOpenAI(prompt, openaiKey, preferredModel); }
     catch (err) {
       if (OPENAI_OLLAMA_FALLBACK_ERROR_PATTERN.test(err?.message || "") && canUseOllamaFallback())
-        return generateContentWithOllama(prompt);
+        return generateContentWithOllama(prompt, preferredModel);
       throw err;
     }
   }
   // auto mode
   const envProvider = (process.env.AI_PROVIDER || "").trim().toLowerCase();
   if (envProvider === "ollama") {
-    try { return await generateContentWithOllama(prompt); }
+    try { return await generateContentWithOllama(prompt, preferredModel); }
     catch (err) {
       if (!openaiKey) throw err;
       return generateContentWithOpenAI(prompt, openaiKey, preferredModel);
@@ -399,7 +464,7 @@ async function runGeneration(
   try { return await generateContentWithOpenAI(prompt, openaiKey, preferredModel); }
   catch (err) {
     if (OPENAI_OLLAMA_FALLBACK_ERROR_PATTERN.test(err?.message || "") && canUseOllamaFallback())
-      return generateContentWithOllama(prompt);
+      return generateContentWithOllama(prompt, preferredModel);
     throw err;
   }
 }
@@ -543,6 +608,7 @@ export const loader = async ({ request }) => {
   });
   const credits = shopData?.credits ?? 100;
   const defaultAiProvider = shopData?.defaultAiProvider || "auto";
+  const envAiModel = resolveEnvDefaultAiModel();
 
   const shouldLoadProducts = tab === "all" || tab === "products";
   const shouldLoadCollections = tab === "all" || tab === "collections";
@@ -630,6 +696,27 @@ export const loader = async ({ request }) => {
     return 0;
   };
 
+  const generatedIdsByType = {
+    products: new Set([
+      ...productCreditsMap.keys(),
+      ...logCreditsMapByType.products.keys(),
+    ]),
+    collections: new Set([
+      ...collectionCreditsMap.keys(),
+      ...logCreditsMapByType.collections.keys(),
+    ]),
+    pages: new Set([
+      ...pageCreditsMap.keys(),
+      ...logCreditsMapByType.pages.keys(),
+    ]),
+    blog: new Set([
+      ...blogCreditsMap.keys(),
+      ...logCreditsMapByType.blog.keys(),
+    ]),
+  };
+
+  const isGeneratedItem = (contentType, itemId) => generatedIdsByType[contentType]?.has(itemId);
+
   let items = [];
 
   try {
@@ -651,7 +738,7 @@ export const loader = async ({ request }) => {
         if (!conn.pageInfo?.hasNextPage || !conn.pageInfo?.endCursor) break;
         afterCursor = conn.pageInfo.endCursor;
       }
-      allItems.push(...productNodes.map((n) => ({
+      allItems.push(...productNodes.filter((n) => isGeneratedItem("products", n.id)).map((n) => ({
         id: n.id,
         title: n.title,
         handle: n.handle,
@@ -680,7 +767,7 @@ export const loader = async ({ request }) => {
         if (!conn.pageInfo?.hasNextPage || !conn.pageInfo?.endCursor) break;
         afterCursor = conn.pageInfo.endCursor;
       }
-      allItems.push(...collectionNodes.map((n) => ({
+      allItems.push(...collectionNodes.filter((n) => isGeneratedItem("collections", n.id)).map((n) => ({
         id: n.id,
         title: n.title,
         handle: n.handle,
@@ -709,7 +796,7 @@ export const loader = async ({ request }) => {
         if (!conn.pageInfo?.hasNextPage || !conn.pageInfo?.endCursor) break;
         afterCursor = conn.pageInfo.endCursor;
       }
-      allItems.push(...pageNodes.map((n) => {
+      allItems.push(...pageNodes.filter((n) => isGeneratedItem("pages", n.id)).map((n) => {
         const mfMap = {};
         (n.metafields?.edges || []).forEach(({ node: mf }) => { mfMap[mf.key] = mf.value; });
         return {
@@ -732,7 +819,7 @@ export const loader = async ({ request }) => {
       const res = await admin.graphql(ARTICLES_QUERY, { variables: { first: 250 } });
       const json = await res.json();
       const edges = json?.data?.articles?.edges || [];
-      allItems.push(...edges.map(({ node: n }) => {
+      allItems.push(...edges.filter(({ node: n }) => isGeneratedItem("blog", n.id)).map(({ node: n }) => {
         const mfMap = {};
         (n.metafields?.edges || []).forEach(({ node: mf }) => { mfMap[mf.key] = mf.value; });
         return {
@@ -767,7 +854,7 @@ export const loader = async ({ request }) => {
         if (!conn.pageInfo?.hasNextPage || !conn.pageInfo?.endCursor) break;
         afterCursor = conn.pageInfo.endCursor;
       }
-      items = nodes.map((n) => ({
+      items = nodes.filter((n) => isGeneratedItem("products", n.id)).map((n) => ({
         id: n.id,
         title: n.title,
         handle: n.handle,
@@ -795,7 +882,7 @@ export const loader = async ({ request }) => {
         if (!conn.pageInfo?.hasNextPage || !conn.pageInfo?.endCursor) break;
         afterCursor = conn.pageInfo.endCursor;
       }
-      items = nodes.map((n) => ({
+      items = nodes.filter((n) => isGeneratedItem("collections", n.id)).map((n) => ({
         id: n.id,
         title: n.title,
         handle: n.handle,
@@ -823,7 +910,7 @@ export const loader = async ({ request }) => {
         if (!conn.pageInfo?.hasNextPage || !conn.pageInfo?.endCursor) break;
         afterCursor = conn.pageInfo.endCursor;
       }
-      items = nodes.map((n) => {
+      items = nodes.filter((n) => isGeneratedItem("pages", n.id)).map((n) => {
         const mfMap = {};
         (n.metafields?.edges || []).forEach(({ node: mf }) => { mfMap[mf.key] = mf.value; });
         return {
@@ -845,7 +932,7 @@ export const loader = async ({ request }) => {
       const res = await admin.graphql(ARTICLES_QUERY, { variables: { first: 250 } });
       const json = await res.json();
       const edges = json?.data?.articles?.edges || [];
-      items = edges.map(({ node: n }) => {
+      items = edges.filter(({ node: n }) => isGeneratedItem("blog", n.id)).map(({ node: n }) => {
         const mfMap = {};
         (n.metafields?.edges || []).forEach(({ node: mf }) => { mfMap[mf.key] = mf.value; });
         return {
@@ -884,6 +971,7 @@ export const loader = async ({ request }) => {
     items,
     credits,
     defaultAiProvider,
+    envAiModel,
     hasOpenaiKey: !!(shopData?.openaiApiKey || process.env.OPENAI_API_KEY),
     hasAnthropicKey: !!(shopData?.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
   };
@@ -925,6 +1013,8 @@ export const action = async ({ request }) => {
         ? "anthropic"
         : preferredModel.startsWith("gpt-")
           ? "openai"
+          : preferredModel.toLowerCase().includes("llama")
+            ? "ollama"
           : aiProvider;
     const generationLanguage = String(formData.get("language") || "English").trim() || "English";
     const seoKeyword = String(formData.get("seoKeyword") || "").trim();
@@ -1718,6 +1808,7 @@ function GenerateTemplateModal({
   contentType,
   generateScope,
   templateSelection,
+  aiModelOptions,
   formValues,
   previewText,
   progress,
@@ -1764,7 +1855,7 @@ function GenerateTemplateModal({
       open={open}
       onClose={onClose}
       title={`Generate ${itemTypeLabel} ${titleScope}`}
-      large
+      fullScreen
       primaryAction={{
         content: isGenerating ? "Generating..." : `Generate (${modalCredits} credits)`,
         onAction: onGenerate,
@@ -1853,7 +1944,7 @@ function GenerateTemplateModal({
               />
               <Select
                 label="AI model"
-                options={AI_MODEL_OPTIONS}
+                options={aiModelOptions}
                 value={formValues.aiModel}
                 onChange={(value) => onFormChange("aiModel", value)}
               />
@@ -1924,7 +2015,7 @@ function statusBadge(status) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ContentManagementPage() {
-  const { tab, filter, items, credits, defaultAiProvider } = useLoaderData();
+  const { tab, filter, items, credits, defaultAiProvider, envAiModel } = useLoaderData();
   const navigate = useNavigate();
   const shopify = useAppBridge();
   const generateFetcher = useFetcher();
@@ -1948,7 +2039,7 @@ export default function ContentManagementPage() {
     seoKeyword: "",
     additionalInformation: "",
     language: "English (US)",
-    aiModel: "gpt-4.1-mini",
+    aiModel: envAiModel || DEFAULT_AI_MODEL,
   });
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generatedPreviewText, setGeneratedPreviewText] = useState("");
@@ -2090,13 +2181,13 @@ export default function ContentManagementPage() {
         seoKeyword: item.title || "",
         additionalInformation: "",
         language: "English (US)",
-        aiModel: "gpt-4.1-mini",
+        aiModel: envAiModel || DEFAULT_AI_MODEL,
       });
       setGeneratedPreviewText("");
       setGenerationProgress(0);
       setTemplateModalOpen(true);
     },
-    [tab]
+    [envAiModel, tab]
   );
 
   const updateGenerateTemplateSelection = useCallback((field, value) => {
@@ -2164,6 +2255,7 @@ export default function ContentManagementPage() {
   ]);
 
   const isSaving = saveFetcher.state !== "idle";
+  const aiModelOptions = getAiModelOptions(envAiModel);
 
   const tabLabel = mainTabs[mainTabIndex]?.id || "all";
   const singularLabel = { products: "Product", collections: "Collection", pages: "Page", blog: "Blog" }[tabLabel] || "Item";
@@ -2320,7 +2412,7 @@ export default function ContentManagementPage() {
     <Page
       fullWidth
       title="Content Management"
-      subtitle="Manage and generate content with AI to attract more customers"
+      subtitle="Manage and generate content with AI to attract more customers (AI-generated records only)"
       primaryAction={
         <InlineStack gap="200" blockAlign="center">
           <button
@@ -2410,15 +2502,15 @@ export default function ContentManagementPage() {
           {/* Table */}
           {localItems.length === 0 ? (
             <EmptyState
-              heading={`No ${tabLabel} found`}
+              heading={`No AI-generated ${tabLabel} found`}
               image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
             >
               <Text as="p">
                 {filter === "empty"
-                  ? `All ${tabLabel} have descriptions.`
+                  ? `No AI-generated ${tabLabel} items match empty content filter.`
                   : filter === "unoptimized"
-                  ? `All ${tabLabel} are fully optimized.`
-                  : `No ${tabLabel} found in your store.`}
+                  ? `No AI-generated ${tabLabel} items match unoptimized filter.`
+                  : `No AI-generated ${tabLabel} records are available yet.`}
               </Text>
             </EmptyState>
           ) : (
@@ -2457,6 +2549,7 @@ export default function ContentManagementPage() {
         contentType={pendingGenerateContentType}
         generateScope={pendingGenerateScope}
         templateSelection={generateTemplateSelection}
+        aiModelOptions={aiModelOptions}
         formValues={generateFormValues}
         previewText={generatedPreviewText}
         progress={generationProgress}
