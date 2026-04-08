@@ -1507,7 +1507,16 @@ function RichTextEditor({ value, onChange }) {
 
   // Sync external value into editor on mount / when value prop changes from outside
   const lastValueRef = useRef(value);
+  const isHydratedRef = useRef(false);
+
   useEffect(() => {
+    isHydratedRef.current = true;
+    if (editorRef.current) editorRef.current.innerHTML = normalizeGeneratedHtml(value || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isHydratedRef.current) return;
     const normalizedValue = normalizeGeneratedHtml(value || "");
     if (lastValueRef.current !== value) {
       lastValueRef.current = value;
@@ -1517,12 +1526,6 @@ function RichTextEditor({ value, onChange }) {
       if (showSource) setSourceHtml(normalizedValue);
     }
   }, [value, showSource]);
-
-  // Initialise on mount
-  useEffect(() => {
-    if (editorRef.current) editorRef.current.innerHTML = normalizeGeneratedHtml(value || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const exec = useCallback((cmd, arg = null) => {
     if (!editorRef.current) return;
@@ -1797,14 +1800,18 @@ function EditorModal({ open, item, field, contentType, onClose, onSave, isSaving
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [activeTab, setActiveTab] = useState(field === "seo" ? 1 : 0);
+  const isHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (item) {
-      setDescHtml(item.descriptionHtml || "");
-      setSeoTitle(item.seoTitle || "");
-      setSeoDescription(item.seoDescription || "");
-      setActiveTab(field === "seo" ? 1 : 0);
-    }
+    isHydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!isHydratedRef.current || !item) return;
+    setDescHtml(item.descriptionHtml || "");
+    setSeoTitle(item.seoTitle || "");
+    setSeoDescription(item.seoDescription || "");
+    setActiveTab(field === "seo" ? 1 : 0);
   }, [item, field]);
 
   if (!item) return null;
@@ -1897,6 +1904,12 @@ function GenerateTemplateModal({
 }) {
   const [editablePreviewHtml, setEditablePreviewHtml] = useState("");
   const [editableMetaText, setEditableMetaText] = useState("");
+  const isHydratedRef = useRef(false);
+
+  useEffect(() => {
+    isHydratedRef.current = true;
+  }, []);
+
   if (!open || !item) return null;
 
   const config = getGenerateTemplateConfig(contentType);
@@ -1922,7 +1935,7 @@ function GenerateTemplateModal({
   const itemTypeLabel = getContentTypeDisplayLabel(contentType);
   const titleScope = scopeLabel === "All" ? "content" : scopeLabel.toLowerCase();
   useEffect(() => {
-    if (!open || !item) return;
+    if (!isHydratedRef.current || !open || !item) return;
     if (showMain) {
       setEditablePreviewHtml(normalizeGeneratedHtml(previewText || item.descriptionHtml || ""));
       setEditableMetaText("");
@@ -2195,6 +2208,7 @@ export default function ContentManagementPage() {
 
   // Handle generate response
   useEffect(() => {
+    if (!isHydratedRef.current) return;
     if (generateFetcher.state !== "idle") return;
     const data = generateFetcher.data;
     if (!data || data.intent !== "generate_single") return;
@@ -2227,9 +2241,10 @@ export default function ContentManagementPage() {
       setErrorMessage(data.error || "Generation failed.");
       setGenerationProgress(0);
     }
-  }, [generateFetcher.state, generateFetcher.data, pendingGenerateScope, shopify]);
+  }, [generateFetcher.state, generateFetcher.data, pendingGenerateScope]);
 
   useEffect(() => {
+    if (!isHydratedRef.current) return undefined;
     if (generateFetcher.state === "idle") return undefined;
     setGenerationProgress(12);
     const timer = setInterval(() => {
@@ -2240,6 +2255,7 @@ export default function ContentManagementPage() {
 
   // Handle save response
   useEffect(() => {
+    if (!isHydratedRef.current) return;
     if (saveFetcher.state !== "idle") return;
     const data = saveFetcher.data;
     if (!data || data.intent !== "save_content") return;
@@ -2261,7 +2277,7 @@ export default function ContentManagementPage() {
     } else {
       setErrorMessage(data.error || "Save failed.");
     }
-  }, [editorOpen, saveFetcher.state, saveFetcher.data, shopify, templateModalOpen]);
+  }, [editorOpen, saveFetcher.state, saveFetcher.data, templateModalOpen]);
 
   const mainTabs = [
     { id: "all", content: "All" },
