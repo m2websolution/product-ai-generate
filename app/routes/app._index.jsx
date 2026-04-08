@@ -530,7 +530,7 @@ export default function Index() {
                       </div>
                     </Grid.Cell>
                     <Grid.Cell>
-                      <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "6px", textAlign: "center", background: "#fafafa" }}>
+                      <div style={{  textAlign: "center"}}>
                         <BlockStack gap="100" align="center">
                           <Text variant="bodySm" fontWeight="semibold" as="span">Need Quick Help?</Text>
                           <InlineStack gap="200" distribute="center" justifyContent="center">
@@ -545,7 +545,7 @@ export default function Index() {
               </div>
 
               {/* Box 3: Review (small) */}
-              <div className="support-help-box support-help-box--small" style={{ borderRadius: "8px", padding: "6px", textAlign: "center" }}>
+              <div className="support-help-box support-help-box--small" style={{ borderRadius: "8px", padding: "40px", textAlign: "center",border: "1px solid #e4e5e7", background: "#ffffff"  }}>
                 <BlockStack gap="200" align="center">
                   <div style={{ width: 52, height: 52, borderRadius: 10, background: "linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
                     <Icon source={StarFilledIcon} tone="base" />
