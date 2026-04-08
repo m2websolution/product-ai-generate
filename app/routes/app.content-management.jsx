@@ -1863,7 +1863,6 @@ function GenerateTemplateModal({
       open={open}
       onClose={onClose}
       title={`Generate ${itemTypeLabel} ${titleScope}`}
-      fullScreen
       className="content-mgmt-generate-modal"
       primaryAction={{
         content: isGenerating ? "Generating..." : `Generate (${modalCredits} credits)`,
@@ -1874,7 +1873,7 @@ function GenerateTemplateModal({
       secondaryActions={[{ content: "Cancel", onAction: onClose, disabled: isGenerating }]}
     >
       <Modal.Section>
-        <BlockStack gap="300">
+        <BlockStack gap="300" className="content-mgmt-generate-modal__content">
           <Text as="p" variant="bodySm" tone="subdued">
             Select templates and options. Credits are deducted only after successful generation.
           </Text>
@@ -1886,12 +1885,12 @@ function GenerateTemplateModal({
             </BlockStack>
           ) : null}
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) minmax(320px, 2fr)", gap: "16px" }}>
+          <div className="content-mgmt-generate-modal__grid">
             <BlockStack gap="300">
               <Card>
                 <BlockStack gap="200">
                   <Text as="p" variant="headingSm">{itemTypeLabel[0].toUpperCase() + itemTypeLabel.slice(1)}</Text>
-                  <div style={{ border: "1px solid #e1e3e5", borderRadius: "12px", padding: "12px" }}>
+                  <div className="content-mgmt-generate-modal__item">
                     <InlineStack gap="300" blockAlign="center" wrap={false}>
                       {item.imageUrl ? (
                         <Thumbnail source={item.imageUrl} alt={item.imageAlt || item.title} size="small" />
@@ -1960,16 +1959,7 @@ function GenerateTemplateModal({
             </BlockStack>
 
             <Card>
-              <div
-                style={{
-                  minHeight: "440px",
-                  border: "1px solid #e1e3e5",
-                  borderRadius: "12px",
-                  padding: "16px",
-                  overflowY: "auto",
-                  background: "#ffffff",
-                }}
-              >
+              <div className="content-mgmt-generate-modal__preview">
                 {showMain ? (
                   previewHtml ? (
                     <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
