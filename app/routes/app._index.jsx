@@ -505,7 +505,6 @@ export default function Index() {
                       <Text variant="bodySm" fontWeight="semibold">Need Quick Help?</Text>
                       <InlineStack gap="200">
                         <Button url="#" variant="primary" size="slim">WhatsApp</Button>
-                        <Button url="#" variant="primary" size="slim">Live Chat</Button>
                       </InlineStack>
                     </BlockStack>
                   </BlockStack>
