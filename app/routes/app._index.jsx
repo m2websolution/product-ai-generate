@@ -514,7 +514,7 @@ export default function Index() {
                       </div>
                     </Grid.Cell>
                     <Grid.Cell>
-                      <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "16px", textAlign: "center", background: "#fafafa" }}>
+                      <div style={{ textAlign: "center"}}>
                         <BlockStack gap="100" align="center">
                           <Icon source={QuestionCircleIcon} tone="interactive" />
                           <Text variant="bodySm" fontWeight="semibold" as="span">
@@ -530,7 +530,7 @@ export default function Index() {
                       </div>
                     </Grid.Cell>
                     <Grid.Cell>
-                      <div style={{ border: "1px solid #e4e5e7", borderRadius: "8px", padding: "16px", textAlign: "center", background: "#fafafa" }}>
+                      <div style={{ textAlign: "center"}}>
                         <BlockStack gap="100" align="center">
                           <Text variant="bodySm" fontWeight="semibold" as="span">Need Quick Help?</Text>
                           <InlineStack gap="200" distribute="center">
@@ -553,7 +553,7 @@ export default function Index() {
                   <Text variant="headingSm" as="h3" fontWeight="bold" alignment="center">
                     Motivate our team for future app development
                   </Text>
-                  <InlineStack gap="200" distribute="center">
+                  <InlineStack gap="200" distribute="center" justifyContent="center">
                     <Button variant="primary" size="slim" onClick={() => {}}>Write a review</Button>
                     <Button size="slim" onClick={() => {}}>Report an issue</Button>
                   </InlineStack>
