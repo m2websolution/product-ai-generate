@@ -16,7 +16,6 @@ import {
   Tabs,
   Text,
   TextField,
-  Thumbnail,
 } from "@shopify/polaris";
 import {
   PRODUCT_DESCRIPTION_TEMPLATES,
@@ -1724,7 +1723,6 @@ export default function ContentManagementPage() {
   const singularLabel = { products: "Product", collections: "Collection", pages: "Page", blog: "Blog" }[tabLabel] || "Item";
 
   const headings = [
-    { title: "" },
     { title: singularLabel },
     { title: "Credits Used" },
     { title: "Status" },
@@ -1741,28 +1739,11 @@ export default function ContentManagementPage() {
 
     return (
       <IndexTable.Row id={item.id} key={item.id} position={idx}>
-        {/* Thumbnail */}
-        <IndexTable.Cell>
-          {item.imageUrl ? (
-            <Thumbnail source={item.imageUrl} alt={item.imageAlt} size="small" />
-          ) : (
-            <div
-              style={{
-                width: "40px", height: "40px", borderRadius: "6px",
-                background: "#f6f6f7", border: "1px solid #e1e3e5",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="#8c9196">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2H5v2h2V5zm2 0h2v2h-2V5zm4 0h2v2h-2V5zM5 9h2v2H5V9zm4 0h2v2H9V9zm4 0h2v2h-2V9zM5 13h10v2H5v-2z" clipRule="evenodd"/>
-              </svg>
-            </div>
-          )}
-        </IndexTable.Cell>
-
         {/* Name */}
         <IndexTable.Cell>
-          <Text variant="bodyMd" fontWeight="semibold" as="span">{item.title}</Text>
+          <div className="content-mgmt-title-cell" title={item.title}>
+            {item.title}
+          </div>
         </IndexTable.Cell>
 
         {/* Credits used */}
@@ -1913,49 +1894,66 @@ export default function ContentManagementPage() {
 
         {/* Main tabs: Products | Collections | Pages | Blog */}
         <Card padding="0">
-          <Tabs
-            tabs={mainTabs}
-            selected={mainTabIndex < 0 ? 0 : mainTabIndex}
-            onSelect={handleMainTabChange}
-            fitted
-          >
-            {/* Filter sub-tabs */}
-            <Box paddingBlockStart="0">
-              <div style={{ borderBottom: "1px solid #e1e3e5", paddingInline: "16px" }}>
-                <Tabs
-                  tabs={filterTabs}
-                  selected={filterTabIndex < 0 ? 0 : filterTabIndex}
-                  onSelect={handleFilterTabChange}
-                  fitted
-                />
-              </div>
+          <Box padding="300" paddingBlockEnd="200">
+            <BlockStack gap="300">
+              <InlineStack gap="200" wrap>
+                {mainTabs.map((tabItem, idx) => {
+                  const selected = idx === (mainTabIndex < 0 ? 0 : mainTabIndex);
+                  return (
+                    <button
+                      key={tabItem.id}
+                      type="button"
+                      onClick={() => handleMainTabChange(idx)}
+                      className={`content-mgmt-tab-btn${selected ? " content-mgmt-tab-btn--active" : ""}`}
+                    >
+                      {tabItem.content}
+                    </button>
+                  );
+                })}
+              </InlineStack>
 
-              {/* Table */}
-              {localItems.length === 0 ? (
-                <EmptyState
-                  heading={`No ${tabLabel} found`}
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                  <Text as="p">
-                    {filter === "empty"
-                      ? `All ${tabLabel} have descriptions.`
-                      : filter === "unoptimized"
-                      ? `All ${tabLabel} are fully optimized.`
-                      : `No ${tabLabel} found in your store.`}
-                  </Text>
-                </EmptyState>
-              ) : (
-                <IndexTable
-                  resourceName={{ singular: singularLabel, plural: tabLabel }}
-                  itemCount={localItems.length}
-                  headings={headings}
-                  selectable={false}
-                >
-                  {rowMarkup}
-                </IndexTable>
-              )}
-            </Box>
-          </Tabs>
+              <InlineStack gap="200" wrap>
+                {filterTabs.map((tabItem, idx) => {
+                  const selected = idx === (filterTabIndex < 0 ? 0 : filterTabIndex);
+                  return (
+                    <button
+                      key={tabItem.id}
+                      type="button"
+                      onClick={() => handleFilterTabChange(idx)}
+                      className={`content-mgmt-tab-btn${selected ? " content-mgmt-tab-btn--active" : ""}`}
+                    >
+                      {tabItem.content}
+                    </button>
+                  );
+                })}
+              </InlineStack>
+            </BlockStack>
+          </Box>
+
+          {/* Table */}
+          {localItems.length === 0 ? (
+            <EmptyState
+              heading={`No ${tabLabel} found`}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <Text as="p">
+                {filter === "empty"
+                  ? `All ${tabLabel} have descriptions.`
+                  : filter === "unoptimized"
+                  ? `All ${tabLabel} are fully optimized.`
+                  : `No ${tabLabel} found in your store.`}
+              </Text>
+            </EmptyState>
+          ) : (
+            <IndexTable
+              resourceName={{ singular: singularLabel, plural: tabLabel }}
+              itemCount={localItems.length}
+              headings={headings}
+              selectable={false}
+            >
+              {rowMarkup}
+            </IndexTable>
+          )}
         </Card>
 
         {/* Credit info footer */}
