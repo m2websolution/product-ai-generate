@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useLoaderData, useSearchParams, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import {
-  Page, Card, BlockStack, InlineStack, Text, Badge, Divider, Box, Grid, Button, Layout, Icon,
+  Page, Card, BlockStack, InlineStack, Text, Badge, Divider, Box, Grid, Button, Layout, Icon, Tabs, Select,
 } from "@shopify/polaris";
 import {
   FolderIcon, TargetIcon, AutomationIcon, CalendarIcon,
@@ -218,6 +218,7 @@ export const loader = async ({ request }) => {
     creditsUsedInRange,
     generationByResource,
     recentLogs: recentLogs.map(l => ({ ...l, id: l.id.toString(), createdAt: l.createdAt.toISOString() })),
+    rangeLogs: rangeLogs.map(l => ({ ...l, id: l.id.toString(), createdAt: l.createdAt.toISOString() })),
     dailyActivity,
     rangeParam, startDate, endDate, rangeLabel,
   };
@@ -872,19 +873,108 @@ const INTENT_LABEL = {
   blog_create_article: "Create Blog Article",
 };
 
+const RESOURCE_TABS = [
+  { id: "all", content: "All" },
+  { id: "product", content: "Product" },
+  { id: "collection", content: "Collection" },
+  { id: "page", content: "Pages" },
+  { id: "blog", content: "Blogs" },
+];
+
+const GENERATE_TYPE_OPTIONS = [
+  { label: "All Generate", value: "all" },
+  { label: "Description", value: "description" },
+  { label: "Content", value: "content" },
+  { label: "Meta Title", value: "meta_title" },
+  { label: "Meta Description", value: "meta_description" },
+];
+
+function matchesGenerateType(intentValue, generateType) {
+  if (generateType === "all") return true;
+  const intent = String(intentValue || "").toLowerCase();
+
+  if (generateType === "meta_title") {
+    return intent.includes("seo_title") || intent.includes("meta_title");
+  }
+  if (generateType === "meta_description") {
+    return intent.includes("seo_description") || intent.includes("meta_description");
+  }
+  if (generateType === "description") {
+    return intent.includes("generate_description");
+  }
+  if (generateType === "content") {
+    return (
+      intent.includes("generate_all") ||
+      intent.includes("bulk_generate") ||
+      intent.includes("create_article") ||
+      intent.includes("content_management")
+    );
+  }
+  return true;
+}
+
 export default function AnalyticsPage() {
   const {
     products, collections, pages, articles,
     seoScore, totalGenerations, rangeGenerations,
     creditsBalance, creditsUsedAllTime, creditsUsedInRange, generationByResource,
-    recentLogs, dailyActivity,
+    recentLogs, rangeLogs, dailyActivity,
     rangeParam, startDate, endDate, rangeLabel,
   } = useLoaderData();
 
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(null);
+  const [resourceFilter, setResourceFilter] = useState("all");
+  const [generateTypeFilter, setGenerateTypeFilter] = useState("all");
   const handleDayClick = useCallback(date => setSelectedDate(p => p === date ? null : date), []);
   const activityRef = useRef(null);
+  const resourceTabIndex = RESOURCE_TABS.findIndex((tab) => tab.id === resourceFilter);
+
+  const filteredRangeLogs = useMemo(() => {
+    return rangeLogs.filter((log) => {
+      const resourceOk = resourceFilter === "all" ? true : log.resourceType === resourceFilter;
+      const typeOk = matchesGenerateType(log.intent, generateTypeFilter);
+      return resourceOk && typeOk;
+    });
+  }, [generateTypeFilter, rangeLogs, resourceFilter]);
+
+  const filteredDailyActivity = useMemo(() => {
+    const counts = buildDailyMap(startDate, endDate);
+    const applied = buildDailyMap(startDate, endDate);
+    const credits = buildDailyMap(startDate, endDate);
+    for (const log of filteredRangeLogs) {
+      const key = toDateStr(new Date(log.createdAt));
+      if (!(key in counts)) continue;
+      counts[key] += 1;
+      credits[key] = (credits[key] || 0) + Number(log.creditsUsed || 0);
+      if (log.appliedToProduct) applied[key] += 1;
+    }
+    return Object.entries(counts).map(([date, count]) => ({
+      date,
+      count,
+      applied: applied[date] || 0,
+      creditsUsed: credits[date] || 0,
+      label: new Date(date + "T12:00:00").toLocaleDateString("en-GB"),
+    }));
+  }, [endDate, filteredRangeLogs, startDate]);
+
+  const filteredGenerationByResource = useMemo(() => {
+    const resourceMap = { product: 0, collection: 0, page: 0, blog: 0 };
+    for (const log of filteredRangeLogs) {
+      resourceMap[log.resourceType] = (resourceMap[log.resourceType] || 0) + 1;
+    }
+    return resourceMap;
+  }, [filteredRangeLogs]);
+
+  const filteredCreditsUsedInRange = useMemo(
+    () => filteredRangeLogs.reduce((sum, log) => sum + Number(log.creditsUsed || 0), 0),
+    [filteredRangeLogs],
+  );
+
+  const filteredRecentLogs = useMemo(
+    () => [...filteredRangeLogs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10),
+    [filteredRangeLogs],
+  );
 
   const actions = [
     products.total    - products.withSeoTitle    > 0 && { label: `${products.total    - products.withSeoTitle} products missing SEO title`,    url: "/app/products"    },
@@ -896,8 +986,8 @@ export default function AnalyticsPage() {
 
   const storeTotal   = products.total + collections.total + pages.total + articles.total;
   const coverageColor = seoScore >= 70 ? "#008060" : seoScore >= 40 ? "#B98900" : "#C9201F";
-  const bestDay      = Math.max(...dailyActivity.map(d => d.count), 0);
-  const activeDays   = dailyActivity.filter(d => d.count > 0).length;
+  const bestDay      = Math.max(...filteredDailyActivity.map(d => d.count), 0);
+  const activeDays   = filteredDailyActivity.filter(d => d.count > 0).length;
 
   return (
     <Page
@@ -946,31 +1036,45 @@ export default function AnalyticsPage() {
               <DateRangePicker rangeParam={rangeParam} startDate={startDate} endDate={endDate} containerRef={activityRef} />
             </InlineStack>
 
+            <Tabs
+              tabs={RESOURCE_TABS}
+              selected={resourceTabIndex < 0 ? 0 : resourceTabIndex}
+              onSelect={(idx) => {
+                const next = RESOURCE_TABS[idx]?.id || "all";
+                setResourceFilter(next);
+                setSelectedDate(null);
+              }}
+            />
+
+            <Select
+              label="Specific generate filter"
+              options={GENERATE_TYPE_OPTIONS}
+              value={generateTypeFilter}
+              onChange={(value) => {
+                setGenerateTypeFilter(value);
+                setSelectedDate(null);
+              }}
+            />
+
             {/* Quick day buttons */}
             <InlineStack gap="200" wrap>
-              {["7", "14", "30"].map(days => (
-                <a
+              {["7", "14", "30"].map((days) => (
+                <Button
                   key={days}
-                  href={`?range=${days}`}
-                  style={{
-                    display: "inline-block", padding: "4px 14px",
-                    borderRadius: 6, textDecoration: "none",
-                    border: `1px solid ${rangeParam === days ? S1_COLOR : "#C9CCCF"}`,
-                    background: rangeParam === days ? S1_COLOR : "white",
-                    color: rangeParam === days ? "white" : "#202223",
-                    fontSize: 13, fontWeight: rangeParam === days ? 600 : 400,
-                  }}
+                  size="slim"
+                  variant={rangeParam === days ? "primary" : "secondary"}
+                  url={`?range=${days}`}
                 >
                   {days}d
-                </a>
+                </Button>
               ))}
             </InlineStack>
 
             {/* Chart — always shown with dates, flat line when no activity */}
-            <AreaLineChart data={dailyActivity} selectedDate={selectedDate} onDayClick={handleDayClick} />
+            <AreaLineChart data={filteredDailyActivity} selectedDate={selectedDate} onDayClick={handleDayClick} />
 
             {/* Day detail */}
-            {selectedDate && <DayDetailPanel date={selectedDate} recentLogs={recentLogs} />}
+            {selectedDate && <DayDetailPanel date={selectedDate} recentLogs={filteredRangeLogs} />}
           </BlockStack>
         </Card>
         </div>
@@ -1055,12 +1159,12 @@ export default function AnalyticsPage() {
                 <Divider />
                 <BlockStack gap="300">
                   {[
-                    { label: rangeLabel,         val: rangeGenerations },
-                    { label: `${rangeLabel} credits`, val: creditsUsedInRange },
+                    { label: rangeLabel,         val: filteredRangeLogs.length },
+                    { label: `${rangeLabel} credits`, val: filteredCreditsUsedInRange },
                     { label: "All-time credits", val: creditsUsedAllTime },
                     { label: "Credits left",     val: creditsBalance },
                     { label: "Best single day",  val: bestDay },
-                    { label: "Active days",      val: `${activeDays} / ${dailyActivity.length}` },
+                    { label: "Active days",      val: `${activeDays} / ${filteredDailyActivity.length}` },
                   ].map(({ label, val }) => (
                     <InlineStack key={label} align="space-between">
                       <Text variant="bodySm" as="span">{label}</Text>
@@ -1071,10 +1175,10 @@ export default function AnalyticsPage() {
                 <Divider />
                 <BlockStack gap="200">
                   {[
-                    { label: "Products", val: generationByResource.product || 0 },
-                    { label: "Collections", val: generationByResource.collection || 0 },
-                    { label: "Pages", val: generationByResource.page || 0 },
-                    { label: "Blogs", val: generationByResource.blog || 0 },
+                    { label: "Products", val: filteredGenerationByResource.product || 0 },
+                    { label: "Collections", val: filteredGenerationByResource.collection || 0 },
+                    { label: "Pages", val: filteredGenerationByResource.page || 0 },
+                    { label: "Blogs", val: filteredGenerationByResource.blog || 0 },
                   ].map(({ label, val }) => (
                     <InlineStack key={label} align="space-between">
                       <Text variant="bodySm" tone="subdued" as="span">{label}</Text>
@@ -1092,12 +1196,12 @@ export default function AnalyticsPage() {
           </Layout.Section>
 
           <Layout.Section>
-            {recentLogs.length > 0 && (
+            {filteredRecentLogs.length > 0 && (
               <Card>
                 <BlockStack gap="400">
                   <Text variant="headingMd" as="h2">Recent AI Generations</Text>
                   <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #E4E5E7" }}>
-                    {recentLogs.map((log, i) => (
+                    {filteredRecentLogs.map((log, i) => (
                       <div key={log.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: i % 2 === 0 ? "#FAFAFA" : "white", gap: 12, flexWrap: "wrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
                           <Text variant="bodyMd" fontWeight="semibold" as="span">{log.productTitle || "Untitled"}</Text>

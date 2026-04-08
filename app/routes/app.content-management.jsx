@@ -18,6 +18,26 @@ import {
   TextField,
   Thumbnail,
 } from "@shopify/polaris";
+import {
+  PRODUCT_DESCRIPTION_TEMPLATES,
+  PRODUCT_META_DESCRIPTION_TEMPLATES,
+  PRODUCT_META_TITLE_TEMPLATES,
+} from "../lib/productPromptTemplateLibrary";
+import {
+  COLLECTION_DESCRIPTION_TEMPLATES,
+  COLLECTION_META_DESCRIPTION_TEMPLATES,
+  COLLECTION_META_TITLE_TEMPLATES,
+} from "../lib/collectionPromptTemplateLibrary";
+import {
+  PAGE_BODY_TEMPLATES,
+  PAGE_META_DESCRIPTION_TEMPLATES,
+  PAGE_META_TITLE_TEMPLATES,
+} from "../lib/pagePromptTemplateLibrary";
+import {
+  BLOG_BODY_TEMPLATES,
+  BLOG_META_DESCRIPTION_TEMPLATES,
+  BLOG_META_TITLE_TEMPLATES,
+} from "../lib/blogPromptTemplateLibrary";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -334,7 +354,7 @@ async function runGeneration(prompt, { aiProvider = "auto", shopOpenaiKey = null
   }
 }
 
-function buildPrompt(contentType, item) {
+function buildPrompt(contentType, item, templateOverrides = {}) {
   const base = {
     language: "English",
     tone: "Neutral",
@@ -354,6 +374,9 @@ function buildPrompt(contentType, item) {
       descriptionText: stripHtml(item.descriptionHtml || ""),
       seoTitle: item.seoTitle || "",
       seoDescription: item.seoDescription || "",
+      descriptionPromptTemplate: templateOverrides.descriptionPromptTemplate || "",
+      metaTitlePromptTemplate: templateOverrides.metaTitlePromptTemplate || "",
+      metaDescriptionPromptTemplate: templateOverrides.metaDescriptionPromptTemplate || "",
     });
   }
   if (contentType === "collections") {
@@ -363,6 +386,9 @@ function buildPrompt(contentType, item) {
       descriptionText: stripHtml(item.descriptionHtml || ""),
       seoTitle: item.seoTitle || "",
       seoDescription: item.seoDescription || "",
+      descriptionPromptTemplate: templateOverrides.descriptionPromptTemplate || "",
+      metaTitlePromptTemplate: templateOverrides.metaTitlePromptTemplate || "",
+      metaDescriptionPromptTemplate: templateOverrides.metaDescriptionPromptTemplate || "",
     });
   }
   if (contentType === "pages") {
@@ -375,9 +401,9 @@ function buildPrompt(contentType, item) {
       length: "Medium",
       format: "Mixed headings and paragraphs",
       contextKeywords: "",
-      bodyPromptTemplate: "",
-      metaTitlePromptTemplate: "",
-      metaDescriptionPromptTemplate: "",
+      bodyPromptTemplate: templateOverrides.bodyPromptTemplate || "",
+      metaTitlePromptTemplate: templateOverrides.metaTitlePromptTemplate || "",
+      metaDescriptionPromptTemplate: templateOverrides.metaDescriptionPromptTemplate || "",
     });
   }
   if (contentType === "blog") {
@@ -390,12 +416,52 @@ function buildPrompt(contentType, item) {
       length: "Medium",
       format: "Mixed headings and paragraphs",
       contextKeywords: "",
-      bodyPromptTemplate: "",
-      metaTitlePromptTemplate: "",
-      metaDescriptionPromptTemplate: "",
+      bodyPromptTemplate: templateOverrides.bodyPromptTemplate || "",
+      metaTitlePromptTemplate: templateOverrides.metaTitlePromptTemplate || "",
+      metaDescriptionPromptTemplate: templateOverrides.metaDescriptionPromptTemplate || "",
     });
   }
   throw new Error(`Unknown content type: ${contentType}`);
+}
+
+function getGenerateTemplateConfig(contentType) {
+  if (contentType === "products") {
+    return {
+      mainLabel: "Description Template",
+      mainTemplates: PRODUCT_DESCRIPTION_TEMPLATES,
+      metaTitleTemplates: PRODUCT_META_TITLE_TEMPLATES,
+      metaDescriptionTemplates: PRODUCT_META_DESCRIPTION_TEMPLATES,
+      mainPromptKey: "descriptionPromptTemplate",
+    };
+  }
+  if (contentType === "collections") {
+    return {
+      mainLabel: "Description Template",
+      mainTemplates: COLLECTION_DESCRIPTION_TEMPLATES,
+      metaTitleTemplates: COLLECTION_META_TITLE_TEMPLATES,
+      metaDescriptionTemplates: COLLECTION_META_DESCRIPTION_TEMPLATES,
+      mainPromptKey: "descriptionPromptTemplate",
+    };
+  }
+  if (contentType === "pages") {
+    return {
+      mainLabel: "Content Template",
+      mainTemplates: PAGE_BODY_TEMPLATES,
+      metaTitleTemplates: PAGE_META_TITLE_TEMPLATES,
+      metaDescriptionTemplates: PAGE_META_DESCRIPTION_TEMPLATES,
+      mainPromptKey: "bodyPromptTemplate",
+    };
+  }
+  if (contentType === "blog") {
+    return {
+      mainLabel: "Content Template",
+      mainTemplates: BLOG_BODY_TEMPLATES,
+      metaTitleTemplates: BLOG_META_TITLE_TEMPLATES,
+      metaDescriptionTemplates: BLOG_META_DESCRIPTION_TEMPLATES,
+      mainPromptKey: "bodyPromptTemplate",
+    };
+  }
+  return null;
 }
 
 // ─── Loader ───────────────────────────────────────────────────────────────────
@@ -785,9 +851,15 @@ export const action = async ({ request }) => {
     try { item = JSON.parse(itemJson || "{}"); } catch { item = {}; }
 
     const aiProvider = formData.get("aiProvider") || shopData?.defaultAiProvider || "auto";
+    const templateOverrides = {
+      descriptionPromptTemplate: String(formData.get("descriptionPromptTemplate") || ""),
+      bodyPromptTemplate: String(formData.get("bodyPromptTemplate") || ""),
+      metaTitlePromptTemplate: String(formData.get("metaTitlePromptTemplate") || ""),
+      metaDescriptionPromptTemplate: String(formData.get("metaDescriptionPromptTemplate") || ""),
+    };
 
     try {
-      const prompt = buildPrompt(contentType, item);
+      const prompt = buildPrompt(contentType, item, templateOverrides);
       const generated = await runGeneration(prompt, {
         aiProvider,
         shopOpenaiKey: shopData?.openaiApiKey || null,
@@ -1307,6 +1379,7 @@ function EditorModal({ open, item, field, contentType, onClose, onSave, isSaving
       descriptionHtml: descHtml,
       seoTitle,
       seoDescription,
+      contentType: item.contentType || contentType,
     });
   };
 
@@ -1363,6 +1436,76 @@ function EditorModal({ open, item, field, contentType, onClose, onSave, isSaving
   );
 }
 
+function GenerateTemplateModal({
+  open,
+  item,
+  contentType,
+  templateSelection,
+  onChange,
+  onClose,
+  onGenerate,
+  isGenerating,
+}) {
+  if (!open || !item) return null;
+
+  const config = getGenerateTemplateConfig(contentType);
+  if (!config) return null;
+
+  const mainOptions = [
+    { label: `Default (${config.mainLabel})`, value: "" },
+    ...config.mainTemplates.map((template) => ({ label: template.name, value: template.id })),
+  ];
+  const metaTitleOptions = [
+    { label: "Default (Meta Title)", value: "" },
+    ...config.metaTitleTemplates.map((template) => ({ label: template.name, value: template.id })),
+  ];
+  const metaDescriptionOptions = [
+    { label: "Default (Meta Description)", value: "" },
+    ...config.metaDescriptionTemplates.map((template) => ({ label: template.name, value: template.id })),
+  ];
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Generate: ${item.title}`}
+      primaryAction={{
+        content: isGenerating ? "Generating..." : `Generate (${CREDITS_PER_GENERATION} credits)`,
+        onAction: onGenerate,
+        loading: isGenerating,
+        disabled: isGenerating,
+      }}
+      secondaryActions={[{ content: "Cancel", onAction: onClose, disabled: isGenerating }]}
+    >
+      <Modal.Section>
+        <BlockStack gap="300">
+          <Text as="p" variant="bodySm" tone="subdued">
+            Select templates for this generation. Credits are deducted only after a successful generation.
+          </Text>
+          <Select
+            label={config.mainLabel}
+            options={mainOptions}
+            value={templateSelection.mainTemplateId}
+            onChange={(value) => onChange("mainTemplateId", value)}
+          />
+          <Select
+            label="Meta Title Template"
+            options={metaTitleOptions}
+            value={templateSelection.metaTitleTemplateId}
+            onChange={(value) => onChange("metaTitleTemplateId", value)}
+          />
+          <Select
+            label="Meta Description Template"
+            options={metaDescriptionOptions}
+            value={templateSelection.metaDescriptionTemplateId}
+            onChange={(value) => onChange("metaDescriptionTemplateId", value)}
+          />
+        </BlockStack>
+      </Modal.Section>
+    </Modal>
+  );
+}
+
 // ─── Client helpers ───────────────────────────────────────────────────────────
 function truncateText(text, max = 80) {
   const plain = (text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -1405,6 +1548,14 @@ export default function ContentManagementPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorItem, setEditorItem] = useState(null);
   const [editorField, setEditorField] = useState("description");
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [pendingGenerateItem, setPendingGenerateItem] = useState(null);
+  const [pendingGenerateContentType, setPendingGenerateContentType] = useState(tab === "all" ? "products" : tab);
+  const [generateTemplateSelection, setGenerateTemplateSelection] = useState({
+    mainTemplateId: "",
+    metaTitleTemplateId: "",
+    metaDescriptionTemplateId: "",
+  });
 
   // Track per-row generating state
   const [generatingId, setGeneratingId] = useState(null);
@@ -1423,6 +1574,7 @@ export default function ContentManagementPage() {
     const data = generateFetcher.data;
     if (!data || data.intent !== "generate_single") return;
     setGeneratingId(null);
+    setPendingGenerateItem(null);
     if (data.ok) {
       setLocalCredits(data.newCredits);
       setLocalItems((prev) =>
@@ -1493,10 +1645,10 @@ export default function ContentManagementPage() {
   }, []);
 
   const handleSaveContent = useCallback(
-    ({ itemId, descriptionHtml, seoTitle, seoDescription }) => {
+    ({ itemId, descriptionHtml, seoTitle, seoDescription, contentType }) => {
       const fd = new FormData();
       fd.append("intent", "save_content");
-      fd.append("contentType", tab);
+      fd.append("contentType", contentType || tab);
       fd.append("itemId", itemId);
       fd.append("descriptionHtml", descriptionHtml);
       fd.append("seoTitle", seoTitle);
@@ -1508,17 +1660,59 @@ export default function ContentManagementPage() {
 
   const handleGenerate = useCallback(
     (item) => {
-      setErrorMessage(null);
-      setGeneratingId(item.id);
-      const fd = new FormData();
-      fd.append("intent", "generate_single");
-      fd.append("contentType", tab);
-      fd.append("item", JSON.stringify(item));
-      fd.append("aiProvider", defaultAiProvider || "auto");
-      generateFetcher.submit(fd, { method: "post" });
+      const effectiveContentType = item.contentType || tab;
+      setPendingGenerateItem(item);
+      setPendingGenerateContentType(effectiveContentType);
+      setGenerateTemplateSelection({
+        mainTemplateId: "",
+        metaTitleTemplateId: "",
+        metaDescriptionTemplateId: "",
+      });
+      setTemplateModalOpen(true);
     },
-    [generateFetcher, tab, defaultAiProvider]
+    [tab]
   );
+
+  const updateGenerateTemplateSelection = useCallback((field, value) => {
+    setGenerateTemplateSelection((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleConfirmGenerate = useCallback(() => {
+    if (!pendingGenerateItem) return;
+    const config = getGenerateTemplateConfig(pendingGenerateContentType);
+    const mainTemplate =
+      config?.mainTemplates.find((template) => template.id === generateTemplateSelection.mainTemplateId)?.template || "";
+    const metaTitleTemplate =
+      config?.metaTitleTemplates.find((template) => template.id === generateTemplateSelection.metaTitleTemplateId)?.template || "";
+    const metaDescriptionTemplate =
+      config?.metaDescriptionTemplates.find((template) => template.id === generateTemplateSelection.metaDescriptionTemplateId)?.template || "";
+
+    setErrorMessage(null);
+    setGeneratingId(pendingGenerateItem.id);
+    setTemplateModalOpen(false);
+
+    const fd = new FormData();
+    fd.append("intent", "generate_single");
+    fd.append("contentType", pendingGenerateContentType);
+    fd.append("item", JSON.stringify(pendingGenerateItem));
+    fd.append("aiProvider", defaultAiProvider || "auto");
+    fd.append("metaTitlePromptTemplate", metaTitleTemplate);
+    fd.append("metaDescriptionPromptTemplate", metaDescriptionTemplate);
+    if (config?.mainPromptKey === "bodyPromptTemplate") {
+      fd.append("bodyPromptTemplate", mainTemplate);
+    } else {
+      fd.append("descriptionPromptTemplate", mainTemplate);
+    }
+    generateFetcher.submit(fd, { method: "post" });
+  }, [
+    defaultAiProvider,
+    generateFetcher,
+    generateTemplateSelection.mainTemplateId,
+    generateTemplateSelection.metaDescriptionTemplateId,
+    generateTemplateSelection.metaTitleTemplateId,
+    pendingGenerateContentType,
+    pendingGenerateItem,
+  ]);
 
   const isSaving = saveFetcher.state !== "idle";
 
@@ -1775,6 +1969,16 @@ export default function ContentManagementPage() {
         onClose={() => setEditorOpen(false)}
         onSave={handleSaveContent}
         isSaving={isSaving}
+      />
+      <GenerateTemplateModal
+        open={templateModalOpen}
+        item={pendingGenerateItem}
+        contentType={pendingGenerateContentType}
+        templateSelection={generateTemplateSelection}
+        onChange={updateGenerateTemplateSelection}
+        onClose={() => setTemplateModalOpen(false)}
+        onGenerate={handleConfirmGenerate}
+        isGenerating={generateFetcher.state !== "idle"}
       />
     </Page>
   );
