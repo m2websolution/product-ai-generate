@@ -9,6 +9,11 @@ export function links() {
   ];
 }
 
+export const headers = () => ({
+  // Prevent stale document HTML from referencing old hashed JS assets after deployments.
+  "Cache-Control": "no-store",
+});
+
 export default function App() {
   return (
     <html lang="en">
