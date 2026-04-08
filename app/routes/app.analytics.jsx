@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLoaderData, useSearchParams, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
