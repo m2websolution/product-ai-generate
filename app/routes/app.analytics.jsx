@@ -881,13 +881,39 @@ const RESOURCE_TABS = [
   { id: "blog", content: "Blogs" },
 ];
 
-const GENERATE_TYPE_OPTIONS = [
-  { label: "All Generate", value: "all" },
-  { label: "Description", value: "description" },
-  { label: "Content", value: "content" },
-  { label: "Meta Title", value: "meta_title" },
-  { label: "Meta Description", value: "meta_description" },
-];
+const GENERATE_TYPE_OPTIONS_BY_RESOURCE = {
+  all: [
+    { label: "All Generate", value: "all" },
+    { label: "Description", value: "description" },
+    { label: "Content", value: "content" },
+    { label: "Meta Title", value: "meta_title" },
+    { label: "Meta Description", value: "meta_description" },
+  ],
+  product: [
+    { label: "All Generate", value: "all" },
+    { label: "Description", value: "description" },
+    { label: "Meta Title", value: "meta_title" },
+    { label: "Meta Description", value: "meta_description" },
+  ],
+  collection: [
+    { label: "All Generate", value: "all" },
+    { label: "Description", value: "description" },
+    { label: "Meta Title", value: "meta_title" },
+    { label: "Meta Description", value: "meta_description" },
+  ],
+  page: [
+    { label: "All Generate", value: "all" },
+    { label: "Content", value: "content" },
+    { label: "Meta Title", value: "meta_title" },
+    { label: "Meta Description", value: "meta_description" },
+  ],
+  blog: [
+    { label: "All Generate", value: "all" },
+    { label: "Content", value: "content" },
+    { label: "Meta Title", value: "meta_title" },
+    { label: "Meta Description", value: "meta_description" },
+  ],
+};
 
 function matchesGenerateType(intentValue, generateType) {
   if (generateType === "all") return true;
@@ -929,6 +955,15 @@ export default function AnalyticsPage() {
   const handleDayClick = useCallback(date => setSelectedDate(p => p === date ? null : date), []);
   const activityRef = useRef(null);
   const resourceTabIndex = RESOURCE_TABS.findIndex((tab) => tab.id === resourceFilter);
+  const generateTypeOptions = useMemo(
+    () => GENERATE_TYPE_OPTIONS_BY_RESOURCE[resourceFilter] || GENERATE_TYPE_OPTIONS_BY_RESOURCE.all,
+    [resourceFilter],
+  );
+
+  useEffect(() => {
+    if (generateTypeOptions.some((option) => option.value === generateTypeFilter)) return;
+    setGenerateTypeFilter("all");
+  }, [generateTypeFilter, generateTypeOptions]);
 
   const filteredRangeLogs = useMemo(() => {
     return rangeLogs.filter((log) => {
@@ -1048,7 +1083,7 @@ export default function AnalyticsPage() {
 
             <Select
               label="Specific generate filter"
-              options={GENERATE_TYPE_OPTIONS}
+              options={generateTypeOptions}
               value={generateTypeFilter}
               onChange={(value) => {
                 setGenerateTypeFilter(value);

@@ -356,13 +356,13 @@ function FilterBar({ resourceFilter, typeFilter, onResourceChange, onTypeChange 
               key={f.id}
               onClick={() => onResourceChange(f.id)}
               style={{
-                padding: "8px 16px",
+                padding: "4px 10px",
                 borderRadius: "6px",
                 border: resourceFilter === f.id ? "2px solid #1a1a1a" : "1.5px solid #d1d5db",
                 background: resourceFilter === f.id ? "#1a1a1a" : "#ffffff",
                 color: resourceFilter === f.id ? "#ffffff" : "#374151",
                 cursor: "pointer",
-                fontSize: "14px",
+                fontSize: "12px",
                 fontWeight: resourceFilter === f.id ? 600 : 500,
                 transition: "all 0.2s ease",
                 lineHeight: "1.5",
