@@ -282,7 +282,7 @@ function QuickActionCard({ icon, title, description, ctaLabel, onClick }) {
           </Text>
         </BlockStack>
         <div style={{ marginTop: "auto", paddingTop: 14 }}>
-          <Button size="large" fullWidth onClick={onClick}>
+          <Button fullWidth onClick={onClick}>
             {ctaLabel}
           </Button>
         </div>
@@ -404,63 +404,61 @@ export default function Index() {
               padding: 20,
             }}
           >
-            <div className="app-hero-content">
-              <BlockStack gap="250" style={{ flex: "1 1 auto", minWidth: 0 }}>
-                <div style={{ display: "inline-flex" }}>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      background: "#d1fae5",
-                      border: "1px solid #a7f3d0",
-                    }}
-                  >
+            <div className="dashboard-hero-layout">
+              <InlineStack align="start" gap="300" blockAlign="start" wrap={false}>
+                <div
+                  style={{
+                    width: 100,
+                    height: 100,
+                    borderRadius: "50%",
+                    background: "#b7e8d2",
+                    border: "1px solid #a7f3d0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <InlineStack align="start" gap="100" blockAlign="center" wrap={false}>
                     <span
                       style={{
-                        width: 7,
-                        height: 7,
+                        width: 8,
+                        height: 8,
                         borderRadius: "50%",
                         background: "#059669",
                         display: "inline-block",
                       }}
                     />
-                    <Text as="span" variant="bodySm" fontWeight="semibold">
+                    <Text as="span" variant="headingSm" fontWeight="semibold">
                       AI powered
                     </Text>
-                  </div>
+                  </InlineStack>
                 </div>
-                <Text as="h1" variant="heading2xl">
-                  Generate SEO content for your Shopify store
-                </Text>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  Create product descriptions, blog posts, collection content, and page copy that is ready to publish.
-                </Text>
-              </BlockStack>
-              <div className="app-hero-actions" style={{ display: "flex", marginInlineStart: "auto" }}>
-                <InlineStack
-                  align="end"
-                  gap="200"
-                  wrap
-                  blockAlign="center"
-                  style={{ justifyContent: "flex-end" }}
+                <BlockStack gap="100">
+                  <Text as="h1" variant="heading2xl">
+                    Generate SEO content for your Shopify store
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+
+              <Text as="p" variant="bodyLg" tone="subdued">
+                Create product descriptions, blog posts, collection content, and page copy that is ready to publish.
+              </Text>
+
+              <BlockStack gap="200" inlineAlign="end" className="dashboard-hero-actions-col">
+                <div style={{ display: "inline-flex" }}>
+                  <Badge tone="info">{credits} credits</Badge>
+                </div>
+                <Button onClick={() => navigate({ pathname: "/app/analytics", search: location.search })}>
+                  View analytics
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => navigate({ pathname: "/app/analytics", search: location.search })}
                 >
-                  <div style={{ display: "inline-flex" }}>
-                    <Badge tone="info">{credits} credits</Badge>
-                  </div>
-                  <Button onClick={() => navigate({ pathname: "/app/analytics", search: location.search })}>
-                    View analytics
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => navigate({ pathname: "/app/analytics", search: location.search })}
-                  >
-                    Upgrade
-                  </Button>
-                </InlineStack>
-              </div>
+                  Upgrade
+                </Button>
+              </BlockStack>
             </div>
           </div>
         </Card>
@@ -536,7 +534,7 @@ export default function Index() {
                         <Select label="AI model" options={aiModelOptions} value={selectedModel} onChange={setSelectedModel} />
                       </BlockStack>
                       <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
-                        <Button size="large" submit variant="primary" loading={isSaving} disabled={isSaving}>
+                        <Button submit variant="primary" loading={isSaving} disabled={isSaving}>
                           {isSaving ? "Saving..." : "Save model"}
                         </Button>
                       </div>
@@ -574,7 +572,7 @@ export default function Index() {
                       <Text as="p" variant="bodySm" tone="subdued">
                         {app.desc}
                       </Text>
-                      <Button size="large" fullWidth url={app.url} external icon={ExternalIcon}>
+                      <Button fullWidth url={app.url} external icon={ExternalIcon}>
                         Add app
                       </Button>
                     </BlockStack>
@@ -601,7 +599,6 @@ export default function Index() {
                       Get help with app setup, best practices, and growth recommendations.
                     </Text>
                     <Button
-                      size="large"
                       fullWidth
                       url="https://outlook.office.com/book/ShopifyGrowthConsultationCall@m2webdesigning.com/?ismsaljsauthenabled=true"
                       external
@@ -626,10 +623,10 @@ export default function Index() {
                       Reach our team during office hours for issue resolution and guidance.
                     </Text>
                     <InlineStack gap="200">
-                      <Button size="large" url="mailto:support@m2webdesigning.com">
+                      <Button url="mailto:support@m2webdesigning.com">
                         Email support
                       </Button>
-                      <Button size="large" url="https://wa.me/918320023122" external>
+                      <Button url="https://wa.me/918320023122" external>
                         WhatsApp
                       </Button>
                     </InlineStack>
@@ -650,9 +647,8 @@ export default function Index() {
                       Browse setup guides and troubleshooting docs.
                     </Text>
                     <InlineStack gap="200">
-                      <Button size="large">View docs</Button>
+                      <Button>View docs</Button>
                       <Button
-                        size="large"
                         onClick={() => {
                           if (!reviewAlreadySubmitted) setIsReviewModalOpen(true);
                         }}
