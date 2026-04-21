@@ -633,10 +633,26 @@ export default function BlogPage() {
   ];
 
   const activeTabKey = tabItems[activeTab]?.id || TAB_KEYS.BUSINESS;
-  const blogOptions = useMemo(
-    () => (blogs.length ? blogs.map((blog) => ({ label: blog.title, value: blog.id })) : [{ label: "No blog found", value: "" }]),
-    [blogs],
+  const toneOptions = useMemo(() => POST_TONE_OPTIONS.map((value) => ({ label: value, value })), []);
+  const audienceOptions = useMemo(
+    () => TARGET_AUDIENCE_OPTIONS.map((value) => ({ label: value, value })),
+    [],
   );
+  const promotionOptions = useMemo(
+    () => PROMOTION_OPTIONS.map((value) => ({ label: value, value })),
+    [],
+  );
+  const holidayOptions = useMemo(() => HOLIDAY_OPTIONS.map((value) => ({ label: value, value })), []);
+  const selectedBlogTitle = useMemo(
+    () => blogs.find((blog) => blog.id === selectedBlogId)?.title || "",
+    [blogs, selectedBlogId],
+  );
+
+  useEffect(() => {
+    if (!selectedBlogId && blogs?.[0]?.id) {
+      setSelectedBlogId(blogs[0].id);
+    }
+  }, [blogs, selectedBlogId]);
 
   useEffect(() => {
     if (!editingBlog || !editorRef.current) return;
@@ -841,71 +857,79 @@ export default function BlogPage() {
 
         {showGenerator ? (
           <Card>
-            <BlockStack gap="400">
+            <BlockStack gap="500">
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h2" variant="headingLg">
                   Blog post generation
                 </Text>
                 <Button onClick={() => setShowGenerator(false)}>Back to list</Button>
               </InlineStack>
-
-              <Box padding="300" background="bg-surface-secondary" borderRadius="300">
-                <InlineStack gap="300" blockAlign="start" wrap={false}>
-                  <Text as="span" variant="heading2xl">✨</Text>
-                  <Text as="p" variant="bodyLg">
-                    Use AI to instantly generate a blog post from scratch. Choose one of the suggestions and save directly.
-                  </Text>
-                </InlineStack>
+              <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">
+                <div className="blog-generator-hero">
+                  <div className="blog-generator-hero-icon">AI</div>
+                  <BlockStack gap="150">
+                    <Text as="h3" variant="headingMd">
+                      Generate high-quality blog ideas
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Use AI to generate suggestions, review content, edit format, and save directly to Shopify.
+                    </Text>
+                  </BlockStack>
+                </div>
               </Box>
 
               <BlockStack gap="100">
-                <Select label="Destination blog" options={blogOptions} value={selectedBlogId} onChange={setSelectedBlogId} />
                 <Text as="p" variant="bodySm" tone="subdued">
                   Language from global settings: {settingsLanguage}
                 </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Blog destination: {selectedBlogTitle || "No blog available"}
+                </Text>
               </BlockStack>
 
-              <Tabs tabs={tabItems} selected={activeTab} onSelect={setActiveTab} fitted />
+              <div className="blog-generator-tabs-wrap">
+                <Tabs tabs={tabItems} selected={activeTab} onSelect={setActiveTab} fitted />
+              </div>
 
               <Box padding="300" borderWidth="025" borderColor="border" borderRadius="300">
                 <BlockStack gap="300">
                   {activeTabKey === TAB_KEYS.HOLIDAY ? (
-                    <InlineStack gap="300" wrap>
-                      <Select label="Select holiday" options={HOLIDAY_OPTIONS.map((value) => ({ label: value, value }))} value={holiday} onChange={setHoliday} />
+                    <div className="blog-generator-fields">
+                      <Select label="Select holiday" options={holidayOptions} value={holiday} onChange={setHoliday} />
                       <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
-                      <Select label="Post tone" options={POST_TONE_OPTIONS.map((value) => ({ label: value, value }))} value={tone} onChange={setTone} />
-                      <Select label="Target audience" options={TARGET_AUDIENCE_OPTIONS.map((value) => ({ label: value, value }))} value={targetAudience} onChange={setTargetAudience} />
-                      <Select label="Select promotion" options={PROMOTION_OPTIONS.map((value) => ({ label: value, value }))} value={promotion} onChange={setPromotion} />
+                      <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                      <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
+                      <Select label="Select promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
                       <TextField label="Select product to promote" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="Add a product or category URL" />
-                    </InlineStack>
+                    </div>
                   ) : null}
 
                   {activeTabKey === TAB_KEYS.PROMOTION ? (
-                    <InlineStack gap="300" wrap>
-                      <Select label="Select promotion" options={PROMOTION_OPTIONS.map((value) => ({ label: value, value }))} value={promotion} onChange={setPromotion} />
+                    <div className="blog-generator-fields">
+                      <Select label="Select promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
                       <TextField label="Select product to promote" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="Add a product or category URL" />
                       <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
-                      <Select label="Post tone" options={POST_TONE_OPTIONS.map((value) => ({ label: value, value }))} value={tone} onChange={setTone} />
-                    </InlineStack>
+                      <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                    </div>
                   ) : null}
 
                   {activeTabKey === TAB_KEYS.CUSTOM ? (
-                    <InlineStack gap="300" wrap>
+                    <div className="blog-generator-fields">
                       <TextField label="Post topic" value={topic} onChange={setTopic} autoComplete="off" placeholder="Write a topic for your post" />
                       <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
-                      <Select label="Post tone" options={POST_TONE_OPTIONS.map((value) => ({ label: value, value }))} value={tone} onChange={setTone} />
-                      <Select label="Target audience" options={TARGET_AUDIENCE_OPTIONS.map((value) => ({ label: value, value }))} value={targetAudience} onChange={setTargetAudience} />
+                      <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                      <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
                       <TextField label="Select product to promote" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="Add a product or category URL" />
-                    </InlineStack>
+                    </div>
                   ) : null}
 
                   {activeTabKey === TAB_KEYS.BUSINESS ? (
-                    <InlineStack gap="300" wrap>
+                    <div className="blog-generator-fields">
                       <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
-                      <Select label="Post tone" options={POST_TONE_OPTIONS.map((value) => ({ label: value, value }))} value={tone} onChange={setTone} />
-                      <Select label="Target audience" options={TARGET_AUDIENCE_OPTIONS.map((value) => ({ label: value, value }))} value={targetAudience} onChange={setTargetAudience} />
+                      <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                      <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
                       <TextField label="Select product to promote (optional)" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="Add a product or category URL" />
-                    </InlineStack>
+                    </div>
                   ) : null}
 
                   <InlineStack>
@@ -930,7 +954,7 @@ export default function BlogPage() {
 
                   {suggestions.slice(0, visibleSuggestionCount).map((suggestion) => (
                     <Card key={suggestion.id}>
-                      <BlockStack gap="250">
+                      <BlockStack gap="300">
                         <Text as="h4" variant="headingMd">{suggestion.title}</Text>
                         <Text as="p" variant="bodyMd" tone="subdued">{suggestion.summary}</Text>
                         <InlineStack gap="200" wrap>
@@ -938,25 +962,26 @@ export default function BlogPage() {
                           <Badge>{suggestion.targetAudience}</Badge>
                           <Badge>{suggestion.postLength}</Badge>
                         </InlineStack>
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Select
-                            label="Status"
-                            labelHidden
-                            options={[
-                              { label: "Draft", value: "draft" },
-                              { label: "Published", value: "published" },
-                            ]}
-                            value={suggestion.status || "draft"}
-                            onChange={(nextStatus) =>
-                              setSuggestions((prev) => prev.map((item) => (item.id === suggestion.id ? { ...item, status: nextStatus } : item)))
-                            }
-                          />
-                          <InlineStack gap="200">
+                        <div className="blog-generator-card-actions">
+                          <div className="blog-generator-card-status">
+                            <Select
+                              label="Status"
+                              options={[
+                                { label: "Draft", value: "draft" },
+                                { label: "Published", value: "published" },
+                              ]}
+                              value={suggestion.status || "draft"}
+                              onChange={(nextStatus) =>
+                                setSuggestions((prev) => prev.map((item) => (item.id === suggestion.id ? { ...item, status: nextStatus } : item)))
+                              }
+                            />
+                          </div>
+                          <InlineStack gap="200" wrap>
                             <Button onClick={() => openSuggestionEditor(suggestion)}>Open in editor</Button>
                             <Button
                               variant="primary"
                               onClick={() => saveSuggestionDirectly(suggestion)}
-                              disabled={!selectedBlogId || fetcher.state !== "idle"}
+                              disabled={!selectedBlogId || fetcher.state !== "idle" || blogs.length === 0}
                               loading={
                                 fetcher.state !== "idle" &&
                                 String(fetcher.formData?.get("intent")) === "save_generated_blog" &&
@@ -966,7 +991,7 @@ export default function BlogPage() {
                               Save blog
                             </Button>
                           </InlineStack>
-                        </InlineStack>
+                        </div>
                       </BlockStack>
                     </Card>
                   ))}
@@ -1131,3 +1156,4 @@ export default function BlogPage() {
 export const headers = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
