@@ -311,12 +311,14 @@ export default function BlogPage() {
   const [createStatus, setCreateStatus] = useState("draft");
   const [editingArticle, setEditingArticle] = useState(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editorBlockType, setEditorBlockType] = useState("p");
   const editorRef = useRef(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!editingArticle || !editorRef.current) return;
     editorRef.current.innerHTML = editingArticle.body || "";
+    setEditorBlockType("p");
   }, [editingArticle]);
 
   useEffect(() => {
@@ -356,6 +358,28 @@ export default function BlogPage() {
     if (!blogs.length) return [{ label: "No blogs found", value: "" }];
     return blogs.map((blog) => ({ label: blog.title, value: blog.id }));
   }, [blogs]);
+
+  function runEditorCommand(command, value = null) {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false, value);
+  }
+
+  function applyBlockType(nextType) {
+    setEditorBlockType(nextType);
+    if (nextType === "p") {
+      runEditorCommand("formatBlock", "<p>");
+      return;
+    }
+    runEditorCommand("formatBlock", `<${nextType}>`);
+  }
+
+  function applyLink() {
+    if (typeof window === "undefined") return;
+    const url = window.prompt("Enter URL");
+    if (!url) return;
+    runEditorCommand("createLink", url);
+  }
 
   const rowsMarkup = useMemo(
     () =>
@@ -526,6 +550,9 @@ export default function BlogPage() {
       >
         <Modal.Section>
           <BlockStack gap="300">
+            <Text as="p" variant="bodyMd" tone="subdued">
+              Edit the description content below. Use the toolbar to format text.
+            </Text>
             <TextField
               label="Title"
               value={editTitle}
@@ -534,23 +561,50 @@ export default function BlogPage() {
             />
             <div style={{ border: "1px solid #d1d5db", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
               <InlineStack gap="100" wrap>
-                <Button size="slim" onClick={() => document.execCommand("bold")}>B</Button>
-                <Button size="slim" onClick={() => document.execCommand("italic")}>I</Button>
-                <Button size="slim" onClick={() => document.execCommand("underline")}>U</Button>
-                <Button size="slim" onClick={() => document.execCommand("insertUnorderedList")}>• List</Button>
-                <Button size="slim" onClick={() => document.execCommand("insertOrderedList")}>1. List</Button>
-                <Button size="slim" onClick={() => document.execCommand("removeFormat")}>Clear</Button>
+                <div style={{ minWidth: 150 }}>
+                  <Select
+                    label="Text style"
+                    labelHidden
+                    options={[
+                      { label: "Paragraph", value: "p" },
+                      { label: "Heading", value: "h2" },
+                      { label: "Sub heading", value: "h3" },
+                      { label: "Description", value: "h4" },
+                    ]}
+                    value={editorBlockType}
+                    onChange={applyBlockType}
+                  />
+                </div>
+                <Button size="slim" onClick={() => runEditorCommand("bold")}>B</Button>
+                <Button size="slim" onClick={() => runEditorCommand("italic")}>I</Button>
+                <Button size="slim" onClick={() => runEditorCommand("underline")}>U</Button>
+                <Button size="slim" onClick={() => runEditorCommand("insertUnorderedList")}>Bullet</Button>
+                <Button size="slim" onClick={() => runEditorCommand("insertOrderedList")}>1. List</Button>
+                <Button size="slim" onClick={() => runEditorCommand("strikeThrough")}>S</Button>
+                <Button size="slim" onClick={() => runEditorCommand("justifyLeft")}>Left</Button>
+                <Button size="slim" onClick={() => runEditorCommand("justifyCenter")}>Center</Button>
+                <Button size="slim" onClick={() => runEditorCommand("justifyRight")}>Right</Button>
+                <Button size="slim" onClick={() => runEditorCommand("justifyFull")}>Justify</Button>
+                <Button size="slim" onClick={() => runEditorCommand("outdent")}>Outdent</Button>
+                <Button size="slim" onClick={() => runEditorCommand("indent")}>Indent</Button>
+                <Button size="slim" onClick={applyLink}>Link</Button>
+                <Button size="slim" onClick={() => runEditorCommand("unlink")}>Unlink</Button>
+                <Button size="slim" onClick={() => runEditorCommand("undo")}>Undo</Button>
+                <Button size="slim" onClick={() => runEditorCommand("redo")}>Redo</Button>
+                <Button size="slim" onClick={() => runEditorCommand("removeFormat")}>Clear</Button>
               </InlineStack>
               <div
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 style={{
-                  minHeight: 340,
+                  minHeight: 380,
+                  maxHeight: 430,
+                  overflowY: "auto",
                   padding: 16,
                   outline: "none",
-                  fontSize: 18,
-                  lineHeight: 1.6,
+                  fontSize: 17,
+                  lineHeight: 1.7,
                 }}
               />
             </div>
@@ -582,3 +636,6 @@ export default function BlogPage() {
 export const headers = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+
+
