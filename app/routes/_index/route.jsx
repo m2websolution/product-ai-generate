@@ -1,6 +1,7 @@
 import { redirect, Form, useLoaderData } from "react-router";
 import { login } from "../../shopify.server";
-import styles from "./styles.module.css";
+import { AppProvider, Page, Card, BlockStack, Text, TextField, Button } from "@shopify/polaris";
+import enTranslations from "@shopify/polaris/locales/en.json";
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
@@ -16,39 +17,49 @@ export default function App() {
   const { showForm } = useLoaderData();
 
   return (
-    <div className={styles.index}>
-      <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
-        <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
-        </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
-        <ul className={styles.list}>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-        </ul>
-      </div>
-    </div>
+    <AppProvider i18n={enTranslations}>
+      <Page>
+        <div style={{ maxWidth: 720, margin: "48px auto" }}>
+          <Card>
+            <BlockStack gap="500">
+              <BlockStack gap="200">
+                <Text as="h1" variant="headingLg">
+                  Product AI Generate
+                </Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Create SEO-friendly product, collection, blog, and page content for your Shopify store using AI.
+                </Text>
+              </BlockStack>
+
+              {showForm && (
+                <Form method="post" action="/auth/login">
+                  <BlockStack gap="300">
+                    <TextField
+                      label="Shop domain"
+                      name="shop"
+                      autoComplete="off"
+                      placeholder="my-shop-domain.myshopify.com"
+                      helpText="Enter your Shopify store domain to continue."
+                    />
+                    <Button submit variant="primary">
+                      Log in
+                    </Button>
+                  </BlockStack>
+                </Form>
+              )}
+
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingSm">
+                  What you can do
+                </Text>
+                <Text as="p" variant="bodyMd">
+                  Generate high-quality product descriptions, write blog posts, optimize collection pages, and produce page content that matches your brand voice.
+                </Text>
+              </BlockStack>
+            </BlockStack>
+          </Card>
+        </div>
+      </Page>
+    </AppProvider>
   );
 }
