@@ -1053,6 +1053,109 @@ const TEMPLATE_PREVIEW_HTML = {
 <li>vs. Competitor C: 31% higher creative workload GPU performance (independent data)</li>
 <li>Display: factory-calibrated DCI-P3 vs. uncalibrated sRGB panels in competing models</li>
 <li>All performance comparisons sourced from TechReview Weekly independent benchmarks, Q3 2024</li></ul>`,
+
+  // ── Collection description HTML previews (additional categories) ─────────────
+  "col-gift-guide": `<h2>The Ultimate Gift Guide for Gamers and Creators</h2>
+<p>Finding the perfect gift for the gamer, creator, or tech enthusiast in your life doesn't have to be stressful. The <strong>Performance Gaming Laptops</strong> collection includes options at every price point — from compact productivity machines to full-power creator workstations — so you can match the right hardware to the right person, every time.</p>
+<h3>Gifts for the Serious Gamer</h3>
+<p>For the gamer who needs performance and portability, our RTX 4080 flagship configurations deliver zero-throttle sustained frame rates in a chassis light enough for daily carry. The 240Hz QHD display, quad-speaker audio, and per-key RGB keyboard make this a gift that gets used every single day.</p>
+<h3>Gifts for the Creative Professional</h3>
+<p>For the video editor, photographer, or designer, our Creator Notebook tier offers factory-calibrated 100% DCI-P3 displays and RTX 4070–4080 GPU configurations that handle 4K timelines without proxy workflows. It's a gift that removes the friction from their most important work.</p>
+<h3>Gifts for the Student or First-Timer</h3>
+<p>The Budget Gaming tier, starting under $900, gives students and newcomers genuine RTX 4060 gaming performance, a 144Hz display, and reliable build quality — without requiring a premium-tier budget. A machine they'll use every day for years, without regrets.</p>
+<ul><li>Gift price ranges: $799–$2,500 — options at every budget level</li>
+<li>Every order ships in premium packaging — gift-ready presentation</li>
+<li>Personalised gift card option available at checkout</li>
+<li>Express delivery available for time-sensitive occasions</li>
+<li>3-year warranty included — a gift that stays reliable for years</li>
+<li>Free 30-day returns if the fit isn't right</li></ul>`,
+
+  "col-new-arrivals": `<h2>Just Landed — New Performance Gaming Laptops</h2>
+<p>The latest additions to the <strong>Performance Gaming Laptops</strong> collection are now live — setting a new standard for what a modern gaming and creator laptop can deliver. New hardware, refined thermals, updated display technology, and smarter connectivity, built from what our most demanding customers asked for.</p>
+<h3>What's New This Season</h3>
+<p>This collection introduces next-generation AMD Ryzen AI 9 and NVIDIA RTX 4080 Super configurations — delivering higher sustained all-core performance and improved AI-accelerated workflows at the same price points as last season's hardware. Three new chassis colourways and a redesigned keyboard layout debut across four of the new arrivals.</p>
+<h3>New Display Technology</h3>
+<p>Two models in this launch introduce OLED display panels with 2880×1800 resolution, 1ms pixel response, and individual per-unit ΔE &lt; 1 factory calibration. For creators who need colour accuracy and gamers who want perfect contrast, these are the most advanced display options we've offered at this price tier.</p>
+<h3>Trending This Week</h3>
+<p>The new Ryzen AI 9 / RTX 4080 Super configuration has become our fastest-moving new arrival in three years. Demand at launch week exceeded our stock forecast. If you want this configuration, ordering early is strongly advised — restock lead times are running six to eight weeks from our manufacturer.</p>
+<ul><li>New Ryzen AI 9 and RTX 4080 Super configurations — available now</li>
+<li>Three new chassis colourways exclusive to this launch window</li>
+<li>OLED panel models: 2880×1800, 1ms, ΔE &lt; 1 factory calibrated</li>
+<li>New arrivals ship within 3–5 business days from in-stock date</li>
+<li>Notify me feature available for pre-order and restock alerts</li>
+<li>All new models carry the full 3-year standard warranty</li></ul>`,
+
+  "col-bestsellers-curated": `<h2>Our Best-Selling Gaming Laptops — Chosen by 50,000+ Customers</h2>
+<p>The models in this collection aren't selected by our marketing team — they're determined by purchase volume, review scores, return rates, and repeat buyer data across more than 50,000 orders. If a laptop appears here, it's because our customers consistently chose it, kept it, and recommended it.</p>
+<h3>Why These Are the Best-Sellers</h3>
+<p>The top-selling UltraBook Pro X15 has held its #1 position for 14 consecutive months. The reason is consistent: it delivers its rated performance under sustained real-world workloads. Customers who bought it for gaming still use it for work. Customers who bought it for creative production use it for gaming. It doesn't compromise — and the reviews reflect that every week.</p>
+<h3>The Editor's Picks</h3>
+<p>Our product team maintains a curated list of models that deserve more attention than their sales rank alone suggests — configurations that receive the highest "would recommend to a friend" scores, machines that reviewers called out for outstanding specific capabilities that elevate them above the category average.</p>
+<p>The current Editor's Pick for creator workflows is the Creator Notebook X15 OLED — for the display calibration alone. The pick for competitive gaming is the UltraBook Pro X15 240Hz configuration. Both carry 4.9-star ratings from over 800 verified reviews each.</p>
+<ul><li>#1 best-seller: UltraBook Pro X15 — 14 consecutive months at top position</li>
+<li>4.8-star average across all models in this collection</li>
+<li>96% of buyers would recommend to a colleague or friend</li>
+<li>Lowest return rate in category — below 2% across all models</li>
+<li>Editor's Pick: Creator Notebook X15 OLED for colour-accurate workflows</li>
+<li>All bestsellers carry 3-year warranty and 30-day returns as standard</li></ul>`,
+
+  // ── Page body HTML previews (additional categories) ───────────────────────────
+  "page-body-team": `<h1>Meet the Team Behind Avada Tech</h1>
+<p>Avada Tech was built by engineers and creators who were, first and foremost, frustrated customers. Every person on our team has used the products they build in a professional context — which is why the products are built the way they are. We don't design hardware from a distance. We design it from personal experience.</p>
+<h2>The Founding Team</h2>
+<p>Our eleven-person founding team came from semiconductor engineering, industrial design, professional video production, competitive software development, and enterprise IT. The shared experience — hardware that didn't deliver on sustained professional workloads — drove us into the same room in San Francisco in 2018. Three years later, the UltraBook Pro X15 shipped.</p>
+<h2>Engineering</h2>
+<p><strong>Sarah Chen — Lead Systems Engineer.</strong> Sarah has spent 14 years in mobile computing hardware, previously at two major OEM manufacturers. She runs our thermal validation programme, which is why our laptops don't throttle. Before Avada Tech, she spent six months running sustained load tests on every competitor's flagship laptop and found the same failure in every one. That research became the foundation for our cooling architecture.</p>
+<p><strong>Raj Patel — Senior Hardware Engineer.</strong> Raj focuses on display quality and colour validation. He worked in broadcast post-production equipment for eight years before joining Avada Tech, where he brought professional colour standards into laptop display production for the first time at this price point.</p>
+<h2>Design and Customer Experience</h2>
+<p><strong>Emma Larsson — Head of Product Design.</strong> Emma leads industrial design and the physical ownership experience — chassis, keyboard, haptics, packaging. She holds 12 patents in portable computing form factor design and has spoken at CES and Design Week on the intersection of durability engineering and premium aesthetics.</p>
+<p>Our 85-person team is based in San Francisco. We're always looking for engineers and creators who want to build hardware they'll actually use themselves — see our open roles at avadatech.com/careers.</p>`,
+
+  "page-body-testimonials": `<h1>What Our Customers Are Saying</h1>
+<p>We don't curate our reviews to remove criticism. Every testimonial here reflects a real purchase, a real workload, and a real verdict. The pattern in these reviews isn't coincidental — it reflects what we set out to build.</p>
+<h2>From Our Creative Community</h2>
+<p><em>"I edit 4K documentary footage for a living. I've been through four laptops in the past three years — all throttled, all ran hot, all made me wait. The UltraBook Pro X15 is the first laptop where I finished a 6-hour export session and the fan speed at the end was the same as the beginning. I don't notice my laptop anymore. That's exactly what I needed."</em><br><strong>— Marcus T., Documentary Filmmaker, London. Verified purchase, 14 months of use.</strong></p>
+<p><em>"The display calibration is what sold me. I do colour grading work and I've been working off an external monitor for years because no laptop display was accurate enough. The DCI-P3 calibration on the Creator Edition is genuinely good enough for professional delivery work. I haven't connected my external monitor in six months."</em><br><strong>— Priya K., Colourist and Motion Designer, Toronto. Verified purchase, 9 months of use.</strong></p>
+<h2>From Gamers and Streamers</h2>
+<p><em>"I stream at 1080p60 while playing competitively at the same time. The only laptop I found that can do both without a frame drop is the UltraBook Pro X15. The 240Hz display means I'm not compromising on competitive response time to create content. I genuinely couldn't have built my streaming channel without this machine."</em><br><strong>— Jake R., Gaming Content Creator, Austin. Verified purchase, 11 months of use.</strong></p>
+<h2>Overall Ratings</h2>
+<p>4.8 stars from 12,000+ verified reviews across five platforms. 96% of buyers would recommend to a colleague. Average review length: 340 words — indicating buyers have detailed, genuine experiences to share. Our highest-rated category, by significant margin, is sustained performance under real workloads.</p>
+<ul><li>4.8★ average — 12,000+ verified reviews across five platforms</li>
+<li>96% would recommend to a colleague or friend</li>
+<li>Top reviewed attribute: sustained performance under real workloads</li>
+<li>Lowest return rate in category — under 2% across all models</li>
+<li>#1 TechReview Weekly, Digital Creator Awards Best Laptop 2025</li>
+<li>Verified purchases only — no incentivised or unverified reviews shown</li></ul>`,
+
+  "page-body-press-media": `<h1>Avada Tech in the Press</h1>
+<p>Since 2023, Avada Tech has been covered by independent reviewers, technology publications, and industry organisations who tested our hardware against competing products under real-world conditions. We don't provide review units with special configurations. The laptops sent for review are identical to the ones you receive when you order.</p>
+<h2>Recent Coverage</h2>
+<p><em>"The UltraBook Pro X15 is the first gaming laptop we've tested that delivers zero thermal throttling under sustained combined CPU and GPU load. Every competitor we've tested in this class throttled within 20 minutes. The X15 ran our full 3-hour test at 99% of rated performance. That's not a minor difference — it's a fundamental engineering achievement at this price point."</em><br><strong>— TechReview Weekly, November 2024.</strong></p>
+<p><em>"Avada Tech has done something the established players haven't: prioritised the performance outcome over the spec sheet. The X15's display calibration meets professional broadcast standards. The thermal management is genuinely class-leading. And the pricing makes it accessible to working creators, not just enterprises."</em><br><strong>— Digital Creator Awards, Best Creator Laptop 2025.</strong></p>
+<h2>Awards and Recognition</h2>
+<ul><li>#1 Best Gaming Laptop — TechReview Weekly, 2024</li>
+<li>Best Creator Laptop — Digital Creator Awards, 2025</li>
+<li>Editors' Choice — Hardware Performance Review, Q3 2024</li>
+<li>Innovation Award — Portable Computing Summit, 2024</li></ul>
+<h2>Press Contact</h2>
+<p>For review unit requests, interview enquiries, press accreditation, or press kit access, contact our communications team. We respond to all verified press enquiries within one business day.</p>
+<p><strong>Press contact:</strong> press@avadatech.com<br><strong>Press kit and brand assets:</strong> avadatech.com/press<br><strong>Review unit requests:</strong> press@avadatech.com — include your publication name and circulation.</p>`,
+
+  "page-body-size-guide": `<h1>Laptop Size and Specification Guide</h1>
+<p>Choosing the right laptop size and specification for your actual use case is more important than choosing the biggest numbers available. This guide helps you match the right configuration to your real workflow, portability requirements, and budget — so you don't pay for hardware you don't need or settle for hardware that can't keep up.</p>
+<h2>Display Size: What to Choose</h2>
+<p><strong>13–14 inch:</strong> Maximum portability, battery life typically 12–15 hours, lightest chassis (under 1.4kg). Best for: travel professionals, students, office productivity. Compromises: smaller display and reduced GPU tier. Not ideal for long gaming sessions or colour-critical creative work on the built-in display.</p>
+<p><strong>15–16 inch:</strong> The sweet spot for most users. Balances portability with a larger display, better speakers, and higher GPU tiers. The UltraBook Pro X15 fits this category. Weight: 1.8–2.2kg. Best for: gaming, video editing, daily professional use with occasional travel.</p>
+<p><strong>17–18 inch:</strong> Maximum display size and highest sustained GPU performance. Less portable. Weight: 2.5–3.2kg. Best for: desktop replacement, stationary workstation-grade use, users who prioritise raw performance over carry weight.</p>
+<h2>Specification by Use Case</h2>
+<ul><li><strong>Gaming at 1080p / 144fps:</strong> RTX 4060, 16GB DDR5, 512GB NVMe minimum</li>
+<li><strong>Gaming at QHD / 240fps:</strong> RTX 4070–4080, 32GB DDR5, 1TB NVMe</li>
+<li><strong>4K Video Editing:</strong> RTX 4080, 32GB+ DDR5, 2TB NVMe, calibrated display</li>
+<li><strong>3D Rendering / ML workloads:</strong> RTX 4080–4090, 64GB DDR5, 2TB+ NVMe</li>
+<li><strong>Office and productivity:</strong> Integrated or RTX 4060, 16GB DDR5, 256GB+ SSD</li>
+<li><strong>Not sure? Book a free 15-min consultation:</strong> avadatech.com/call</li></ul>
+<h2>Measurement Notes</h2>
+<p>All display sizes are measured diagonally across the screen surface. Chassis dimensions and weights listed on each product page are measured without the power adapter. If you're replacing an existing laptop, compare chassis dimensions directly — a 15.6" panel does not guarantee the same footprint across manufacturers. Contact our team if you need side-by-side dimension comparisons before purchasing.</p>`,
 };
 
 // ── SERP preview examples for SEO title templates ────────────────────────────
@@ -1844,6 +1947,18 @@ export default function TemplatePage() {
                     </div>
                   </BlockStack>
                 </div>
+              ) : htmlPreview ? (
+                <div
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    padding: "20px 24px",
+                    background: "#fafafa",
+                    lineHeight: "1.6",
+                  }}
+                  // Safe: content is authored statically in this file, never user input
+                  dangerouslySetInnerHTML={{ __html: wrapHtml(htmlPreview) }}
+                />
               ) : previewData?.filterId === "description" && descriptionPreview ? (
                 <div
                   style={{
@@ -1899,18 +2014,6 @@ export default function TemplatePage() {
                     </div>
                   </BlockStack>
                 </div>
-              ) : htmlPreview ? (
-                <div
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    padding: "20px 24px",
-                    background: "#fafafa",
-                    lineHeight: "1.6",
-                  }}
-                  // Safe: content is authored statically in this file, never user input
-                  dangerouslySetInnerHTML={{ __html: wrapHtml(htmlPreview) }}
-                />
               ) : generatedPreview ? (
                 <div
                   style={{
