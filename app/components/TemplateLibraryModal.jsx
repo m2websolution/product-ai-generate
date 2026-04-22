@@ -468,7 +468,14 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
                       </Box>
                     </Card>
                   ) : (
-                    <div className="app-card-grid" style={{ gap: "14px" }}>
+                    <div
+                      className="app-card-grid"
+                      style={{
+                        gap: "14px",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      }}
+                    >
                       {filtered.map((template) => (
                         <Card key={template.id}>
                           <Box padding="300">

@@ -27,7 +27,7 @@ import {
   Text,
   TextField,
 } from "@shopify/polaris";
-import { ProductIcon, CollectionIcon, SearchIcon } from "@shopify/polaris-icons";
+import { ProductIcon, CollectionIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon } from "@shopify/polaris-icons";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { buildProductContentPrompt } from "../lib/contentPromptTemplates";
@@ -1618,7 +1618,7 @@ export default function ProductsPage() {
             </Card>
           </div>
 
-          {/* Products / Collections tab + collection filter */}
+          {/* Products / Collections tab */}
           <div className="app-toolbar" style={{ marginBottom: "16px", alignItems: "stretch" }}>
             <div className="app-toolbar-fixed" style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: "10px", overflow: "hidden", background: "#fff", minWidth: "180px" }}>
               {sectionTabs.map((tab, index) => {
@@ -1648,15 +1648,6 @@ export default function ProductsPage() {
                 );
               })}
             </div>
-            <div className="app-toolbar-fixed" style={{ minWidth: "180px", flex: "0 0 220px" }}>
-              <Select
-                label="Filter by Collection"
-                labelHidden
-                options={collectionOptions}
-                value={filters.collectionId || ""}
-                onChange={(val) => navigate(makeUrl({ collectionId: val }))}
-              />
-            </div>
           </div>
 
           <Card padding="0">
@@ -1668,17 +1659,28 @@ export default function ProductsPage() {
                     selected={statusTabIndex}
                     onSelect={handleTabChange}
                   />
-                  <div className="app-toolbar-grow" style={{ minWidth: "240px", maxWidth: "420px" }}>
-                    <TextField
-                      label="Search products"
-                      labelHidden
-                      placeholder="Search by product title..."
-                      value={searchValue}
-                      onChange={handleSearchInput}
-                      autoComplete="off"
-                      prefix={isSearchLoading ? <Spinner size="small" /> : <Icon source={SearchIcon} tone="subdued" />}
-                    />
-                  </div>
+                  <InlineStack gap="200" blockAlign="center">
+                    <div style={{ minWidth: "210px", width: "210px" }}>
+                      <Select
+                        label="Filter by Collection"
+                        labelHidden
+                        options={collectionOptions}
+                        value={filters.collectionId || ""}
+                        onChange={(val) => navigate(makeUrl({ collectionId: val }))}
+                      />
+                    </div>
+                    <div className="app-toolbar-grow" style={{ minWidth: "240px", maxWidth: "420px" }}>
+                      <TextField
+                        label="Search products"
+                        labelHidden
+                        placeholder="Search by product title..."
+                        value={searchValue}
+                        onChange={handleSearchInput}
+                        autoComplete="off"
+                        prefix={isSearchLoading ? <Spinner size="small" /> : <Icon source={SearchIcon} tone="subdued" />}
+                      />
+                    </div>
+                  </InlineStack>
                 </InlineStack>
               </div>
 
@@ -1789,9 +1791,6 @@ export default function ProductsPage() {
 
             {/* Content Type Pills */}
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-              <Text as="p" variant="bodySm" tone="subdued" style={{ marginBottom: "8px" }}>
-                Flow: Select Products → Choose Content Types → Configure Prompt/Tone/Language → Check Credits → Generate → Queue Progress → Content Management
-              </Text>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
                 {[
                   { id: "description", label: "Description" },
@@ -1828,21 +1827,6 @@ export default function ProductsPage() {
                     </button>
                   );
                 })}
-                <button
-                  disabled
-                  style={{
-                    padding: "5px 14px",
-                    borderRadius: "20px",
-                    border: "1px solid #d1d5db",
-                    background: "#f3f4f6",
-                    color: "#9ca3af",
-                    cursor: "not-allowed",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                  }}
-                >
-                  Alt Text (Soon)
-                </button>
               </div>
             </div>
 
@@ -1864,7 +1848,7 @@ export default function ProductsPage() {
                   <Checkbox
                     label={<span>Use custom instructions <span style={{ color: "#f59e0b", fontSize: "14px" }}>✦</span></span>}
                     checked={useCustomDescInstructions}
-                    onChange={(v) => setUseCustomDescInstructions(v)}
+                    onChange={(v) => { setUseCustomDescInstructions(v); if (v && !(bulkDescTemplate || "").trim()) { setBulkDescTemplate(DEFAULT_DESCRIPTION_CUSTOM_PROMPT); } }}
                   />
                   {!useCustomDescInstructions && (
                     <button
@@ -1881,7 +1865,7 @@ export default function ProductsPage() {
                     <div style={{ marginTop: "4px" }}>
                       <TextField
                         label="Custom Prompt" labelHidden
-                        multiline={8}
+                        multiline
                         minLength={0}
                         value={bulkDescTemplate}
                         onChange={setBulkDescTemplate}
@@ -1933,7 +1917,7 @@ export default function ProductsPage() {
                     <div style={{ marginTop: "4px" }}>
                       <TextField
                         label="Custom Prompt" labelHidden
-                        multiline={8}
+                        multiline
                         minLength={0}
                         value={bulkMetaDescTemplate}
                         onChange={setBulkMetaDescTemplate}
@@ -1985,7 +1969,7 @@ export default function ProductsPage() {
                     <div style={{ marginTop: "4px" }}>
                       <TextField
                         label="Custom Prompt" labelHidden
-                        multiline={8}
+                        multiline
                         minLength={0}
                         value={bulkMetaTitleTemplate}
                         onChange={setBulkMetaTitleTemplate}
@@ -2018,22 +2002,12 @@ export default function ProductsPage() {
                 onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "#374151", display: "flex", alignItems: "center", gap: "6px", padding: 0 }}
               >
-                <span style={{ fontSize: "11px" }}>{showAdvancedSettings ? "∧" : "∨"}</span>
+                <Icon source={showAdvancedSettings ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
                 {showAdvancedSettings ? "Hide" : "Show"} Advanced Settings
               </button>
               {showAdvancedSettings && (
                 <div style={{ marginTop: "12px" }}>
                   <BlockStack gap="300">
-                    {bulkContentTypes.includes("description") && (
-                      <TextField
-                        label="Description Keywords"
-                        value={bulkDescKeywords}
-                        onChange={setBulkDescKeywords}
-                        placeholder="e.g. eco-friendly, premium, handmade"
-                        helpText="Keywords specific to product descriptions"
-                        autoComplete="off"
-                      />
-                    )}
                     {bulkContentTypes.includes("meta_description") && (
                       <TextField
                         label="Meta Description Keywords"
@@ -2261,3 +2235,4 @@ export default function ProductsPage() {
     </Page>
   );
 }
+
