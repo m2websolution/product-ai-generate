@@ -56,6 +56,8 @@ export const loader = async ({ request }) => {
       createdAt: true,
       reviewSubmittedAt: true,
       reviewPromptDismissedAt: true,
+      ownerName: true,
+      name: true,
     },
   });
 
@@ -70,11 +72,25 @@ export const loader = async ({ request }) => {
       !shopData.reviewPromptDismissedAt,
   );
 
+  const shopDomain = String(session.shop || "").trim();
+  const shopHandle = shopDomain.split(".")[0] || "Shop Owner";
+  const fallbackOwnerName = shopHandle
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  const shopOwnerName =
+    (shopData?.ownerName || "").trim() ||
+    (shopData?.name || "").trim() ||
+    fallbackOwnerName ||
+    "Shop Owner";
+
   return {
     defaultAiModel: shopData?.defaultAiModel || envDefaultAiModel,
     envDefaultAiModel,
     shouldShowReviewPopup,
     hasSubmittedReview: Boolean(shopData?.reviewSubmittedAt),
+    shopOwnerName,
   };
 };
 
@@ -292,7 +308,7 @@ function QuickActionCard({ icon, title, description, ctaLabel, onClick }) {
 }
 
 export default function Index() {
-  const { defaultAiModel, envDefaultAiModel, shouldShowReviewPopup, hasSubmittedReview } = useLoaderData();
+  const { defaultAiModel, envDefaultAiModel, shouldShowReviewPopup, hasSubmittedReview, shopOwnerName } = useLoaderData();
   const layoutData = useRouteLoaderData("routes/app");
   const actionData = useActionData();
   const reviewFetcher = useFetcher();
@@ -408,32 +424,25 @@ export default function Index() {
           >
             <div className="dashboard-hero-layout">
               <BlockStack gap="200">
-                <div className="dashboard-hero-chip">
-                  <span className="dashboard-hero-chip-dot" />
-                  <Text as="span" variant="bodyMd" fontWeight="semibold">
-                    AI powered
-                  </Text>
-                </div>
                 <Text as="h1" variant="heading2xl">
-                  Generate SEO content for your Shopify store
+                  Hi {shopOwnerName} !
                 </Text>
-                <Text as="p" variant="bodyLg" tone="subdued">
-                  Create product descriptions, blog posts, collection content, and page copy that is ready to publish.
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Welcome to Avada AI Product copy
                 </Text>
               </BlockStack>
 
-              <BlockStack gap="150" inlineAlign="start" className="dashboard-hero-actions-col">
-                <div style={{ display: "inline-flex" }}>
+              <BlockStack gap="150" inlineAlign="end" className="dashboard-hero-actions-col">
+                <InlineStack align="end" gap="200" blockAlign="center">
                   <Badge tone="info">{credits} credits</Badge>
-                </div>
-        
-                <Button
-                  size="slim"
-                  variant="primary"
-                  onClick={() => navigate({ pathname: "/app/analytics", search: location.search })}
-                >
-                  Upgrade
-                </Button>
+                  <Button
+                    size="slim"
+                    variant="primary"
+                    onClick={() => navigate({ pathname: "/app/analytics", search: location.search })}
+                  >
+                    Upgrade
+                  </Button>
+                </InlineStack>
               </BlockStack>
             </div>
           </div>
