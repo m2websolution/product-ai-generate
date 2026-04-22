@@ -1093,8 +1093,28 @@ export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
-    select: { openaiApiKey: true, anthropicApiKey: true, defaultAiProvider: true, credits: true, creditsUsedTotal: true },
+    select: {
+      openaiApiKey: true,
+      anthropicApiKey: true,
+      defaultAiProvider: true,
+      credits: true,
+      creditsUsedTotal: true,
+      ownerName: true,
+      name: true,
+    },
   });
+  const shopDomain = String(session.shop || "").trim();
+  const shopHandle = shopDomain.split(".")[0] || "Shop Owner";
+  const fallbackOwnerName = shopHandle
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  const shopOwnerName =
+    (shopData?.ownerName || "").trim() ||
+    (shopData?.name || "").trim() ||
+    fallbackOwnerName ||
+    "Shop Owner";
   const url = new URL(request.url);
 
   const search = (url.searchParams.get("q") || "").trim();
@@ -1133,6 +1153,7 @@ export const loader = async ({ request }) => {
       defaultAiProvider: shopData?.defaultAiProvider || "auto",
       credits: shopData?.credits ?? 100,
       creditsUsedTotal: shopData?.creditsUsedTotal ?? 0,
+      shopOwnerName,
     };
   }
 
@@ -1182,6 +1203,7 @@ export const loader = async ({ request }) => {
     defaultAiProvider: shopData?.defaultAiProvider || "auto",
     credits: shopData?.credits ?? 100,
     creditsUsedTotal: shopData?.creditsUsedTotal ?? 0,
+    shopOwnerName,
   };
 };
 
@@ -1194,7 +1216,7 @@ const bulkInitialSettings = {
 };
 
 export default function CollectionsPage() {
-  const { filters, collections, defaultAiProvider, credits } = useLoaderData();
+  const { filters, collections, defaultAiProvider, credits, shopOwnerName } = useLoaderData();
   const navigation = useNavigation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1523,54 +1545,37 @@ export default function CollectionsPage() {
         <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "220px", height: "220px", borderRadius: "50%", background: "transparent", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "-40px", left: "25%", width: "160px", height: "160px", borderRadius: "50%", background: "transparent", pointerEvents: "none" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1, flexWrap: "wrap", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ width: "46px", height: "46px", borderRadius: "6px", background: "#ffffff", border: "1px solid #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Icon source={CollectionIcon} tone="base" />
+          <div>
+            <div style={{ fontSize: "24px", fontWeight: 800, color: "#111827", marginBottom: "4px", letterSpacing: "-0.3px" }}>
+              Hi {shopOwnerName} !
             </div>
-            <div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#000000", marginBottom: "3px", letterSpacing: "-0.3px" }}>Collections</div>
-              <div style={{ fontSize: "13px", color: "#000000", lineHeight: 1.4 }}>Optimize your collection pages with AI-generated descriptions</div>
+            <div style={{ fontSize: "14px", color: "#6b7280", lineHeight: 1.4, fontWeight: 600 }}>
+              Manage your apps and generate high-converting AI content for your store.
             </div>
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", "--p-color-text": "#000", "--p-color-bg-fill": "#ffffff", "--p-color-border": "#d1d5db" }}>
-            {/* Credits badge */}
-            <button
-              type="button"
-              onClick={() => navigate("/app/analytics")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-                borderRadius: 20,
-                padding: "4px 10px",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#000000",
-                lineHeight: 1,
-                whiteSpace: "nowrap",
-                cursor: "pointer",
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 20 20" fill="#f59e0b">
-                <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z"/>
-              </svg>
-              <span>{credits} credits.</span>
-              <span style={{ color: "#000000" }}>Upgrade</span>
-            </button>
-            <Button onClick={() => navigate(makeUrl({}))} variant="secondary" size="slim">↺ Refresh</Button>
-            <Button onClick={() => navigate("/app")} variant="secondary" size="slim">← Back</Button>
-          </div>
+          <InlineStack gap="200" blockAlign="center">
+            <Text as="span" variant="headingSm" tone="subdued">{credits} credits.</Text>
+            <Button onClick={() => navigate("/app/analytics")} variant="secondary">
+              Upgrade
+            </Button>
+          </InlineStack>
         </div>
       </div>
 
 
 
-      <div className="app-split-layout" style={{ marginTop: "0" }}>
+      <div
+        className="app-split-layout"
+        style={{
+          marginTop: "0",
+          display: "flex",
+          gap: "16px",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+        }}
+      >
         {/* ── LEFT: Collection List ── */}
-        <div className="app-split-main">
+        <div className="app-split-main" style={{ flex: "1 1 0", minWidth: "0" }}>
           {/* Instructions Card */}
           <div style={{ marginBottom: "16px" }}>
             <Card>
@@ -1694,7 +1699,7 @@ export default function CollectionsPage() {
         </div>
 
         {/* ── RIGHT: Bulk Settings Panel ── */}
-        <div className="app-split-side">
+        <div className="app-split-side" style={{ flex: "0 0 420px", width: "420px", maxWidth: "100%" }}>
           <Card padding="0">
             {/* Header */}
             <div style={{ padding: "16px", borderBottom: "1px solid var(--p-color-border)" }}>
