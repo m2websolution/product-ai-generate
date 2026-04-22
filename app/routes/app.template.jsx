@@ -240,6 +240,19 @@ function getSystemTemplates(resourceId, typeId) {
   }));
 }
 
+function dedupeTemplatesByName(templates) {
+  const seen = new Set();
+  return (templates || []).filter((template) => {
+    const key = String(template?.name || "")
+      .trim()
+      .toLowerCase();
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getActiveTemplateId(resourceId, typeId, selectionMap) {
   const sel = selectionMap[resourceId];
   if (!sel) return "";
@@ -276,6 +289,120 @@ const TEMPLATE_PREVIEW_VALUES = {
   trust_signal: "trusted by over 10,000 customers",
 };
 
+const CATEGORY_PREVIEW_PROFILES = {
+  "problem-solution": {
+    hook: "Struggling with lag, heat, and short battery life during intensive work?",
+    description:
+      "The UltraBook Pro X15 is built to solve those core issues with optimized thermal control, fast hardware, and reliable all-day productivity.",
+    features:
+      "It combines powerful processing, stable cooling, and fast storage so users can work and play without interruption.",
+    audience: "Best for gamers, editors, developers, and power users who need consistent high performance.",
+    cta: "Choose the UltraBook Pro X15 and turn daily friction into smooth performance.",
+  },
+  "technical specifications": {
+    hook: "Engineered for precision performance across demanding workflows.",
+    description:
+      "The UltraBook Pro X15 combines desktop-grade components with a portable build for creators and gamers.",
+    features:
+      "Every core component is selected for speed, thermal stability, and long-term reliability under heavy usage.",
+    audience: "Ideal for users who evaluate laptops by measurable performance benchmarks.",
+    cta: "Review the full specifications and upgrade with confidence.",
+  },
+  "lifestyle integration": {
+    hook: "From office to travel to late-night sessions, one laptop fits every routine.",
+    description:
+      "The UltraBook Pro X15 is designed to integrate into daily life with strong battery efficiency and premium portability.",
+    features:
+      "Its balance of power, comfort, and mobility supports work, entertainment, and creativity in one device.",
+    audience: "Perfect for professionals and students who need flexible everyday performance.",
+    cta: "Bring home a laptop that adapts to your lifestyle, not the other way around.",
+  },
+  "eco-friendly product": {
+    hook: "High performance with a more responsible product approach.",
+    description:
+      "The UltraBook Pro X15 uses efficient power management and durable materials to reduce waste over its lifecycle.",
+    features:
+      "Longer component life and optimized energy use help lower replacement frequency and overall footprint.",
+    audience: "Great for buyers who value both performance and environmental responsibility.",
+    cta: "Make a smarter, more sustainable choice without compromising speed.",
+  },
+  "premium/luxury product": {
+    hook: "Crafted for users who demand refined design and elite performance.",
+    description:
+      "The UltraBook Pro X15 delivers premium materials, advanced engineering, and polished user experience in every detail.",
+    features:
+      "Its finish, performance tuning, and display quality position it as a top-tier machine in its class.",
+    audience: "Designed for professionals and enthusiasts who expect flagship quality.",
+    cta: "Experience premium performance built for uncompromising standards.",
+  },
+  "budget-friendly product": {
+    hook: "Get exceptional performance without overspending.",
+    description:
+      "The UltraBook Pro X15 focuses on high-impact hardware choices to deliver strong value for the price.",
+    features:
+      "It offers practical speed, reliability, and expansion headroom for users who want smart long-term value.",
+    audience: "Best for budget-conscious buyers who still need serious performance.",
+    cta: "Invest in real value with performance that lasts.",
+  },
+  "seasonal/limited edition": {
+    hook: "A limited-edition performance release for this season.",
+    description:
+      "This edition of the UltraBook Pro X15 combines signature performance with a timely, exclusive launch profile.",
+    features:
+      "With limited availability and premium specs, it is built for users who want both power and exclusivity.",
+    audience: "Ideal for collectors, early adopters, and seasonal campaign shoppers.",
+    cta: "Secure yours before this limited run sells out.",
+  },
+  "storytelling narrative": {
+    hook: "Created to solve real productivity pain points faced by modern users.",
+    description:
+      "The UltraBook Pro X15 started as a mission to combine true power, portability, and reliability in one machine.",
+    features:
+      "From concept to final design, every component was chosen to support meaningful day-to-day outcomes.",
+    audience: "For users who connect with products built around real-world needs.",
+    cta: "Be part of the story and experience performance designed with purpose.",
+  },
+  "social proof focus": {
+    hook: "Chosen by thousands of users for speed, reliability, and daily consistency.",
+    description:
+      "The UltraBook Pro X15 is backed by strong user feedback across gaming, productivity, and creative workflows.",
+    features:
+      "Customers highlight smooth multitasking, low thermal throttling, and dependable long-session performance.",
+    audience: "A trusted pick for new buyers who rely on proven user results.",
+    cta: "Join the growing community already using the UltraBook Pro X15.",
+  },
+  "gift & occasion": {
+    hook: "A powerful gift choice for milestone occasions and major upgrades.",
+    description:
+      "The UltraBook Pro X15 is a memorable gift for students, professionals, and gamers stepping into a new phase.",
+    features:
+      "Its practical value and premium experience make it suitable for birthdays, graduations, and career milestones.",
+    audience: "Perfect for gift buyers who want meaningful utility and wow factor.",
+    cta: "Gift performance that makes an impact from day one.",
+  },
+  "competitive differentiation": {
+    hook: "Built to outperform generic alternatives where it matters most.",
+    description:
+      "The UltraBook Pro X15 differentiates through sustained performance, faster storage, and smarter cooling.",
+    features:
+      "Compared to typical options, it delivers stronger reliability under pressure and better user efficiency.",
+    audience: "For buyers comparing options and looking for clear performance advantages.",
+    cta: "Upgrade to a laptop that clearly stands apart from the competition.",
+  },
+};
+
+function normalizeCategoryKey(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getCategoryProfile(templateName = "") {
+  const normalized = normalizeCategoryKey(templateName);
+  return CATEGORY_PREVIEW_PROFILES[normalized] || null;
+}
+
 function replaceTemplateTokens(template = "") {
   return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}|{\s*([a-zA-Z0-9_]+)\s*}/g, (_, a, b) => {
     const key = (a || b || "").trim();
@@ -283,9 +410,10 @@ function replaceTemplateTokens(template = "") {
   });
 }
 
-function resolvePromptLine(hint, state) {
+function resolvePromptLine(hint, state, context = {}) {
   const text = String(hint || "").trim();
   const normalized = text.toLowerCase();
+  const profile = context.categoryProfile || null;
   const nextSpec = () => {
     const specs = [
       '15.6" 240Hz QHD IPS display with 2ms response time',
@@ -302,25 +430,25 @@ function resolvePromptLine(hint, state) {
   if (normalized.includes("product name") || normalized.includes("collection title")) {
     return TEMPLATE_PREVIEW_VALUES.product_title;
   }
-  if (normalized.includes("hook")) return "Engineered for creators and gamers who demand speed and reliability.";
+  if (normalized.includes("hook")) return profile?.hook || "Engineered for creators and gamers who demand speed and reliability.";
   if (normalized.includes("brief technical overview")) {
-    return "The UltraBook Pro X15 combines desktop-class performance with a lightweight premium chassis.";
+    return profile?.description || "The UltraBook Pro X15 combines desktop-class performance with a lightweight premium chassis.";
   }
   if (normalized.includes("key specification")) return nextSpec();
-  if (normalized.includes("key feature")) return "Advanced thermal design for stable performance under heavy workloads.";
-  if (normalized.includes("key benefit")) return "Delivers smoother multitasking, faster rendering, and better gaming consistency.";
+  if (normalized.includes("key feature")) return profile?.features || "Advanced thermal design for stable performance under heavy workloads.";
+  if (normalized.includes("key benefit")) return profile?.features || "Delivers smoother multitasking, faster rendering, and better gaming consistency.";
   if (normalized.includes("audience") || normalized.includes("use case")) {
-    return "Ideal for gamers, designers, and professionals who need reliable high performance.";
+    return profile?.audience || "Ideal for gamers, designers, and professionals who need reliable high performance.";
   }
-  if (normalized.includes("call to action")) return "Upgrade your setup with performance built for modern workloads.";
+  if (normalized.includes("call to action")) return profile?.cta || "Upgrade your setup with performance built for modern workloads.";
   if (normalized.includes("paragraph comparing")) {
     return "Compared to conventional laptops in this segment, this model offers higher sustained performance and improved cooling efficiency.";
   }
   if (normalized.includes("description")) {
-    return "Built with premium materials and optimized components to deliver speed, durability, and everyday usability.";
+    return profile?.description || "Built with premium materials and optimized components to deliver speed, durability, and everyday usability.";
   }
   if (normalized.includes("features/benefits")) {
-    return "It balances speed, thermal stability, and battery efficiency to improve both productivity and gaming sessions.";
+    return profile?.features || "It balances speed, thermal stability, and battery efficiency to improve both productivity and gaming sessions.";
   }
   if (normalized.includes("intro")) return "This section provides a clear overview to help customers evaluate the product quickly.";
   if (normalized.includes("question")) return "Q: Is this laptop suitable for professional editing? A: Yes, it is optimized for high-performance workloads.";
@@ -348,6 +476,101 @@ function generateTemplatePreview(template = "") {
       return resolvePromptLine(rawHint, state);
     })
     .join("\n\n");
+}
+
+function sanitizeSectionHeading(value = "") {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildStructuredPreview(template = "", templateName = "") {
+  const resolved = replaceTemplateTokens(template);
+  const lines = resolved.split("\n");
+  const state = { specIndex: 0 };
+  const context = { categoryProfile: getCategoryProfile(templateName) };
+  const sections = [];
+  const sectionIndexMap = new Map();
+  let heading = "";
+  let subheading = "";
+
+  function getSection(sectionTitle) {
+    const key = sectionTitle.toLowerCase();
+    if (sectionIndexMap.has(key)) {
+      return sections[sectionIndexMap.get(key)];
+    }
+    const section = { title: sanitizeSectionHeading(sectionTitle), paragraphs: [], points: [] };
+    sectionIndexMap.set(key, sections.length);
+    sections.push(section);
+    return section;
+  }
+
+  function pushContent(sectionTitle, content, asPoint = false) {
+    if (!content) return;
+    const section = getSection(sectionTitle);
+    if (asPoint) {
+      section.points.push(content);
+      return;
+    }
+    section.paragraphs.push(content);
+  }
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const bracketMatch = trimmed.match(/^\[(.*)\]$/);
+    if (!bracketMatch) {
+      if (!heading) {
+        heading = trimmed;
+        return;
+      }
+      if (!subheading) {
+        subheading = trimmed;
+        return;
+      }
+      pushContent("Details", trimmed);
+      return;
+    }
+
+    const rawHint = bracketMatch[1].trim();
+    const normalizedRawHint = rawHint.toLowerCase();
+    const parts = rawHint.split(":");
+    const hasCategory = parts.length > 1;
+    const category = hasCategory ? sanitizeSectionHeading(parts.shift().trim()) : "Details";
+    const hint = hasCategory ? parts.join(":").trim() : rawHint;
+    const normalizedHint = hint.toLowerCase();
+    const content = resolvePromptLine(hint, state, context);
+
+    if (!heading && (normalizedRawHint.includes("product name") || normalizedRawHint.includes("collection title"))) {
+      heading = content;
+      return;
+    }
+
+    if (!subheading && (normalizedHint.includes("overview") || normalizedHint.includes("hook") || normalizedHint.includes("description"))) {
+      subheading = content;
+      return;
+    }
+
+    const isPoint =
+      normalizedHint.includes("key specification") ||
+      normalizedHint.includes("key feature") ||
+      normalizedHint.includes("key benefit") ||
+      normalizedHint.includes("highlight") ||
+      normalizedHint.includes("question") ||
+      normalizedHint.includes("attribute");
+
+    pushContent(category, content, isPoint);
+  });
+
+  if (!heading) heading = TEMPLATE_PREVIEW_VALUES.product_title;
+  if (!subheading) {
+    subheading = context.categoryProfile?.description
+      || "Preview generated in template format. Use this structure to create category-wise content.";
+  }
+
+  return { heading, subheading, sections };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -583,16 +806,16 @@ export default function TemplatePage() {
   // ── Derived data ────────────────────────────────────────────────────────────
 
   const systemTemplates = useMemo(
-    () => getSystemTemplates(resourceFilter, typeFilter),
+    () => dedupeTemplatesByName(getSystemTemplates(resourceFilter, typeFilter)),
     [resourceFilter, typeFilter],
   );
 
   const filteredCustomTemplates = useMemo(() => {
-    return customTemplates.filter((t) => {
+    return dedupeTemplatesByName(customTemplates.filter((t) => {
       const resourceMatch = resourceFilter === "all" || t.resource === resourceFilter;
       const typeMatch = t.type === typeFilter;
       return resourceMatch && typeMatch;
-    });
+    }));
   }, [customTemplates, resourceFilter, typeFilter]);
 
   // ── Apply template ──────────────────────────────────────────────────────────
@@ -849,8 +1072,8 @@ export default function TemplatePage() {
   const isSystemTab = mainTab === 0;
   const templates = isSystemTab ? systemTemplates : filteredCustomTemplates;
   const showResourceBadge = resourceFilter === "all";
-  const generatedPreviewText = useMemo(
-    () => generateTemplatePreview(previewData?.template || ""),
+  const generatedPreview = useMemo(
+    () => buildStructuredPreview(previewData?.template || "", previewData?.name || ""),
     [previewData],
   );
 
@@ -1007,16 +1230,42 @@ export default function TemplatePage() {
             </Text>
             <Card>
               <Box padding="300">
-                <div
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    lineHeight: 1.6,
-                    fontSize: 14,
-                    color: "var(--p-color-text)",
-                  }}
-                >
-                  {generatedPreviewText}
-                </div>
+                <BlockStack gap="300">
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingMd" fontWeight="bold">
+                      {generatedPreview.heading}
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      {generatedPreview.subheading}
+                    </Text>
+                  </BlockStack>
+
+                  {generatedPreview.sections.map((section) => (
+                    <BlockStack key={section.title} gap="150">
+                      <Text as="h4" variant="headingSm">
+                        {section.title}
+                      </Text>
+
+                      {section.paragraphs.map((paragraph, idx) => (
+                        <Text key={`${section.title}-p-${idx}`} as="p" variant="bodyMd">
+                          {paragraph}
+                        </Text>
+                      ))}
+
+                      {section.points.length > 0 ? (
+                        <ul style={{ margin: "0", paddingLeft: "20px" }}>
+                          {section.points.map((point, idx) => (
+                            <li key={`${section.title}-point-${idx}`} style={{ marginBottom: "6px" }}>
+                              <Text as="span" variant="bodyMd">
+                                {point}
+                              </Text>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </BlockStack>
+                  ))}
+                </BlockStack>
               </Box>
             </Card>
             <InlineStack align="end" gap="200">
