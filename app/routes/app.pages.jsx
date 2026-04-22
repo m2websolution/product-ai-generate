@@ -722,25 +722,26 @@ export default function PagesPage() {
     <Page fullWidth>
       {/* ── Hero Header ── */}
       <div style={{
-        background: "linear-gradient(135deg, #00131a 0%, #064e3b 50%, #0c2a4a 100%)",
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
         borderRadius: "6px",
         padding: "28px 32px",
         marginBottom: "24px",
         position: "relative",
       }}>
-        <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "220px", height: "220px", borderRadius: "50%", background: "radial-gradient(circle, rgba(6,182,212,0.28) 0%, transparent 70%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "-40px", left: "25%", width: "160px", height: "160px", borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "220px", height: "220px", borderRadius: "50%", background: "transparent", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-40px", left: "25%", width: "160px", height: "160px", borderRadius: "50%", background: "transparent", pointerEvents: "none" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1, flexWrap: "wrap", gap: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ width: "46px", height: "46px", borderRadius: "6px", background: "rgba(6,182,212,0.2)", border: "1px solid rgba(6,182,212,0.4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: "46px", height: "46px", borderRadius: "6px", background: "#ffffff", border: "1px solid #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon source={PageIcon} tone="base" />
             </div>
             <div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#ffffff", marginBottom: "3px", letterSpacing: "-0.3px" }}>Storefront Pages</div>
-              <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Generate and manage AI content for your Shopify storefront pages</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#000000", marginBottom: "3px", letterSpacing: "-0.3px" }}>Storefront Pages</div>
+              <div style={{ fontSize: "13px", color: "#000000", lineHeight: 1.4 }}>Generate and manage AI content for your Shopify storefront pages</div>
             </div>
           </div>
-          <div style={{ "--p-color-text": "#fff", "--p-color-bg-fill": "rgba(255,255,255,0.08)", "--p-color-border": "rgba(255,255,255,0.25)" }}>
+          <div style={{ "--p-color-text": "#000", "--p-color-bg-fill": "#ffffff", "--p-color-border": "#d1d5db" }}>
             {/* Credits badge */}
             <button
               type="button"
@@ -749,14 +750,14 @@ export default function PagesPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "5px",
-                border: "1px solid rgba(255,255,255,0.3)",
-                background: "rgba(255,255,255,0.1)",
+                border: "1px solid #d1d5db",
+                background: "#ffffff",
                 borderRadius: 20,
                 padding: "4px 10px",
                 boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
                 fontSize: 12,
                 fontWeight: 600,
-                color: "#ffffff",
+                color: "#000000",
                 lineHeight: 1,
                 whiteSpace: "nowrap",
                 cursor: "pointer",
@@ -767,7 +768,7 @@ export default function PagesPage() {
                 <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z"/>
               </svg>
               <span>{credits} credits.</span>
-              <span style={{ color: "#60d5ff" }}>Upgrade</span>
+              <span style={{ color: "#000000" }}>Upgrade</span>
             </button>
             <Button onClick={() => navigate("/app")} variant="secondary" size="slim">← Dashboard</Button>
           </div>
