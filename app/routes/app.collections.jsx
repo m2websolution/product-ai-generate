@@ -73,6 +73,35 @@ const LANGUAGE_OPTIONS = [
   "Telugu", "Thai", "Turkish", "Ukrainian", "Urdu", "Vietnamese",
 ].map((l) => ({ label: l, value: l }));
 
+const DEFAULT_DESCRIPTION_CUSTOM_PROMPT = `Write a clear, engaging, and professional product description for the given product. The description should be structured and easy to scan.
+
+Follow this format:
+
+Introduction - Start with 1-2 sentences that capture the product's essence: what it is, who it's for, and its main appeal.
+
+Key Features - Highlight important attributes such as size, color, material, functionality, technology, or craftsmanship.
+
+Benefits - Explain how the product helps the user, what problem it solves, or what experience it enhances.
+
+Keep the tone trustworthy, simple, and appealing, like a top e-commerce store.
+Avoid exaggeration. Adapt the level of detail depending on the product type.
+
+Html format should be like this:
+<p>
+{Introduction text here}
+</p>
+
+<ul>
+<li><b>{Feature name}</b>: {Feature text here}</li>
+<li><b>{Feature name}</b>: {Feature text here}</li>
+<li><b>{Feature name}</b>: {Feature text here}</li>
+... and so on
+</ul>
+
+<p>
+{Benefits text here}
+</p>`;
+
 const TONE_OPTIONS = [
   { label: "Professional", value: "professional" },
   { label: "Friendly", value: "friendly" },
@@ -830,6 +859,9 @@ export const action = async ({ request }) => {
       const metaTitlePromptTemplate = readFormString(formData, "metaTitlePromptTemplate");
       const metaDescriptionPromptTemplate = readFormString(formData, "metaDescriptionPromptTemplate");
       const aiProvider = readFormString(formData, "aiProvider") || "auto";
+      const addTitleAsHeadingFlag = !!readFormString(formData, "addTitleAsHeading");
+      const preserveOldDescriptionFlag = !!readFormString(formData, "preserveOldDescription");
+      const removeImagesFlag = !!readFormString(formData, "removeImagesFromDescription");
       const selectedContentTypes = parseSelectedContentTypes(
         formData.get("contentTypes"),
         COLLECTION_CONTENT_TYPES,
@@ -879,11 +911,25 @@ export const action = async ({ request }) => {
             },
           );
 
-          const nextDescription = shouldUpdateDescription
+          let nextDescription = shouldUpdateDescription
             ? (generated.collectionDescription
               ? normalizeGeneratedHtml(generated.collectionDescription)
               : c.descriptionHtml || "")
             : c.descriptionHtml || "";
+          if (shouldUpdateDescription && generated.collectionDescription) {
+            if (removeImagesFlag) {
+              nextDescription = nextDescription.replace(/<img\b[^>]*>/gi, "").replace(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi, "");
+            }
+            if (addTitleAsHeadingFlag && c.title) {
+              nextDescription = `<h2>${c.title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h2>${nextDescription}`;
+            }
+            if (preserveOldDescriptionFlag && c.descriptionHtml) {
+              const oldHtml = removeImagesFlag
+                ? c.descriptionHtml.replace(/<img\b[^>]*>/gi, "").replace(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi, "")
+                : c.descriptionHtml;
+              nextDescription = nextDescription + oldHtml;
+            }
+          }
           const nextSeoTitle = shouldUpdateMetaTitle
             ? (generated.seoTitle || c.seoTitleValue || "")
             : (c.seoTitleValue || "");
@@ -1155,7 +1201,7 @@ export default function CollectionsPage() {
   const shopify = useAppBridge();
   const [searchValue, setSearchValue] = useState(filters.search);
   const [fallbackCollections, setFallbackCollections] = useState(collections);
-  const [bulkDescTemplate, setBulkDescTemplate] = useState("");
+  const [bulkDescTemplate, setBulkDescTemplate] = useState(DEFAULT_DESCRIPTION_CUSTOM_PROMPT);
   const [bulkMetaDescTemplate, setBulkMetaDescTemplate] = useState("");
   const [bulkMetaTitleTemplate, setBulkMetaTitleTemplate] = useState("");
   const [bulkSettings, setBulkSettings] = useState(() => {
@@ -1185,20 +1231,20 @@ export default function CollectionsPage() {
   const [templateLibraryContentType, setTemplateLibraryContentType] = useState("description");
   const [outputLanguage, setOutputLanguage] = useState(() => readGlobalSettings().language || "English");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [addTitleAsHeading, setAddTitleAsHeading] = useState(false);
+  const [preserveOldDescription, setPreserveOldDescription] = useState(false);
+  const [removeImagesFromDescription, setRemoveImagesFromDescription] = useState(false);
 
   useEffect(() => {
     const templateSelection = readStoredCollectionPromptTemplateSelection();
     if (templateSelection.descriptionPromptTemplate) {
       setBulkDescTemplate(templateSelection.descriptionPromptTemplate);
-      setUseCustomDescInstructions(true);
     }
     if (templateSelection.metaTitlePromptTemplate) {
       setBulkMetaTitleTemplate(templateSelection.metaTitlePromptTemplate);
-      setUseCustomMetaTitleInstructions(true);
     }
     if (templateSelection.metaDescriptionPromptTemplate) {
       setBulkMetaDescTemplate(templateSelection.metaDescriptionPromptTemplate);
-      setUseCustomMetaDescInstructions(true);
     }
   }, []);
 
@@ -1305,6 +1351,9 @@ export default function CollectionsPage() {
     payload.append("metaDescriptionPromptTemplate", useCustomMetaDescInstructions ? (bulkMetaDescTemplate || "") : "");
     payload.append("contentTypes", JSON.stringify(bulkContentTypes));
     payload.append("aiProvider", bulkSettings.aiProvider);
+    payload.append("addTitleAsHeading", addTitleAsHeading ? "1" : "");
+    payload.append("preserveOldDescription", preserveOldDescription ? "1" : "");
+    payload.append("removeImagesFromDescription", removeImagesFromDescription ? "1" : "");
     bulkFetcher.submit(payload, { method: "post" });
   }, [
     bulkDescKeywords,
@@ -1321,6 +1370,9 @@ export default function CollectionsPage() {
     useCustomDescInstructions,
     useCustomMetaDescInstructions,
     useCustomMetaTitleInstructions,
+    addTitleAsHeading,
+    preserveOldDescription,
+    removeImagesFromDescription,
   ]);
 
   const isBulkGenerating = bulkFetcher.state !== "idle";
@@ -1732,7 +1784,7 @@ export default function CollectionsPage() {
                         Browse Templates
                       </button>
                       <button
-                        onClick={() => { setBulkDescTemplate(""); setUseCustomDescInstructions(false); }}
+                        onClick={() => { setBulkDescTemplate(DEFAULT_DESCRIPTION_CUSTOM_PROMPT); setUseCustomDescInstructions(false); }}
                         style={{ padding: "6px 14px", background: "#fff", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}
                       >
                         Reset to Default
@@ -1887,6 +1939,38 @@ export default function CollectionsPage() {
                         autoComplete="off"
                       />
                     )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "14px", paddingTop: "4px" }}>
+                      <div>
+                        <Checkbox
+                          label={<span style={{ fontWeight: 600, fontSize: "13px" }}>Add Collection Title as heading tag in the description</span>}
+                          checked={addTitleAsHeading}
+                          onChange={(v) => setAddTitleAsHeading(v)}
+                        />
+                        <p style={{ margin: "4px 0 0 24px", fontSize: "12px", color: "#6b7280", lineHeight: "1.45" }}>
+                          This will add your Collection Title as the main heading in the description.
+                        </p>
+                      </div>
+                      <div>
+                        <Checkbox
+                          label={<span style={{ fontWeight: 600, fontSize: "13px" }}>Preserve old description and add new AI Generated content to the start of it</span>}
+                          checked={preserveOldDescription}
+                          onChange={(v) => setPreserveOldDescription(v)}
+                        />
+                        <p style={{ margin: "4px 0 0 24px", fontSize: "12px", color: "#6b7280", lineHeight: "1.45" }}>
+                          This will keep your existing description and add the AI-generated content to the start of it.
+                        </p>
+                      </div>
+                      <div>
+                        <Checkbox
+                          label={<span style={{ fontWeight: 600, fontSize: "13px" }}>Remove images from Collection Description <span style={{ color: "#6b7280", fontWeight: 400 }}>(Recommended)</span></span>}
+                          checked={removeImagesFromDescription}
+                          onChange={(v) => setRemoveImagesFromDescription(v)}
+                        />
+                        <p style={{ margin: "4px 0 0 24px", fontSize: "12px", color: "#6b7280", lineHeight: "1.45" }}>
+                          This will remove all images from your collection descriptions to ensure clean text content.
+                        </p>
+                      </div>
+                    </div>
                   </BlockStack>
                 </div>
               )}

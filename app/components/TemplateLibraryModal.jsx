@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 // ─── Category mapping by template ID ────────────────────────────────────────
 const TEMPLATE_CATEGORIES = {
@@ -118,33 +118,166 @@ function getCategory(templateId) {
   return TEMPLATE_CATEGORIES[templateId] || "General";
 }
 
-// ─── Preview Modal ────────────────────────────────────────────────────────────
-function PreviewPanel({ template, onClose, onUse }) {
+// ─── Length badge helper ──────────────────────────────────────────────────────
+function getLengthLabel(templateText) {
+  const len = (templateText || "").length;
+  if (len < 150) return { label: "short", color: "#10b981", bg: "#d1fae5" };
+  if (len < 400) return { label: "medium", color: "#f59e0b", bg: "#fef3c7" };
+  return { label: "long", color: "#6366f1", bg: "#ede9fe" };
+}
+
+// ─── Preview Panel ────────────────────────────────────────────────────────────
+function buildMetaPreviewText(template) {
+  const fallback = "Organic Bamboo Bed Sheets - Queen Size - Softer than cotton for ultimate luxury. Temperature regulating for year-round comfort. Shop now!";
+  const text = String(template?.template || "").trim();
+  if (!text) return fallback;
+  const withoutBracketHints = text.replace(/\[[^\]]+\]/g, "").trim();
+  if (!withoutBracketHints) return fallback;
+  return withoutBracketHints
+    .replace(/\s+/g, " ")
+    .replace(/\{[^}]+\}/g, "Organic Bamboo Bed Sheets")
+    .slice(0, 220);
+}
+
+function buildDescriptionPreviewText(template) {
+  const raw = String(template?.template || "").trim();
+  if (!raw) return "";
+
+  const cleanedLines = raw
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^\s*[-*]\s*/, "")
+        .replace(/\[([^\]]+)\]/g, "$1")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean)
+    .filter((line) => !/^key features and benefits\s*:/i.test(line));
+
+  if (!cleanedLines.length) return "";
+
+  const introLines = cleanedLines.slice(0, 2);
+  const featureLines = cleanedLines.slice(2, 8);
+  const closingLines = cleanedLines.slice(8);
+
+  const introText = introLines.join(" ").replace(/\s+/g, " ").trim();
+  const featureText = featureLines.map((line) => `- ${line}`).join("\n");
+  const closingText = closingLines.join(" ").replace(/\s+/g, " ").trim();
+
+  return [
+    introText,
+    featureText ? `\n\nRefined Details:\n${featureText}` : "",
+    closingText ? `\n\n${closingText}` : "",
+  ]
+    .join("")
+    .trim();
+}
+
+function PreviewPanel({ template, category, contentTypeLabel, contentTypeId, onClose, onUse }) {
+  const length = getLengthLabel(template.template);
+  const isDescriptionPreview = contentTypeId === "description";
+  const isMetaPreview = contentTypeId === "meta_description" || contentTypeId === "meta_title";
+  const metaPreviewText = useMemo(() => buildMetaPreviewText(template), [template]);
+  const descriptionPreviewText = useMemo(() => buildDescriptionPreviewText(template), [template]);
   return (
     <div className="template-library-modal__preview" style={{
       position: "absolute", inset: 0, zIndex: 20,
-      background: "rgba(255,255,255,0.98)",
+      background: "#fff",
       display: "flex", flexDirection: "column",
       borderRadius: "12px", overflow: "hidden",
     }}>
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: "15px", color: "#111" }}>{template.name}</div>
-          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>{template.description}</div>
-        </div>
+      {/* Preview header */}
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
         <button
           onClick={onClose}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: "#6b7280", lineHeight: 1, padding: "4px 8px" }}
-        >✕</button>
+          style={{ background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: "6px", cursor: "pointer", fontSize: "13px", padding: "6px 12px", fontWeight: 500, color: "#374151", display: "flex", alignItems: "center", gap: "4px" }}
+        >
+          ← Back
+        </button>
+        <span style={{ flex: 1, fontWeight: 700, fontSize: "15px", color: "#111", textAlign: "center" }}>{template.name}</span>
+        <button onClick={onUse} style={{ padding: "7px 18px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap" }}>
+          Use template
+        </button>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-        <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "16px", fontFamily: "monospace", fontSize: "13px", lineHeight: "1.7", whiteSpace: "pre-wrap", color: "#374151" }}>
-          {template.template}
+
+      {/* Preview body — two columns */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* Left: main content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "6px" }}>About this template</div>
+            <p style={{ fontSize: "13px", color: "#6b7280", margin: 0, lineHeight: "1.6" }}>
+              {template.description || "Use this template to generate AI content tailored for your product."}
+            </p>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "8px" }}>Template Prompt:</div>
+            <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "14px 16px", fontFamily: "monospace", fontSize: "12px", lineHeight: "1.8", whiteSpace: "pre-wrap", color: "#374151" }}>
+              {template.template}
+            </div>
+          </div>
+
+          {isDescriptionPreview && descriptionPreviewText && (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "8px" }}>
+                Descriptions will look like this:
+              </div>
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  padding: "14px 16px",
+                  fontSize: "14px",
+                  lineHeight: "1.6",
+                  color: "#374151",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {descriptionPreviewText}
+              </div>
+            </div>
+          )}
+
+          {isMetaPreview && (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "8px" }}>
+                {contentTypeId === "meta_title" ? "Meta Title Preview:" : "Meta Description Preview:"}
+              </div>
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "14px 16px", fontSize: "14px", lineHeight: "1.6", color: "#374151" }}>
+                {metaPreviewText}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-      <div className="template-library-modal__footer-actions" style={{ padding: "12px 20px", borderTop: "1px solid #e5e7eb", display: "flex", gap: "10px", justifyContent: "flex-end", flexShrink: 0 }}>
-        <button onClick={onClose} style={{ padding: "8px 18px", background: "#f3f4f6", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}>Back</button>
-        <button onClick={onUse} style={{ padding: "8px 18px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>Use Template</button>
+
+        {/* Right: sidebar details */}
+        <div style={{ width: "200px", borderLeft: "1px solid #e5e7eb", padding: "20px 16px", flexShrink: 0, overflowY: "auto" }}>
+          <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "14px" }}>Template Details</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>Category</div>
+              <div style={{ fontSize: "13px", color: "#374151" }}>{category}</div>
+            </div>
+            {contentTypeLabel && (
+              <div>
+                <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>Content Type</div>
+                <div style={{ fontSize: "13px", color: "#374151" }}>{contentTypeLabel}</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>Length</div>
+              <span style={{ background: length.bg, color: length.color, borderRadius: "10px", padding: "2px 10px", fontSize: "12px", fontWeight: 600 }}>
+                {length.label}
+              </span>
+            </div>
+            <div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>Language</div>
+              <div style={{ fontSize: "13px", color: "#374151" }}>English</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -167,6 +300,7 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
 
   if (!open) return null;
 
+  const activeTabLabel = tabs.find((t) => t.id === activeTab)?.label || activeTab;
   const currentTemplates = templatesByTab[activeTab] || [];
 
   // Derive categories
@@ -214,6 +348,9 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
         {previewTemplate && (
           <PreviewPanel
             template={previewTemplate}
+            category={getCategory(previewTemplate.id)}
+            contentTypeLabel={activeTabLabel}
+            contentTypeId={activeTab}
             onClose={() => setPreviewTemplate(null)}
             onUse={() => { handleUse(previewTemplate); }}
           />

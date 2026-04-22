@@ -350,7 +350,8 @@ canvas {
   }
 
   .app-split-side {
-    flex: 0 0 clamp(280px, 30%, 420px);
+    flex: 0 0 50%;
+    max-width: 50%;
   }
 
   .app-form-grid-3 {
