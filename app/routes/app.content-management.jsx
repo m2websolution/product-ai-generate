@@ -1901,18 +1901,39 @@ function GenerateTemplateModal({
   }, []);
 
   const [templatePopoverActive, setTemplatePopoverActive] = useState(false);
-  const selectedTemplateCount = [
-    templateSelection?.mainTemplateId,
-    templateSelection?.metaTitleTemplateId,
-    templateSelection?.metaDescriptionTemplateId,
-  ].filter(Boolean).length;
-  const activeScopeLabels = [];
-  if (showMain) activeScopeLabels.push(contentType === "pages" ? "Content" : "Description");
-  if (showMetaTitle) activeScopeLabels.push("Meta Title");
-  if (showMetaDescription) activeScopeLabels.push("Meta Description");
-  const browseButtonLabel = selectedTemplateCount > 0
-    ? `Browse Templates (${selectedTemplateCount} selected)`
-    : "Browse Templates";
+  const sectionTitle = showMetaTitle && !showMain && !showMetaDescription
+    ? "Meta Title"
+    : showMetaDescription && !showMain && !showMetaTitle
+      ? "Meta Description"
+      : contentType === "pages"
+        ? "Body"
+        : "Description";
+  const browseButtonLabel = "Browse Templates";
+  const defaultPromptByScope = (() => {
+    if (showMetaTitle && !showMain && !showMetaDescription) {
+      return contentType === "collections"
+        ? "Generate SEO-optimized meta title for the given collection.\n\nRequirements:\n- Primary keyword placement\n- Brand name inclusion\n- Under 60 characters\n- Compelling and descriptive\n- Search-friendly format\n\nFocus on click-through rate optimization."
+        : "Generate SEO-optimized meta title for the given item.\n\nRequirements:\n- Primary keyword placement\n- Brand name inclusion\n- Under 60 characters\n- Compelling and descriptive\n- Search-friendly format\n\nFocus on click-through rate optimization.";
+    }
+    if (showMetaDescription && !showMain && !showMetaTitle) {
+      return contentType === "collections"
+        ? "Generate SEO-optimized meta description for given collection.\n\nFocus on:\n- Primary keyword naturally included\n- Clear value proposition\n- Call to action\n- 140-160 characters max\n- Compelling and click-worthy\n\nFormat: Engaging description that drives clicks from search results."
+        : "Generate SEO-optimized meta description for given item.\n\nFocus on:\n- Primary keyword naturally included\n- Clear value proposition\n- Call to action\n- 140-160 characters max\n- Compelling and click-worthy\n\nFormat: Engaging description that drives clicks from search results.";
+    }
+    if (contentType === "pages") {
+      return "Generate premium long-form page content for the given Shopify page.\n\nObjective:\nCreate clear, persuasive, SEO-aware content that is easy to scan and ready to publish.\n\nRequirements:\n- Use heading/subheading structure\n- Keep language simple and customer-focused\n- Add bullet points where useful\n- Keep natural keyword usage and avoid stuffing\n- End with a clear CTA";
+    }
+    if (contentType === "collections") {
+      return "Write a clear, engaging, and SEO-friendly collection description for the given collection.\n\nFocus on:\n- What type of products are in this collection\n- Who this collection is best for\n- Key value/benefits customers get\n- Search-friendly structure with natural keywords\n\nFormat:\n- 1 short intro paragraph\n- 3-5 bullet points for highlights\n- 1 closing CTA line";
+    }
+    return "Write a clear, engaging, and conversion-focused product description.\n\nUse:\n- Short intro paragraph\n- Key features as bullet points\n- Benefits and use-case clarity\n- Closing CTA";
+  })();
+  const handleCustomInstructionToggle = useCallback((checked) => {
+    onUseCustomInstructionsChange(checked);
+    if (checked && !String(customPrompt || "").trim()) {
+      onCustomPromptChange(defaultPromptByScope);
+    }
+  }, [customPrompt, defaultPromptByScope, onCustomPromptChange, onUseCustomInstructionsChange]);
   const templateSections = [
     ...(showMain
       ? [{
@@ -2042,62 +2063,6 @@ function GenerateTemplateModal({
           ) : null}
 
           <div className="content-mgmt-generate-modal__grid">
-            <BlockStack gap="300">
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="p" variant="headingSm">{itemTypeLabel[0].toUpperCase() + itemTypeLabel.slice(1)}</Text>
-                  <div className="content-mgmt-generate-modal__item">
-                    <InlineStack gap="300" blockAlign="center" wrap={false}>
-                      {item.imageUrl ? (
-                        <Thumbnail source={item.imageUrl} alt={item.imageAlt || item.title} size="small" />
-                      ) : (
-                        <div className="content-mgmt-thumb-placeholder" aria-hidden="true" />
-                      )}
-                      <Text as="p" variant="bodyMd">{item.title}</Text>
-                    </InlineStack>
-                  </div>
-                </BlockStack>
-              </Card>
-
-              <BlockStack gap="200">
-                <InlineStack gap="200" wrap={false}>
-                  <Popover
-                    active={templatePopoverActive}
-                    activator={
-                      <Button onClick={() => setTemplatePopoverActive((prev) => !prev)}>
-                        {browseButtonLabel}
-                      </Button>
-                    }
-                    onClose={() => setTemplatePopoverActive(false)}
-                  >
-                    <ActionList sections={templateSections} />
-                  </Popover>
-                  <Button variant="secondary" onClick={onResetDefaults}>
-                    Reset to Default
-                  </Button>
-                </InlineStack>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Target: {activeScopeLabels.join(", ")}
-                </Text>
-              </BlockStack>
-
-              <Checkbox
-                label="Use custom instructions"
-                checked={Boolean(useCustomInstructions)}
-                onChange={onUseCustomInstructionsChange}
-              />
-
-              <TextField
-                label="Custom Prompt"
-                value={customPrompt}
-                onChange={onCustomPromptChange}
-                multiline={8}
-                autoComplete="off"
-                disabled={!useCustomInstructions}
-                placeholder="Write detailed instructions for style, tone, structure, and required points."
-              />
-            </BlockStack>
-
             <Card>
               <div className="content-mgmt-generate-modal__preview">
                 {showMain ? (
@@ -2122,6 +2087,76 @@ function GenerateTemplateModal({
                 )}
               </div>
             </Card>
+
+            <BlockStack gap="300">
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="p" variant="headingSm">{itemTypeLabel[0].toUpperCase() + itemTypeLabel.slice(1)}</Text>
+                  <div className="content-mgmt-generate-modal__item">
+                    <InlineStack gap="300" blockAlign="center" wrap={false}>
+                      {item.imageUrl ? (
+                        <Thumbnail source={item.imageUrl} alt={item.imageAlt || item.title} size="small" />
+                      ) : (
+                        <div className="content-mgmt-thumb-placeholder" aria-hidden="true" />
+                      )}
+                      <Text as="p" variant="bodyMd">{item.title}</Text>
+                    </InlineStack>
+                  </div>
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="250">
+                  <Text as="h3" variant="headingSm">{sectionTitle}</Text>
+                  <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                    <Checkbox
+                      label={(
+                        <span>
+                          Use custom instructions <span style={{ color: "#f59e0b" }}>✦</span>
+                        </span>
+                      )}
+                      checked={Boolean(useCustomInstructions)}
+                      onChange={handleCustomInstructionToggle}
+                    />
+                  <Popover
+                    active={templatePopoverActive}
+                    activator={
+                        <Button onClick={() => setTemplatePopoverActive((prev) => !prev)}>
+                        {browseButtonLabel}
+                      </Button>
+                    }
+                    onClose={() => setTemplatePopoverActive(false)}
+                  >
+                    <ActionList sections={templateSections} />
+                  </Popover>
+                  </InlineStack>
+
+                  {useCustomInstructions ? (
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">Custom Prompt</Text>
+                      <TextField
+                        label="Custom Prompt"
+                        labelHidden
+                        value={customPrompt}
+                        onChange={onCustomPromptChange}
+                        multiline={12}
+                        autoComplete="off"
+                        placeholder="Write detailed instructions for style, tone, structure, and required points."
+                      />
+                      <InlineStack gap="200">
+                        <Button onClick={() => setTemplatePopoverActive(true)}>Browse Templates</Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => onResetDefaults(defaultPromptByScope)}
+                        >
+                          Reset to Default
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+                  ) : null}
+                </BlockStack>
+              </Card>
+            </BlockStack>
           </div>
         </BlockStack>
       </Modal.Section>
@@ -2404,15 +2439,19 @@ export default function ContentManagementPage() {
     }
   }, [pendingGenerateContentType]);
 
-  const resetGenerateModalDefaults = useCallback(() => {
+  const resetGenerateModalDefaults = useCallback((defaultPrompt = "") => {
     const defaults = defaultGenerateModalPrefs();
     setGenerateTemplateSelection(defaults.templateSelection);
-    setUseCustomInstructions(defaults.useCustomInstructions);
-    setCustomPrompt(defaults.customPrompt);
+    setUseCustomInstructions(Boolean(defaultPrompt));
+    setCustomPrompt(defaultPrompt || defaults.customPrompt);
     if (pendingGenerateContentType) {
       setGeneratePrefsByType((all) => ({
         ...all,
-        [pendingGenerateContentType]: defaults,
+        [pendingGenerateContentType]: {
+          ...defaults,
+          useCustomInstructions: Boolean(defaultPrompt),
+          customPrompt: defaultPrompt || "",
+        },
       }));
     }
   }, [pendingGenerateContentType]);
