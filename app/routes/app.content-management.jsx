@@ -2499,37 +2499,18 @@ export default function ContentManagementPage() {
         <Card padding="0">
           <Box padding="300" paddingBlockEnd="200">
             <BlockStack gap="300">
-              <InlineStack gap="200" wrap>
-                {mainTabs.map((tabItem, idx) => {
-                  const selected = idx === (mainTabIndex < 0 ? 0 : mainTabIndex);
-                  return (
-                    <button
-                      key={tabItem.id}
-                      type="button"
-                      onClick={() => handleMainTabChange(idx)}
-                      className={`content-mgmt-tab-btn${selected ? " content-mgmt-tab-btn--active" : ""}`}
-                    >
-                      {tabItem.content}
-                    </button>
-                  );
-                })}
-              </InlineStack>
+              <Tabs
+                tabs={mainTabs}
+                selected={mainTabIndex < 0 ? 0 : mainTabIndex}
+                onSelect={handleMainTabChange}
+                fitted
+              />
 
-              <InlineStack gap="200" wrap>
-                {filterTabs.map((tabItem, idx) => {
-                  const selected = idx === (filterTabIndex < 0 ? 0 : filterTabIndex);
-                  return (
-                    <button
-                      key={tabItem.id}
-                      type="button"
-                      onClick={() => handleFilterTabChange(idx)}
-                      className={`content-mgmt-tab-btn${selected ? " content-mgmt-tab-btn--active" : ""}`}
-                    >
-                      {tabItem.content}
-                    </button>
-                  );
-                })}
-              </InlineStack>
+              <Tabs
+                tabs={filterTabs}
+                selected={filterTabIndex < 0 ? 0 : filterTabIndex}
+                onSelect={handleFilterTabChange}
+              />
             </BlockStack>
           </Box>
 
