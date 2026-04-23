@@ -2056,11 +2056,15 @@ export default function CollectionsPage() {
           ? ` ${response.creditsUsed} credits used${typeof response.newCredits === "number" ? `. Remaining: ${response.newCredits}` : ""}.`
           : "";
       shopify.toast.show(`Bulk generate complete: ${response.succeeded}/${response.total} updated.${creditsMessage}`);
-      navigate("/app/content-management?tab=collections&filter=all");
+      navigate(
+        isCollectionProductsMode
+          ? "/app/content-management?tab=collection_products&filter=all"
+          : "/app/content-management?tab=collections&filter=all",
+      );
       return;
     }
     setBulkValidationMessage(response.error || "Bulk generation failed.");
-  }, [bulkFetcher.state, bulkFetcher.data, navigate, revalidator, shopify]);
+  }, [bulkFetcher.state, bulkFetcher.data, isCollectionProductsMode, navigate, revalidator, shopify]);
 
   useEffect(() => () => {
     if (queueIntervalRef.current) clearInterval(queueIntervalRef.current);
@@ -2197,7 +2201,7 @@ export default function CollectionsPage() {
             }}
           >
             <BlockStack gap="050">
-              <Text as="span" variant="bodyMd" fontWeight="semibold">
+              <Text as="span" variant="bodyMd" fontWeight="medium">
                 <span className="collections-name-clamp">{collection.title}</span>
               </Text>
               <InlineStack gap="200" blockAlign="center">
@@ -2209,8 +2213,7 @@ export default function CollectionsPage() {
                     borderRadius: "999px",
                     background: "#bfdbfe",
                     color: "#1e3a8a",
-                    fontSize: "14px",
-                    fontWeight: 600,
+                    fontSize: "12px",
                     lineHeight: 1.2,
                   }}
                 >
@@ -2260,13 +2263,12 @@ export default function CollectionsPage() {
   ));
 
   const sectionTabs = [
-    { id: "products", label: "Products", to: { pathname: "/app/products", search: "" }, icon: ProductIcon },
-    { id: "collections", label: "Collections", to: { pathname: "/app/collections", search: "" }, icon: CollectionIcon },
+    { id: "products", content: "Products", to: { pathname: "/app/products", search: "" } },
+    { id: "collections", content: "Collections", to: { pathname: "/app/collections", search: "" } },
     {
       id: "collection-products",
-      label: "Collection Product",
+      content: "Collection Product",
       to: { pathname: "/app/collections", search: `?mode=${COLLECTION_PRODUCTS_MODE}` },
-      icon: ProductIcon,
     },
   ];
   const statusTabs = [
@@ -2279,6 +2281,18 @@ export default function CollectionsPage() {
     : isCollectionProductsMode
       ? "collection-products"
       : "collections";
+  const activeSectionTabIndex = Math.max(
+    0,
+    sectionTabs.findIndex((tab) => tab.id === activeSectionId),
+  );
+  const handleSectionTabChange = useCallback(
+    (selectedTabIndex) => {
+      const nextTab = sectionTabs[selectedTabIndex];
+      if (!nextTab?.to) return;
+      navigate(nextTab.to);
+    },
+    [navigate, sectionTabs],
+  );
 
   return (
     <Page fullWidth>
@@ -2347,50 +2361,13 @@ export default function CollectionsPage() {
         {/* ── LEFT: Collection List ── */}
         <div className="app-split-main" style={{ flex: "1 1 0", minWidth: "0" }}>
           {/* ── Products / Collections tab bar ── */}
-          <div className="app-toolbar" style={{ marginBottom: "20px",width: "fit-content" }}>
-            <div
-              className="app-toolbar-fixed"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "nowrap",
-                overflowX: "auto",
-                border: "1px solid #d1d5db",
-                borderRadius: "12px",
-                padding: "4px",
-                background: "#f3f4f6",
-                gap: "4px",
-              }}
-            >
-              {sectionTabs.map((tab) => {
-                const isActive = activeSectionId === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => navigate(tab.to)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      minWidth: "150px",
-                      padding: "8px 14px",
-                      border: "none",
-                      borderRadius: "10px",
-                      background: isActive ? "#000000" : "transparent",
-                      color: isActive ? "#ffffff" : "#374151",
-                      fontWeight: 600,
-                      fontSize: "14px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Icon source={tab.icon} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="app-toolbar" style={{ marginBottom: "20px", maxWidth: "640px" }}>
+            <Tabs
+              tabs={sectionTabs}
+              selected={activeSectionTabIndex}
+              onSelect={handleSectionTabChange}
+              fitted
+            />
           </div>
 
           <Card padding="0">

@@ -175,6 +175,7 @@ function getScopeDisplayLabel(contentType, scope) {
 function getContentTypeDisplayLabel(contentType) {
   if (contentType === "products") return "product";
   if (contentType === "collections") return "collection";
+  if (contentType === "collection_products") return "collection product";
   if (contentType === "pages") return "page";
   return "item";
 }
@@ -645,7 +646,7 @@ export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const requestedTab = (url.searchParams.get("tab") || "all").toLowerCase();
   const requestedFilter = (url.searchParams.get("filter") || "all").toLowerCase();
-  const validTabs = new Set(["all", "products", "collections", "pages"]);
+  const validTabs = new Set(["all", "products", "collections", "collection_products", "pages"]);
   const validFilters = new Set(["all", "unoptimized", "empty"]);
   const tab = validTabs.has(requestedTab) ? requestedTab : "all";
   const filter = validFilters.has(requestedFilter) ? requestedFilter : "all";
@@ -660,12 +661,14 @@ export const loader = async ({ request }) => {
 
   const shouldLoadProducts = tab === "all" || tab === "products";
   const shouldLoadCollections = tab === "all" || tab === "collections";
+  const shouldLoadCollectionProducts = tab === "collection_products";
   const shouldLoadPages = tab === "all" || tab === "pages";
   const shouldLoadBlog = false;
 
   const [
     productGeneratedRows,
     collectionGeneratedRows,
+    collectionProductGeneratedRows,
     pageGeneratedRows,
     logRows,
   ] = await Promise.all([
@@ -681,13 +684,29 @@ export const loader = async ({ request }) => {
           select: { collectionId: true, creditsUsed: true },
         })
       : Promise.resolve([]),
+    shouldLoadCollectionProducts
+      ? db.collectionProductGeneratedContent.findMany({
+          where: { shop: session.shop },
+          select: {
+            collectionId: true,
+            collectionTitle: true,
+            productId: true,
+            productTitle: true,
+            descriptionHtml: true,
+            seoTitle: true,
+            seoDescription: true,
+            creditsUsed: true,
+            updatedAt: true,
+            appliedToProduct: true,
+          },
+        })
+      : Promise.resolve([]),
     shouldLoadPages
       ? db.pageGeneratedContent.findMany({
           where: { shop: session.shop },
           select: { pageId: true, creditsUsed: true },
         })
       : Promise.resolve([]),
-    Promise.resolve([]),
     db.generatedContentLog.findMany({
       where: { shop: session.shop },
       select: { productId: true, resourceType: true, creditsUsed: true },
@@ -936,6 +955,24 @@ export const loader = async ({ request }) => {
           creditsUsed: resolveCreditsUsed("pages", n.id),
         };
       });
+    } else if (tab === "collection_products") {
+      items = collectionProductGeneratedRows.map((row) => ({
+        id: `${row.collectionId}::${row.productId}`,
+        title: row.productTitle || row.productId,
+        collectionTitle: row.collectionTitle || row.collectionId,
+        productId: row.productId,
+        collectionId: row.collectionId,
+        handle: "",
+        status: row.appliedToProduct ? "Active" : "Generated",
+        descriptionHtml: row.descriptionHtml || "",
+        seoTitle: row.seoTitle || "",
+        seoDescription: row.seoDescription || "",
+        imageUrl: null,
+        imageAlt: row.productTitle || row.productId,
+        updatedAt: row.updatedAt || null,
+        contentType: "collection_products",
+        creditsUsed: row.creditsUsed ?? 0,
+      }));
     }
   } catch (err) {
     console.error(`Content management loader error (tab=${tab}):`, err);
@@ -2145,6 +2182,7 @@ export default function ContentManagementPage() {
     { id: "all", content: "All" },
     { id: "products", content: "Products" },
     { id: "collections", content: "Collections" },
+    { id: "collection_products", content: "Collection Product" },
     { id: "pages", content: "Pages" },
   ];
   const mainTabIndex = mainTabs.findIndex((t) => t.id === tab);
@@ -2278,24 +2316,33 @@ export default function ContentManagementPage() {
   const aiModelOptions = getAiModelOptions(envAiModel);
 
   const tabLabel = mainTabs[mainTabIndex]?.id || "all";
-  const singularLabel = { products: "Product", collections: "Collection", pages: "Page", blog: "Blog" }[tabLabel] || "Item";
+  const singularLabel = {
+    products: "Product",
+    collections: "Collection",
+    collection_products: "Collection Product",
+    pages: "Page",
+    blog: "Blog",
+  }[tabLabel] || "Item";
 
   const headings = [
     { title: "Item" },
     { title: "Credits Used" },
     { title: "Status" },
     { title: "Description" },
+    { title: "SEO Title" },
     { title: "SEO Description" },
     { title: "Last Updated" },
-    { title: "Generate" },
+    ...(tabLabel === "collection_products" ? [] : [{ title: "Generate" }]),
   ];
 
   const rowMarkup = localItems.map((item, idx) => {
     const isGenerating = generatingId === item.id;
     const effectiveContentType = item.contentType || tab;
+    const isCollectionProductRow = effectiveContentType === "collection_products";
     const scopeOptions = getGenerateScopeOptions(effectiveContentType);
     const isPopoverOpen = openGeneratePopoverId === item.id;
     const descText = truncateText(item.descriptionHtml, 90);
+    const seoTitleText = truncateText(item.seoTitle, 70);
     const seoDescText = truncateText(item.seoDescription, 80);
 
     return (
@@ -2310,6 +2357,11 @@ export default function ContentManagementPage() {
             )}
             <div className="content-mgmt-title-cell" title={item.title}>
               {item.title}
+              {item.collectionTitle ? (
+                <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
+                  Collection: {item.collectionTitle}
+                </div>
+              ) : null}
             </div>
           </InlineStack>
         </IndexTable.Cell>
@@ -2326,7 +2378,11 @@ export default function ContentManagementPage() {
 
         {/* Description – clickable to open editor */}
         <IndexTable.Cell>
-          {descText ? (
+          {isCollectionProductRow ? (
+            <Text variant="bodySm" as="span" tone={descText ? undefined : "subdued"}>
+              {descText || "—"}
+            </Text>
+          ) : descText ? (
             <button
               type="button"
               onClick={() => openEditor(item, "description")}
@@ -2352,9 +2408,45 @@ export default function ContentManagementPage() {
           )}
         </IndexTable.Cell>
 
+        {/* SEO Title */}
+        <IndexTable.Cell>
+          {isCollectionProductRow ? (
+            <Text variant="bodySm" as="span" tone={seoTitleText ? undefined : "subdued"}>
+              {seoTitleText || "—"}
+            </Text>
+          ) : seoTitleText ? (
+            <button
+              type="button"
+              onClick={() => openEditor(item, "seo")}
+              title="Click to edit SEO title"
+              style={{
+                background: "none", border: "none", padding: 0, cursor: "pointer",
+                textAlign: "left", maxWidth: "220px", display: "block",
+              }}
+            >
+              <Text variant="bodySm" as="span" tone="subdued" truncate>
+                {seoTitleText}
+              </Text>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openEditor(item, "seo")}
+              title="Click to add SEO title"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+            >
+              <Text variant="bodySm" as="span" tone="subdued">—</Text>
+            </button>
+          )}
+        </IndexTable.Cell>
+
         {/* SEO Description – clickable */}
         <IndexTable.Cell>
-          {seoDescText ? (
+          {isCollectionProductRow ? (
+            <Text variant="bodySm" as="span" tone={seoDescText ? undefined : "subdued"}>
+              {seoDescText || "—"}
+            </Text>
+          ) : seoDescText ? (
             <button
               type="button"
               onClick={() => openEditor(item, "seo")}
@@ -2388,56 +2480,58 @@ export default function ContentManagementPage() {
         </IndexTable.Cell>
 
         {/* Generate button */}
-        <IndexTable.Cell>
-          <InlineStack gap="100" wrap={false}>
-            <Button
-              size="slim"
-              icon={
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z" />
-                </svg>
-              }
-              onClick={() => handleGenerate(item, "all")}
-              loading={isGenerating}
-              disabled={isGenerating || localCredits < CREDITS_PER_GENERATION}
-            >
-              Generate
-            </Button>
-            <Popover
-              active={isPopoverOpen}
-              activator={
+        {!isCollectionProductRow ? (
+          <IndexTable.Cell>
+            <InlineStack gap="100" wrap={false}>
               <Button
                 size="slim"
                 icon={
-                  <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M5.5 7.5L10 12L14.5 7.5" />
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 1L12.39 7.26L19 8.27L14.5 12.64L15.78 19.02L10 15.77L4.22 19.02L5.5 12.64L1 8.27L7.61 7.26L10 1Z" />
                   </svg>
                 }
-                onClick={() => setOpenGeneratePopoverId((prev) => (prev === item.id ? null : item.id))}
-                disabled={isGenerating || localCredits < 1}
-                accessibilityLabel="More generate options"
-              />
-              }
-              onClose={() => setOpenGeneratePopoverId(null)}
-            >
-              <ActionList
-                items={scopeOptions
-                  .filter((option) => option.value !== "all")
-                  .map((option) => {
-                    const optionCredits = creditsForGenerateScope(option.value);
-                    return {
-                      content: `${option.label} (${optionCredits} credit${optionCredits === 1 ? "" : "s"})`,
-                      disabled: localCredits < optionCredits,
-                      onAction: () => {
-                        setOpenGeneratePopoverId(null);
-                        handleGenerate(item, option.value);
-                      },
-                    };
-                  })}
-              />
-            </Popover>
-          </InlineStack>
-        </IndexTable.Cell>
+                onClick={() => handleGenerate(item, "all")}
+                loading={isGenerating}
+                disabled={isGenerating || localCredits < CREDITS_PER_GENERATION}
+              >
+                Generate
+              </Button>
+              <Popover
+                active={isPopoverOpen}
+                activator={
+                <Button
+                  size="slim"
+                  icon={
+                    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path d="M5.5 7.5L10 12L14.5 7.5" />
+                    </svg>
+                  }
+                  onClick={() => setOpenGeneratePopoverId((prev) => (prev === item.id ? null : item.id))}
+                  disabled={isGenerating || localCredits < 1}
+                  accessibilityLabel="More generate options"
+                />
+                }
+                onClose={() => setOpenGeneratePopoverId(null)}
+              >
+                <ActionList
+                  items={scopeOptions
+                    .filter((option) => option.value !== "all")
+                    .map((option) => {
+                      const optionCredits = creditsForGenerateScope(option.value);
+                      return {
+                        content: `${option.label} (${optionCredits} credit${optionCredits === 1 ? "" : "s"})`,
+                        disabled: localCredits < optionCredits,
+                        onAction: () => {
+                          setOpenGeneratePopoverId(null);
+                          handleGenerate(item, option.value);
+                        },
+                      };
+                    })}
+                />
+              </Popover>
+            </InlineStack>
+          </IndexTable.Cell>
+        ) : null}
       </IndexTable.Row>
     );
   });
@@ -2498,26 +2592,20 @@ export default function ContentManagementPage() {
         {/* Main tabs: Products | Collections | Pages | Blog */}
         <Card padding="0">
           <Box padding="300" paddingBlockEnd="200">
-            <div className="content-mgmt-tabs-design">
-              <BlockStack gap="300">
-                <div className="content-mgmt-tabs-main">
-                  <Tabs
-                    tabs={mainTabs}
-                    selected={mainTabIndex < 0 ? 0 : mainTabIndex}
-                    onSelect={handleMainTabChange}
-                    fitted
-                  />
-                </div>
+            <BlockStack gap="300">
+              <Tabs
+                tabs={mainTabs}
+                selected={mainTabIndex < 0 ? 0 : mainTabIndex}
+                onSelect={handleMainTabChange}
+                fitted
+              />
 
-                <div className="content-mgmt-tabs-filter">
-                  <Tabs
-                    tabs={filterTabs}
-                    selected={filterTabIndex < 0 ? 0 : filterTabIndex}
-                    onSelect={handleFilterTabChange}
-                  />
-                </div>
-              </BlockStack>
-            </div>
+              <Tabs
+                tabs={filterTabs}
+                selected={filterTabIndex < 0 ? 0 : filterTabIndex}
+                onSelect={handleFilterTabChange}
+              />
+            </BlockStack>
           </Box>
 
           {/* Table */}
@@ -2553,34 +2641,6 @@ export default function ContentManagementPage() {
           </Text>
         </Box>
       </BlockStack>
-
-      <style>{`
-        .content-mgmt-tabs-design {
-          background: #f3f4f6;
-          border-radius: 14px;
-          padding: 10px;
-        }
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab {
-          border-radius: 10px;
-          color: #4b5563;
-          font-weight: 600;
-        }
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab:hover,
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab:focus {
-          background: #e5e7eb;
-          color: #374151;
-        }
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab--active,
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab--active:hover,
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab--active:focus,
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab--active:active {
-          background: #000000;
-          color: #ffffff;
-        }
-        .content-mgmt-tabs-design .Polaris-Tabs__Tab--active path {
-          fill: #ffffff;
-        }
-      `}</style>
 
       {/* Editor Modal */}
       <EditorModal

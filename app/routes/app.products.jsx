@@ -1575,13 +1575,12 @@ export default function ProductsPage() {
   const location = useLocation();
   const sectionMode = new URLSearchParams(location.search).get("mode");
   const sectionTabs = [
-    { id: "products", label: "Products", to: { pathname: "/app/products", search: "" }, icon: ProductIcon },
-    { id: "collections", label: "Collections", to: { pathname: "/app/collections", search: "" }, icon: CollectionIcon },
+    { id: "products", content: "Products", to: { pathname: "/app/products", search: "" } },
+    { id: "collections", content: "Collections", to: { pathname: "/app/collections", search: "" } },
     {
       id: "collection-products",
-      label: "Collection Product",
+      content: "Collection Product",
       to: { pathname: "/app/collections", search: "?mode=collection-products" },
-      icon: ProductIcon,
     },
   ];
   const activeSectionId = location.pathname?.startsWith("/app/products")
@@ -1589,6 +1588,18 @@ export default function ProductsPage() {
     : sectionMode === "collection-products"
       ? "collection-products"
       : "collections";
+  const activeSectionTabIndex = Math.max(
+    0,
+    sectionTabs.findIndex((tab) => tab.id === activeSectionId),
+  );
+  const handleSectionTabChange = useCallback(
+    (selectedTabIndex) => {
+      const nextTab = sectionTabs[selectedTabIndex];
+      if (!nextTab?.to) return;
+      navigate(nextTab.to);
+    },
+    [navigate, sectionTabs],
+  );
 
   return (
     <Page fullWidth>
@@ -1649,48 +1660,13 @@ export default function ProductsPage() {
         {/* ── LEFT: Product List ── */}
         <div className="app-split-main" style={{ flex: "1 1 0", minWidth: "0" }}>
           {/* Products / Collections tab */}
-          <div className="app-toolbar" style={{ marginBottom: "16px" ,width: "fit-content"}}>
-            <div
-              className="app-toolbar-fixed"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                border: "1px solid #d1d5db",
-                borderRadius: "12px",
-                padding: "4px",
-                background: "#f3f4f6",
-                gap: "4px",
-              }}
-            >
-              {sectionTabs.map((tab) => {
-                const isActive = activeSectionId === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => navigate(tab.to)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      minWidth: "150px",
-                      padding: "8px 14px",
-                      border: "none",
-                      borderRadius: "10px",
-                      background: isActive ? "#000000" : "transparent",
-                      color: isActive ? "#ffffff" : "#374151",
-                      fontWeight: 600,
-                      fontSize: "14px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Icon source={tab.icon} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="app-toolbar" style={{ marginBottom: "16px", maxWidth: "640px" }}>
+            <Tabs
+              tabs={sectionTabs}
+              selected={activeSectionTabIndex}
+              onSelect={handleSectionTabChange}
+              fitted
+            />
           </div>
 
           <Card padding="0">
