@@ -2166,20 +2166,22 @@ export default function CollectionsPage() {
       </IndexTable.Cell>
 
       <IndexTable.Cell>
-        <Button
-          size="slim"
-          variant="tertiary"
-          onClick={() =>
-            navigate(
-              makeUrl({
-                search: filters.search,
-                productsCollectionId: collection.id,
-              }),
-            )
-          }
-        >
-          View
-        </Button>
+        {isCollectionProductsMode ? (
+          <Button
+            size="slim"
+            variant="tertiary"
+            onClick={() =>
+              navigate(
+                makeUrl({
+                  search: filters.search,
+                  productsCollectionId: collection.id,
+                }),
+              )
+            }
+          >
+            View
+          </Button>
+        ) : null}
       </IndexTable.Cell>
 
       {!isCollectionProductsMode && (
@@ -2407,7 +2409,7 @@ export default function CollectionsPage() {
                         ),
                       },
                       { title: "Collection Name" },
-                      { title: "View" },
+                      ...(isCollectionProductsMode ? [{ title: "View" }] : []),
                       ...(!isCollectionProductsMode
                         ? [
                             { title: "Short" },
@@ -2434,72 +2436,74 @@ export default function CollectionsPage() {
             </BlockStack>
           </Card>
 
-          <div style={{ marginTop: "16px" }}>
-            <Card padding="0">
-              <BlockStack gap="0">
-                <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
-                  <Text as="h3" variant="headingSm" fontWeight="semibold">
-                    Collection Products{collectionProductsTitle ? `: ${collectionProductsTitle}` : ""}
-                  </Text>
-                </div>
-                {!filters.productsCollectionId ? (
-                  <Box padding="400">
-                    <Text as="p" tone="subdued">
-                      Click `View` on any collection to load its product table here.
+          {isCollectionProductsMode ? (
+            <div style={{ marginTop: "16px" }}>
+              <Card padding="0">
+                <BlockStack gap="0">
+                  <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border)" }}>
+                    <Text as="h3" variant="headingSm" fontWeight="semibold">
+                      Collection Products{collectionProductsTitle ? `: ${collectionProductsTitle}` : ""}
                     </Text>
-                  </Box>
-                ) : collectionProducts.length === 0 ? (
-                  <Box padding="400">
-                    <Text as="p" tone="subdued">
-                      No products found for the selected collection.
-                    </Text>
-                  </Box>
-                ) : (
-                  <div className="collections-table-wrap app-table-scroll">
-                    <IndexTable
-                      resourceName={{ singular: "product", plural: "products" }}
-                      itemCount={collectionProducts.length}
-                      headings={[
-                        {
-                          title: (
-                            <Checkbox
-                              label={`Select all visible (${collectionProducts.length})`}
-                              labelHidden
-                              checked={allVisibleCollectionProductsSelected}
-                              indeterminate={collectionProductsSelectionIndeterminate}
-                              onChange={handleToggleSelectAllCollectionProducts}
-                            />
-                          ),
-                        },
-                        { title: "Product" },
-                        { title: "Shopify Status" },
-                      ]}
-                      selectable={false}
-                    >
-                      {collectionProducts.map((product, index) => (
-                        <IndexTable.Row id={product.id} key={product.id} position={index}>
-                          <IndexTable.Cell>
-                            <Checkbox
-                              label={`Select ${product.title}`}
-                              labelHidden
-                              checked={selectedCollectionProductIds.includes(product.id)}
-                              onChange={handleToggleCollectionProductSelection(product.id)}
-                            />
-                          </IndexTable.Cell>
-                          <IndexTable.Cell>
-                            <Text as="span" variant="bodyMd" fontWeight="medium">
-                              {product.title}
-                            </Text>
-                          </IndexTable.Cell>
-                          <IndexTable.Cell>{renderBadge(product.status)}</IndexTable.Cell>
-                        </IndexTable.Row>
-                      ))}
-                    </IndexTable>
                   </div>
-                )}
-              </BlockStack>
-            </Card>
-          </div>
+                  {!filters.productsCollectionId ? (
+                    <Box padding="400">
+                      <Text as="p" tone="subdued">
+                        Click `View` on any collection to load its product table here.
+                      </Text>
+                    </Box>
+                  ) : collectionProducts.length === 0 ? (
+                    <Box padding="400">
+                      <Text as="p" tone="subdued">
+                        No products found for the selected collection.
+                      </Text>
+                    </Box>
+                  ) : (
+                    <div className="collections-table-wrap app-table-scroll">
+                      <IndexTable
+                        resourceName={{ singular: "product", plural: "products" }}
+                        itemCount={collectionProducts.length}
+                        headings={[
+                          {
+                            title: (
+                              <Checkbox
+                                label={`Select all visible (${collectionProducts.length})`}
+                                labelHidden
+                                checked={allVisibleCollectionProductsSelected}
+                                indeterminate={collectionProductsSelectionIndeterminate}
+                                onChange={handleToggleSelectAllCollectionProducts}
+                              />
+                            ),
+                          },
+                          { title: "Product" },
+                          { title: "Shopify Status" },
+                        ]}
+                        selectable={false}
+                      >
+                        {collectionProducts.map((product, index) => (
+                          <IndexTable.Row id={product.id} key={product.id} position={index}>
+                            <IndexTable.Cell>
+                              <Checkbox
+                                label={`Select ${product.title}`}
+                                labelHidden
+                                checked={selectedCollectionProductIds.includes(product.id)}
+                                onChange={handleToggleCollectionProductSelection(product.id)}
+                              />
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>
+                              <Text as="span" variant="bodyMd" fontWeight="medium">
+                                {product.title}
+                              </Text>
+                            </IndexTable.Cell>
+                            <IndexTable.Cell>{renderBadge(product.status)}</IndexTable.Cell>
+                          </IndexTable.Row>
+                        ))}
+                      </IndexTable>
+                    </div>
+                  )}
+                </BlockStack>
+              </Card>
+            </div>
+          ) : null}
         </div>
 
         {/* ── RIGHT: Bulk Settings Panel ── */}
