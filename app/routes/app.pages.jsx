@@ -50,6 +50,7 @@ const PAGES_QUERY = `#graphql
           id
           title
           handle
+          publishedAt
           bodySummary
           body
           metafields(first: 2, namespace: "global") {
@@ -246,6 +247,10 @@ function evaluateContentShortStatus(content) {
   if (!content || !content.trim()) return { label: "Missing", tone: "critical" };
   if (content.trim().length < 80) return { label: "Short", tone: "warning" };
   return { label: "Good", tone: "success" };
+}
+
+function evaluatePagePublishStatus(publishedAt) {
+  return publishedAt ? { label: "Active", tone: "success" } : { label: "Draft", tone: "warning" };
 }
 
 function buildGenerationPrompt({
@@ -896,6 +901,7 @@ export default function PagesPage() {
             >
               {pages.map((page, index) => {
                 const shortStatus = evaluateContentShortStatus(stripHtml(page.body || page.bodySummary || ""));
+                const publishStatus = evaluatePagePublishStatus(page.publishedAt);
                 return (
                   <IndexTable.Row
                     id={page.id}
@@ -910,9 +916,7 @@ export default function PagesPage() {
                       <Badge tone={shortStatus.tone}>{shortStatus.label}</Badge>
                     </IndexTable.Cell>
                     <IndexTable.Cell>
-                      {page.seo?.title
-                        ? <Badge tone="success">Set</Badge>
-                        : <Badge tone="attention">Missing</Badge>}
+                      <Badge tone={publishStatus.tone}>{publishStatus.label}</Badge>
                     </IndexTable.Cell>
                   </IndexTable.Row>
                 );
