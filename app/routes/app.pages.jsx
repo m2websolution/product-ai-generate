@@ -633,16 +633,50 @@ const AI_PROVIDER_OPTIONS = [
   { label: "Anthropic", value: "anthropic" },
 ];
 
-const DEFAULT_BODY_CUSTOM_PROMPT = `Generate high-quality page body content for the given Shopify page.
+const DEFAULT_BODY_CUSTOM_PROMPT = `Generate premium long-form page content for the given Shopify page.
 
-Focus on:
-- Clear section structure with readable headings
-- Brand-consistent tone and language
-- Strong value proposition and trust-building copy
-- Scannable formatting with concise paragraphs
-- Conversion-focused messaging where relevant
+Objective:
+Create clear, persuasive, SEO-aware content that is easy to scan and ready to publish on a storefront page.
 
-Format: Return clean HTML suitable for direct Shopify page publishing.`;
+Requirements:
+- Understand the page type and user intent before writing (About, Contact, FAQ, Policy, Landing, Custom).
+- Write in a trustworthy, brand-consistent tone suitable for ecommerce.
+- Keep language simple, direct, and customer-focused.
+- Include natural keyword usage without stuffing.
+- Ensure every section provides clear value to the shopper.
+
+Content structure:
+1. Opening section:
+- Start with a strong headline and 1-2 short introductory paragraphs.
+- Clearly explain what this page is about and why it matters to the visitor.
+
+2. Core sections:
+- Add meaningful subheadings (H2/H3) for major topics.
+- Use concise paragraphs under each heading.
+- Include bullet points where scannability improves readability.
+- Add benefit-focused copy, not just feature statements.
+
+3. Trust and clarity:
+- Include reassurance statements where relevant (quality, support, shipping, returns, process, transparency).
+- Avoid vague claims and overly promotional language.
+- Keep facts practical and believable.
+
+4. Conversion intent:
+- Add a soft call-to-action in key sections.
+- End with a clear final call-to-action aligned with the page purpose.
+
+Style rules:
+- No keyword stuffing.
+- No clickbait language.
+- No repetitive filler text.
+- Avoid overly long paragraphs.
+- Keep headings descriptive and human-readable.
+
+Output format:
+- Return valid clean HTML only.
+- Use semantic tags where appropriate: <h2>, <h3>, <p>, <ul>, <li>, <strong>.
+- Do not include markdown, code fences, or explanation outside the final HTML.
+- Ensure output is directly publishable in Shopify page editor.`;
 
 const DEFAULT_META_TITLE_CUSTOM_PROMPT = `Generate SEO-optimized meta title for the given page.
 
