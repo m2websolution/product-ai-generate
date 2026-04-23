@@ -1873,7 +1873,7 @@ export default function TemplatePage() {
           ) : (
             <div
               className="app-card-grid"
-              style={{ gap: 16, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
+              style={{ gap: 16, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
             >
               {templates.map((template) => {
                 const res = template.resource;
