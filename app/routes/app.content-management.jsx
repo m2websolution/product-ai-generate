@@ -2593,12 +2593,13 @@ export default function ContentManagementPage() {
         <Card padding="0">
           <Box padding="300" paddingBlockEnd="200">
             <BlockStack gap="300">
-              <Tabs
-                tabs={mainTabs}
-                selected={mainTabIndex < 0 ? 0 : mainTabIndex}
-                onSelect={handleMainTabChange}
-                fitted
-              />
+              <div className="content-mgmt-main-tabs-shell">
+                <Tabs
+                  tabs={mainTabs}
+                  selected={mainTabIndex < 0 ? 0 : mainTabIndex}
+                  onSelect={handleMainTabChange}
+                />
+              </div>
 
               <Tabs
                 tabs={filterTabs}
@@ -2641,6 +2642,25 @@ export default function ContentManagementPage() {
           </Text>
         </Box>
       </BlockStack>
+
+      <style>{`
+        .content-mgmt-main-tabs-shell {
+          background: #f3f4f6;
+          border: 1px solid #e5e7eb;
+          border-radius: 14px;
+          padding: 4px;
+        }
+        .content-mgmt-main-tabs-shell .Polaris-Tabs__Tab {
+          border-radius: 10px;
+        }
+        .content-mgmt-main-tabs-shell .Polaris-Tabs__Tab--active,
+        .content-mgmt-main-tabs-shell .Polaris-Tabs__Tab--active:hover,
+        .content-mgmt-main-tabs-shell .Polaris-Tabs__Tab--active:focus {
+          background: #e5e7eb;
+          color: #111827;
+          border-radius: 10px;
+        }
+      `}</style>
 
       {/* Editor Modal */}
       <EditorModal
