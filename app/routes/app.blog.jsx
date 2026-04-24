@@ -1021,8 +1021,13 @@ export const action = async ({ request }) => {
   if (intent === "regenerate_blog") {
     const articleId = cleanText(formData.get("articleId"));
     const seed = cleanText(formData.get("seed"));
+    const tabType = cleanText(formData.get("tabType")) || TAB_KEYS.BUSINESS;
+    const topic = cleanText(formData.get("topic"));
     const tone = normalizeToneValue(formData.get("tone"), defaultTone);
     const postLength = normalizePostLength(formData.get("postLength"), "medium");
+    const targetAudience = cleanText(formData.get("targetAudience")) || "Everyone";
+    const promotion = cleanText(formData.get("promotion")) || "No promotion";
+    const holiday = cleanText(formData.get("holiday")) || "Choose a holiday to promote";
     const productUrl = normalizeProductUrl(formData.get("productUrl"));
     if (!articleId) return { ok: false, intent, error: "Missing article id." };
 
@@ -1037,15 +1042,22 @@ export const action = async ({ request }) => {
 
     let title = seed || "Updated Shopify article";
     let body = "";
+    const seedTopic =
+      topic ||
+      (tabType === TAB_KEYS.HOLIDAY
+        ? `${holiday} campaign ideas`
+        : tabType === TAB_KEYS.PROMOTION
+          ? `${promotion} promotion blog ideas`
+          : seed || "Shopify growth");
     try {
       const [generated] = await generateBlogSuggestionsWithAI({
-        tabType: TAB_KEYS.BUSINESS,
-        topic: seed || "Shopify growth",
+        tabType,
+        topic: seedTopic,
         tone,
         postLength,
-        targetAudience: "Everyone",
-        promotion: "No promotion",
-        holiday: "",
+        targetAudience,
+        promotion,
+        holiday,
         language,
         productUrl,
         aiProvider: cleanText(shopRecord?.defaultAiProvider) || "auto",
@@ -1063,12 +1075,12 @@ export const action = async ({ request }) => {
     if (!body) {
       body = buildBlogHtml({
         title,
-        topic: seed || "Shopify growth",
+        topic: seedTopic,
         tone,
-        audience: "Everyone",
-        promotion: "No promotion",
-        holiday: "",
-        tabType: TAB_KEYS.BUSINESS,
+        audience: targetAudience,
+        promotion,
+        holiday,
+        tabType,
         language,
         postLength,
         productUrl,
@@ -1199,6 +1211,7 @@ export default function BlogPage() {
 
   const [suggestions, setSuggestions] = useState([]);
   const [visibleSuggestionCount, setVisibleSuggestionCount] = useState(3);
+  const [regenerateTarget, setRegenerateTarget] = useState(null);
 
   const [editingBlog, setEditingBlog] = useState(null);
   const [editTitle, setEditTitle] = useState("");
@@ -1275,6 +1288,7 @@ export default function BlogPage() {
       setMessage(
         `Blog regenerated successfully.${typeof fetcher.data.creditsUsed === "number" ? ` ${fetcher.data.creditsUsed} credit used${typeof fetcher.data.newCredits === "number" ? `. Remaining: ${fetcher.data.newCredits}` : ""}.` : ""}`,
       );
+      setRegenerateTarget(null);
     }
 
     if (fetcher.data.intent === "save_blog_content") {
@@ -1336,6 +1350,30 @@ export default function BlogPage() {
     fetcher.submit(payload, { method: "post" });
   }
 
+  function openRegenerateModal(article) {
+    setRegenerateTarget({
+      articleId: article.id,
+      seed: article.title,
+    });
+  }
+
+  function submitRegenerateFromModal() {
+    if (!regenerateTarget?.articleId) return;
+    const payload = new FormData();
+    payload.append("intent", "regenerate_blog");
+    payload.append("articleId", regenerateTarget.articleId);
+    payload.append("seed", regenerateTarget.seed || "");
+    payload.append("tabType", activeTabKey);
+    payload.append("topic", topic);
+    payload.append("tone", tone);
+    payload.append("postLength", postLength);
+    payload.append("targetAudience", targetAudience);
+    payload.append("promotion", promotion);
+    payload.append("holiday", holiday);
+    payload.append("productUrl", productUrl);
+    fetcher.submit(payload, { method: "post" });
+  }
+
   const rowsMarkup = useMemo(
     () =>
       rows.map((article, index) => (
@@ -1394,16 +1432,7 @@ export default function BlogPage() {
           <IndexTable.Cell>
             <Button
               size="slim"
-              onClick={() => {
-                const payload = new FormData();
-                payload.append("intent", "regenerate_blog");
-                payload.append("articleId", article.id);
-                payload.append("seed", article.title);
-                payload.append("tone", tone);
-                payload.append("postLength", postLength);
-                payload.append("productUrl", productUrl);
-                fetcher.submit(payload, { method: "post" });
-              }}
+              onClick={() => openRegenerateModal(article)}
               disabled={fetcher.state !== "idle"}
             >
               Regenerate
@@ -1653,6 +1682,39 @@ export default function BlogPage() {
                 }
               >
                 Save
+              </Button>
+            </InlineStack>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal open={Boolean(regenerateTarget)} onClose={() => setRegenerateTarget(null)} title="Regenerate Blog" size="large">
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" variant="bodyMd" tone="subdued">
+              Apply the same settings used in Create Blog, then regenerate this post.
+            </Text>
+
+            <Tabs tabs={tabItems} selected={activeTab} onSelect={setActiveTab} />
+
+            <div className="blog-generator-fields">
+              <TextField label="Post topic" value={topic} onChange={setTopic} autoComplete="off" placeholder="Write a specific topic for your post" />
+              <Select label="Holiday" options={holidayOptions} value={holiday} onChange={setHoliday} />
+              <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+              <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
+              <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+              <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
+              <TextField label="Product URL (optional)" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
+            </div>
+
+            <InlineStack align="end" gap="200">
+              <Button onClick={() => setRegenerateTarget(null)}>Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={submitRegenerateFromModal}
+                loading={fetcher.state !== "idle" && String(fetcher.formData?.get("intent")) === "regenerate_blog"}
+              >
+                Regenerate
               </Button>
             </InlineStack>
           </BlockStack>
