@@ -736,13 +736,6 @@ export default function BlogPage() {
     () => blogs.find((blog) => blog.id === selectedBlogId)?.title || "",
     [blogs, selectedBlogId],
   );
-  const blogOptions = useMemo(
-    () =>
-      blogs.length
-        ? blogs.map((blog) => ({ label: blog.title, value: blog.id }))
-        : [{ label: "No blog available", value: "" }],
-    [blogs],
-  );
 
   useEffect(() => {
     if (!selectedBlogId && blogs?.[0]?.id) {
@@ -928,15 +921,11 @@ export default function BlogPage() {
   );
 
   return (
-    <Page
-      fullWidth
-      title="Blogs"
-      subtitle="Generate, review, edit, and save blog posts with Shopify + database sync."
-    >
+    <Page fullWidth>
       <BlockStack gap="400">
         <AppPageHeader
           title="Blogs"
-          description="Generate, review, edit, and save blog posts with Shopify + database sync."
+          description="Create, regenerate, edit, and publish SEO-friendly blog content for your Shopify store."
         />
         {message ? (
           <Banner tone="success" onDismiss={() => setMessage("")}>
@@ -963,16 +952,6 @@ export default function BlogPage() {
                       Choose a generation type, fill in fields, and create ready-to-publish blog drafts for Shopify.
                     </Text>
                   </BlockStack>
-
-                  <div className="blog-generator-meta-grid">
-                    <Select
-                      label="Blog destination"
-                      options={blogOptions}
-                      value={selectedBlogId}
-                      onChange={setSelectedBlogId}
-                      disabled={blogs.length === 0}
-                    />
-                  </div>
 
                   <div className="blog-generator-tabs-wrap">
                     <Tabs tabs={tabItems} selected={activeTab} onSelect={setActiveTab} />
@@ -1204,12 +1183,6 @@ export default function BlogPage() {
       </Modal>
 
       <style>{`
-        .blog-generator-meta-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr);
-          gap: 12px;
-          align-items: end;
-        }
         .blog-generator-tabs-wrap {
           border: 1px solid #e5e7eb;
           border-radius: 12px;
@@ -1224,9 +1197,6 @@ export default function BlogPage() {
           gap: 12px;
         }
         @media (max-width: 900px) {
-          .blog-generator-meta-grid {
-            grid-template-columns: 1fr;
-          }
           .blog-generator-fields {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
