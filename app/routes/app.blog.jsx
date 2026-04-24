@@ -921,7 +921,11 @@ export default function BlogPage() {
   );
 
   return (
-    <Page title="Blogs" subtitle="Generate, review, edit, and save blog posts with Shopify + database sync.">
+    <Page
+      fullWidth
+      title="Blogs"
+      subtitle="Generate, review, edit, and save blog posts with Shopify + database sync."
+    >
       <BlockStack gap="400">
         <AppPageHeader
           title="Blogs"
