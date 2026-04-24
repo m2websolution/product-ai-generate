@@ -1713,15 +1713,45 @@ export default function BlogPage() {
 
             <Tabs tabs={tabItems} selected={activeTab} onSelect={setActiveTab} />
 
-            <div className="blog-generator-fields">
-              <TextField label="Post topic" value={topic} onChange={setTopic} autoComplete="off" placeholder="Write a specific topic for your post" />
-              <Select label="Holiday" options={holidayOptions} value={holiday} onChange={setHoliday} />
-              <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
-              <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
-              <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
-              <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
-              <TextField label="Product URL (optional)" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
-            </div>
+            {activeTabKey === TAB_KEYS.HOLIDAY ? (
+              <div className="blog-generator-fields">
+                <Select label="Holiday" options={holidayOptions} value={holiday} onChange={setHoliday} />
+                <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+                <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
+                <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
+                <TextField label="Product URL" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
+              </div>
+            ) : null}
+
+            {activeTabKey === TAB_KEYS.PROMOTION ? (
+              <div className="blog-generator-fields">
+                <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+                <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
+                <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
+                <TextField label="Product URL" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
+              </div>
+            ) : null}
+
+            {activeTabKey === TAB_KEYS.CUSTOM ? (
+              <div className="blog-generator-fields">
+                <TextField label="Post topic" value={topic} onChange={setTopic} autoComplete="off" placeholder="Write a specific topic for your post" />
+                <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
+                <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
+                <TextField label="Product URL" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
+              </div>
+            ) : null}
+
+            {activeTabKey === TAB_KEYS.BUSINESS ? (
+              <div className="blog-generator-fields">
+                <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
+                <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
+                <Select label="Target audience" options={audienceOptions} value={targetAudience} onChange={setTargetAudience} />
+                <TextField label="Product URL (optional)" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
+              </div>
+            ) : null}
 
             <BlockStack gap="200">
               <Text as="h4" variant="headingSm">Current blog description</Text>
