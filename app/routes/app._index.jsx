@@ -503,7 +503,7 @@ export default function Index() {
 
         <Card>
           <BlockStack gap="400">
-            <InlineStack className="dashboard-inline-title" gap="200" blockAlign="center" wrap={false}>
+            <InlineStack className="dashboard-inline-title" align="start" gap="200" blockAlign="center" wrap={false}>
               <Icon source={AppsIcon} tone="base" />
               <Text as="h2" variant="headingMd">
                 Boost store performance with our apps
@@ -572,7 +572,7 @@ export default function Index() {
               <Grid.Cell>
                 <Card>
                   <BlockStack gap="200">
-                    <InlineStack className="dashboard-inline-title" gap="200" blockAlign="center" wrap={false}>
+                    <InlineStack className="dashboard-inline-title" align="start" gap="200" blockAlign="center" wrap={false}>
                       <Icon source={EmailIcon} tone="base" />
                       <Text as="h3" variant="headingSm">
                         Support ticket
@@ -596,7 +596,7 @@ export default function Index() {
               <Grid.Cell>
                 <Card>
                   <BlockStack gap="200">
-                    <InlineStack className="dashboard-inline-title" gap="200" blockAlign="center" wrap={false}>
+                    <InlineStack className="dashboard-inline-title" align="start" gap="200" blockAlign="center" wrap={false}>
                       <Icon source={QuestionCircleIcon} tone="base" />
                       <Text as="h3" variant="headingSm">
                         Knowledge base

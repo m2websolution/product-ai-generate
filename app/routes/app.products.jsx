@@ -1660,7 +1660,7 @@ export default function ProductsPage() {
         {/* ── LEFT: Product List ── */}
         <div className="app-split-main" style={{ flex: "1 1 0", minWidth: "0" }}>
           {/* Products / Collections tab */}
-          <div className="app-toolbar" style={{ marginBottom: "16px", maxWidth: "640px" }}>
+          <div className="app-toolbar app-segmented-tabs" style={{ marginBottom: "16px", maxWidth: "640px" }}>
             <Tabs
               tabs={sectionTabs}
               selected={activeSectionTabIndex}
@@ -2239,6 +2239,35 @@ export default function ProductsPage() {
       )}
 
       <style>{`
+        .app-segmented-tabs .Polaris-Tabs {
+          border: 1px solid #d1d5db;
+          border-radius: 12px;
+          background: #f3f4f6;
+          padding: 2px;
+        }
+        .app-segmented-tabs .Polaris-Tabs__Wrapper {
+          padding: 0 !important;
+        }
+        .app-segmented-tabs .Polaris-Tabs__Tab {
+          min-height: 36px;
+          border-radius: 10px;
+        }
+        .app-segmented-tabs .Polaris-Tabs__Title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #4b5563;
+        }
+        .app-segmented-tabs .Polaris-Tabs__Tab--active {
+          background: #ffffff;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+        }
+        .app-segmented-tabs .Polaris-Tabs__Tab--active .Polaris-Tabs__Title {
+          color: #1f2937;
+        }
+        .app-segmented-tabs .Polaris-Tabs__Tab--active .Polaris-Tabs__Title::before {
+          content: "✓ ";
+          font-weight: 700;
+        }
         .products-table-wrap {
           max-height: 62vh;
           overflow-y: auto;
