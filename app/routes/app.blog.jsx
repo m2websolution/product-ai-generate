@@ -1826,6 +1826,7 @@ export default function BlogPage() {
                 <TextField label="Product URL" value={productUrl} onChange={setProductUrl} autoComplete="off" placeholder="https://yourstore.com/products/..." />
               </div>
             ) : null}
+            
 
             {activeTabKey === TAB_KEYS.BUSINESS ? (
               <div className="blog-generator-fields">
