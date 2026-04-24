@@ -573,7 +573,7 @@ export default function Index() {
                 <Card>
                   <BlockStack gap="200">
                     <InlineStack className="dashboard-inline-title" align="start" gap="200" blockAlign="center" wrap={false}>
-                      <Icon source={EmailIcon} tone="base" />
+                      <Icon source={EmailIcon} tone="base" style={{ margin:"unset !important" }}  />
                       <Text as="h3" variant="headingSm">
                         Support ticket
                       </Text>
@@ -597,7 +597,7 @@ export default function Index() {
                 <Card>
                   <BlockStack gap="200">
                     <InlineStack className="dashboard-inline-title" align="start" gap="200" blockAlign="center" wrap={false}>
-                      <Icon source={QuestionCircleIcon} tone="base" />
+                      <Icon source={QuestionCircleIcon} tone="base" style={{ margin:"unset !important" }} />
                       <Text as="h3" variant="headingSm">
                         Knowledge base
                       </Text>
