@@ -660,6 +660,37 @@ export default function Index() {
           </Banner>
         ) : null}
 
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center" wrap>
+              <BlockStack gap="050">
+                <Text as="h2" variant="headingMd">AI Model</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Select the default model used for content generation.
+                </Text>
+              </BlockStack>
+              <Form method="post">
+                <input type="hidden" name="intent" value="save_settings" />
+                <input type="hidden" name="defaultAiModel" value={selectedModel} />
+                <InlineStack gap="200" blockAlign="center">
+                  <div style={{ minWidth: 240 }}>
+                    <Select
+                      label="AI model"
+                      labelHidden
+                      options={aiModelOptions}
+                      value={selectedModel}
+                      onChange={setSelectedModel}
+                    />
+                  </div>
+                  <Button size="slim" submit variant="primary" loading={isSaving} disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Save model"}
+                  </Button>
+                </InlineStack>
+              </Form>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+
         <Grid columns={{ xs: 1, sm: 1, md: 3, lg: 3, xl: 3 }}>
           <Grid.Cell columnSpan={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2 }}>
             <Card>
