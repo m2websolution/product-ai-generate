@@ -197,6 +197,14 @@ function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeToneValue(value, fallback = "Casual") {
+  const normalizedFallback = cleanText(fallback) || "Casual";
+  const candidate = cleanText(value);
+  if (!candidate) return normalizedFallback;
+  const matched = POST_TONE_OPTIONS.find((option) => option.toLowerCase() === candidate.toLowerCase());
+  return matched || candidate;
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -646,6 +654,7 @@ export const loader = async ({ request }) => {
 
   const defaults = getDefaultGlobalSettings();
   const settingsLanguage = cleanText(parsedSettings?.language || defaults.language || "English") || "English";
+  const settingsTone = normalizeToneValue(parsedSettings?.tone || defaults.tone || "Casual");
 
   const blogs = [];
   let after = null;
@@ -689,7 +698,7 @@ export const loader = async ({ request }) => {
     after = connection.pageInfo.endCursor;
   }
 
-  return { blogs, articles, settingsLanguage };
+  return { blogs, articles, settingsLanguage, settingsTone };
 };
 
 export const action = async ({ request }) => {
@@ -709,12 +718,13 @@ export const action = async ({ request }) => {
   }
   const defaults = getDefaultGlobalSettings();
   const language = cleanText(parsedSettings?.language || defaults.language || "English") || "English";
+  const defaultTone = normalizeToneValue(parsedSettings?.tone || defaults.tone || "Casual");
 
   if (intent === "generate_suggestions") {
     const tabType = cleanText(formData.get("tabType")) || TAB_KEYS.BUSINESS;
     const topic = cleanText(formData.get("topic"));
     const postLength = cleanText(formData.get("postLength")) || "medium";
-    const tone = cleanText(formData.get("tone")) || "Casual";
+    const tone = normalizeToneValue(formData.get("tone"), defaultTone);
     const targetAudience = cleanText(formData.get("targetAudience")) || "Everyone";
     const promotion = cleanText(formData.get("promotion")) || "No promotion";
     const holiday = cleanText(formData.get("holiday")) || "Choose a holiday to promote";
@@ -810,7 +820,7 @@ export const action = async ({ request }) => {
       bodyHtml: body,
       status,
       language,
-      tone: cleanText(formData.get("tone")) || "Casual",
+      tone: normalizeToneValue(formData.get("tone"), defaultTone),
       lengthOption: cleanText(formData.get("postLength")) || "medium",
       targetAudience: cleanText(formData.get("targetAudience")) || "Everyone",
       tabType: cleanText(formData.get("tabType")) || TAB_KEYS.BUSINESS,
@@ -834,7 +844,7 @@ export const action = async ({ request }) => {
           intent: "blog_generate",
           resourceType: "blog",
           language,
-          tone: cleanText(formData.get("tone")) || "Casual",
+          tone: normalizeToneValue(formData.get("tone"), defaultTone),
           generatedDescription: body,
           creditsUsed: BLOG_BODY_CREDIT_COST,
           appliedToProduct: true,
@@ -857,6 +867,7 @@ export const action = async ({ request }) => {
   if (intent === "regenerate_blog") {
     const articleId = cleanText(formData.get("articleId"));
     const seed = cleanText(formData.get("seed"));
+    const tone = normalizeToneValue(formData.get("tone"), defaultTone);
     if (!articleId) return { ok: false, intent, error: "Missing article id." };
 
     const creditBalance = await getOrCreateShopCredits(session.shop);
@@ -874,7 +885,7 @@ export const action = async ({ request }) => {
       const [generated] = await generateBlogSuggestionsWithAI({
         tabType: TAB_KEYS.BUSINESS,
         topic: seed || "Shopify growth",
-        tone: "Casual",
+        tone,
         postLength: "medium",
         targetAudience: "Everyone",
         promotion: "No promotion",
@@ -896,7 +907,7 @@ export const action = async ({ request }) => {
       body = buildBlogHtml({
         title,
         topic: seed || "Shopify growth",
-        tone: "Casual",
+        tone,
         audience: "Everyone",
         promotion: "No promotion",
         holiday: "",
@@ -937,7 +948,7 @@ export const action = async ({ request }) => {
           intent: "blog_regenerate",
           resourceType: "blog",
           language,
-          tone: "Casual",
+          tone,
           generatedDescription: body,
           creditsUsed: BLOG_BODY_CREDIT_COST,
           appliedToProduct: true,
@@ -1011,7 +1022,7 @@ export const action = async ({ request }) => {
 };
 
 export default function BlogPage() {
-  const { blogs, articles, settingsLanguage } = useLoaderData();
+  const { blogs, articles, settingsLanguage, settingsTone } = useLoaderData();
   const fetcher = useFetcher();
 
   const [rows, setRows] = useState(() => articles);
@@ -1022,7 +1033,7 @@ export default function BlogPage() {
 
   const [topic, setTopic] = useState("");
   const [postLength, setPostLength] = useState("medium");
-  const [tone, setTone] = useState("Casual");
+  const [tone, setTone] = useState(() => normalizeToneValue(settingsTone, "Casual"));
   const [targetAudience, setTargetAudience] = useState("Everyone");
   const [promotion, setPromotion] = useState("Buy One Get One Free (BOGO)");
   const [holiday, setHoliday] = useState("Choose a holiday to promote");
@@ -1230,6 +1241,7 @@ export default function BlogPage() {
                 payload.append("intent", "regenerate_blog");
                 payload.append("articleId", article.id);
                 payload.append("seed", article.title);
+                payload.append("tone", tone);
                 fetcher.submit(payload, { method: "post" });
               }}
               disabled={fetcher.state !== "idle"}
@@ -1511,14 +1523,6 @@ export default function BlogPage() {
       </Modal>
 
       <style>{`
-        .blog-generator-tabs-wrap {
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 4px;
-          background: #f9fafb;
-          width: fit-content;
-          max-width: 100%;
-        }
         .blog-generator-fields {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
