@@ -1442,7 +1442,7 @@ export default function BlogPage() {
               onClick={() => openRegenerateModal(article)}
               disabled={fetcher.state !== "idle"}
             >
-              {`Regenerate (${BLOG_BODY_CREDIT_COST} credit${BLOG_BODY_CREDIT_COST > 1 ? "s" : ""})`}
+              Regenerate
             </Button>
           </IndexTable.Cell>
         </IndexTable.Row>
