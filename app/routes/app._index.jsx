@@ -482,48 +482,6 @@ export default function Index() {
     { id: "credits", label: "Credits left", value: String(creditsLeft ?? 0), icon: CollectionIcon },
     { id: "plan", label: "Current Plan", value: currentPlan || "FREE", icon: PageIcon },
   ];
-  const generateBreakdown = [
-    {
-      id: "product",
-      title: "Product Generate",
-      subtitle: "Description, Meta title, Meta Description",
-      count:
-        generationStats.product.description +
-        generationStats.product.metaTitle +
-        generationStats.product.metaDescription,
-    },
-    {
-      id: "collection",
-      title: "Collection Generate",
-      subtitle: "Description, Meta title, Meta Description",
-      count:
-        generationStats.collection.description +
-        generationStats.collection.metaTitle +
-        generationStats.collection.metaDescription,
-    },
-    {
-      id: "collectionProduct",
-      title: "Collection Product Generate",
-      subtitle: "Description, Meta title, Meta Description",
-      count:
-        generationStats.collectionProduct.description +
-        generationStats.collectionProduct.metaTitle +
-        generationStats.collectionProduct.metaDescription,
-    },
-    {
-      id: "pages",
-      title: "Pages Generate",
-      subtitle: "Body Content, Meta title, Meta Description",
-      count: generationStats.page.body + generationStats.page.metaTitle + generationStats.page.metaDescription,
-    },
-    {
-      id: "blog",
-      title: "Blog Generate",
-      subtitle: "Content Generate",
-      count: generationStats.blog.content,
-    },
-  ];
-  const totalGenerateCount = generateBreakdown.reduce((sum, row) => sum + Number(row.count || 0), 0);
   const specificCountBoxes = [
     {
       id: "product",
@@ -703,37 +661,6 @@ export default function Index() {
           </Banner>
         ) : null}
 
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center" wrap>
-              <BlockStack gap="050">
-                <Text as="h2" variant="headingMd">AI Model</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Select the default model used for content generation.
-                </Text>
-              </BlockStack>
-              <Form method="post">
-                <input type="hidden" name="intent" value="save_settings" />
-                <input type="hidden" name="defaultAiModel" value={selectedModel} />
-                <InlineStack gap="200" blockAlign="center">
-                  <div style={{ minWidth: 240 }}>
-                    <Select
-                      label="AI model"
-                      labelHidden
-                      options={aiModelOptions}
-                      value={selectedModel}
-                      onChange={setSelectedModel}
-                    />
-                  </div>
-                  <Button size="slim" submit variant="primary" loading={isSaving} disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save model"}
-                  </Button>
-                </InlineStack>
-              </Form>
-            </InlineStack>
-          </BlockStack>
-        </Card>
-
         <BlockStack gap="200">
           <Text as="h2" variant="headingMd">Specific Generated Count</Text>
           <Grid columns={{ xs: 1, sm: 1, md: 2, lg: 3, xl: 3 }}>
@@ -775,93 +702,36 @@ export default function Index() {
           </Grid>
         </BlockStack>
 
-        <Grid columns={{ xs: 1, sm: 1, md: 3, lg: 3, xl: 3 }}>
-          <Grid.Cell columnSpan={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2 }}>
-            <Card>
-              <BlockStack gap="300">
-                <InlineStack align="space-between" blockAlign="center">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={AppsIcon} tone="base" />
-                    <Text as="h2" variant="headingMd">Generate content</Text>
-                  </InlineStack>
-                  <div
-                    style={{
-                      minWidth: "44px",
-                      height: "30px",
-                      padding: "0 12px",
-                      borderRadius: "999px",
-                      background: "#dbeafe",
-                      color: "#1e3a8a",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 700,
-                      fontSize: "20px",
-                    }}
-                  >
-                    {totalGenerateCount}
-                  </div>
-                </InlineStack>
-
-                <BlockStack gap="100">
-                  {generateBreakdown.map((row, idx) => (
-                    <div
-                      key={row.id}
-                      style={{
-                        borderBottom: idx < generateBreakdown.length - 1 ? "1px solid #eef0f3" : "none",
-                        paddingBottom: idx < generateBreakdown.length - 1 ? "10px" : "0",
-                        marginBottom: idx < generateBreakdown.length - 1 ? "2px" : "0",
-                      }}
-                    >
-                      <InlineStack align="space-between" blockAlign="start" wrap={false}>
-                        <BlockStack gap="050">
-                          <Text as="p" variant="bodyMd" fontWeight="semibold">{row.title}</Text>
-                          <Text as="p" variant="bodySm" tone="subdued">{row.subtitle}</Text>
-                        </BlockStack>
-                        <div
-                          style={{
-                            minWidth: "32px",
-                            height: "32px",
-                            padding: "0 10px",
-                            borderRadius: "12px",
-                            background: "#dbeafe",
-                            color: "#1e3a8a",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: 700,
-                            fontSize: "18px",
-                            lineHeight: 1,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {row.count}
-                        </div>
-                      </InlineStack>
-                    </div>
-                  ))}
-                </BlockStack>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center" wrap>
+              <BlockStack gap="050">
+                <Text as="h2" variant="headingMd">AI Model</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Select the default model used for content generation.
+                </Text>
               </BlockStack>
-            </Card>
-          </Grid.Cell>
-
-          <Grid.Cell>
-            <Card>
-              <div style={{ minHeight: 248, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <BlockStack gap="200" inlineAlign="center">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={ChartVerticalIcon} tone="base" />
-                    <Text as="h2" variant="headingMd">Time saved</Text>
-                  </InlineStack>
-                  <InlineStack gap="100" blockAlign="end">
-                    <Text as="span" variant="heading2xl">{formattedTimeSaved}</Text>
-                    <Text as="span" variant="bodyMd" tone="subdued">hours</Text>
-                  </InlineStack>
-                </BlockStack>
-              </div>
-            </Card>
-          </Grid.Cell>
-        </Grid>
+              <Form method="post">
+                <input type="hidden" name="intent" value="save_settings" />
+                <input type="hidden" name="defaultAiModel" value={selectedModel} />
+                <InlineStack gap="200" blockAlign="center">
+                  <div style={{ minWidth: 240 }}>
+                    <Select
+                      label="AI model"
+                      labelHidden
+                      options={aiModelOptions}
+                      value={selectedModel}
+                      onChange={setSelectedModel}
+                    />
+                  </div>
+                  <Button size="slim" submit variant="primary" loading={isSaving} disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Save model"}
+                  </Button>
+                </InlineStack>
+              </Form>
+            </InlineStack>
+          </BlockStack>
+        </Card>
 
         <Card>
           <BlockStack gap="400">
