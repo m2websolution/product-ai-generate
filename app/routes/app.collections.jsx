@@ -541,6 +541,7 @@ function withSingleTitleHeading(html, title) {
   if (!normalizedTitle) return html || "";
 
   const bodyWithoutDuplicateTitleHeadings = (html || "")
+    .replace(/^\s*<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>\s*/i, "")
     .replace(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi, (match, headingText) =>
       normalizeHeadingText(headingText) === normalizedTitle ? "" : match,
     )
