@@ -380,10 +380,9 @@ function PreviewPanel({
  * @param {{ id: string, label: string }[]} props.tabs  - e.g. [{id:'description',label:'Description'},...]
  * @param {string} props.initialTab - which tab to open on
  * @param {Record<string, Array>} props.templatesByTab - templates keyed by tab id
- * @param {number} props.usageCount - how many selected items this template will generate for
  * @param {(templateText: string) => void} props.onUseTemplate
  */
-export function TemplateLibraryModal({ open, onClose, tabs, initialTab, templatesByTab, usageCount, onUseTemplate }) {
+export function TemplateLibraryModal({ open, onClose, tabs, initialTab, templatesByTab, onUseTemplate }) {
   const [activeTab, setActiveTab] = useState(initialTab || (tabs?.[0]?.id ?? "description"));
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -402,11 +401,10 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
   if (!open) return null;
 
   const currentTemplates = templatesByTab[activeTab] || [];
-  const normalizedUsageCount = Number.isFinite(Number(usageCount)) ? Number(usageCount) : null;
 
   // Derive categories
   const categoriesSet = new Set(currentTemplates.map((t) => getCategory(t)));
-  const categories = ["All", ...[...categoriesSet].sort()];
+  const categories = [ ...[...categoriesSet].sort()];
   const categoryCounts = currentTemplates.reduce((counts, template) => {
     const category = getCategory(template);
     counts.set(category, (counts.get(category) || 0) + 1);
@@ -486,7 +484,7 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
                           variant={selectedCategory === cat ? "primary" : "secondary"}
                           onClick={() => setSelectedCategory(cat)}
                         >
-                          {cat} ({cat === "All" ? currentTemplates.length : categoryCounts.get(cat) || 0})
+                          {cat} ({categoryCounts.get(cat) || 0})
                         </Button>
                       ))}
                     </BlockStack>
@@ -521,11 +519,6 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
                               <BlockStack gap="200">
                                 <InlineStack align="space-between" blockAlign="start" gap="200">
                                   <Text as="h4" variant="headingSm">{template.name}</Text>
-                                  {normalizedUsageCount !== null ? (
-                                    <Badge tone={normalizedUsageCount > 0 ? "success" : undefined}>
-                                      {normalizedUsageCount}
-                                    </Badge>
-                                  ) : null}
                                 </InlineStack>
                                 <Text as="p" variant="bodySm" tone="subdued">
                                   {template.description || "Template ready for use."}

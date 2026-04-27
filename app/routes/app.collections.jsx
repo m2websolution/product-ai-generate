@@ -3285,7 +3285,6 @@ export default function CollectionsPage() {
         ]}
         initialTab={templateLibraryContentType}
         templatesByTab={activeTemplateLibraryByTab}
-        usageCount={isCollectionProductsMode ? estimatedTargetItems : selectedCollections.length}
         onUseTemplate={(templateText) => {
           if (templateLibraryContentType === "description") {
             setBulkDescTemplate(templateText);

@@ -2382,7 +2382,6 @@ export default function ProductsPage() {
           meta_description: PRODUCT_META_DESCRIPTION_TEMPLATES,
           meta_title: PRODUCT_META_TITLE_TEMPLATES,
         }}
-        usageCount={selectedProducts.length}
         onUseTemplate={(templateText) => {
           if (templateLibraryContentType === "description") {
             setBulkDescTemplate(templateText);
