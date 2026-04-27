@@ -39,6 +39,9 @@ import {
   EmailIcon,
   QuestionCircleIcon,
   AppsIcon,
+  LayoutSectionIcon,
+  SettingsIcon,
+  NoteIcon,
 } from "@shopify/polaris-icons";
 
 export const loader = async ({ request }) => {
@@ -652,6 +655,21 @@ export default function Index() {
           title={`Hi ${shopOwnerName}!`}
           description="Manage your apps and generate high-converting AI content for your store."
         />
+
+        <InlineStack gap="300" wrap>
+          <Button icon={LayoutSectionIcon} url="/app/template" size="medium">
+            Template
+          </Button>
+          <Button icon={SettingsIcon} url="/app/settings" size="medium">
+            Settings
+          </Button>
+          <Button icon={NoteIcon} url="/app/content-management" size="medium">
+            Content Management
+          </Button>
+          <Button icon={ChartVerticalIcon} url="/app/analytics" size="medium">
+            Analytics
+          </Button>
+        </InlineStack>
 
         <Card padding="0">
           <div className="dashboard-kpi-grid">
