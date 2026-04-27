@@ -927,6 +927,156 @@ export const PRODUCT_DESCRIPTION_TEMPLATES = [
   ...ADDITIONAL_PRODUCT_DESCRIPTION_TEMPLATES,
 ];
 
+const PRODUCT_META_DESCRIPTION_CATEGORY_TEMPLATES = [
+  {
+    id: "md-compliance-accuracy",
+    name: "Compliance & Accuracy Meta",
+    category: "Compliance & Accuracy",
+    description: "Keeps product snippets factual, accurate, and platform-safe.",
+    template:
+      "Write a compliant product meta description under 155 characters.\n- Use accurate product facts only.\n- Include one specification, material, size, compatibility, or use detail.\n- Avoid hype, unsupported claims, excessive punctuation, and misleading urgency.\n- End with a clear benefit.",
+  },
+  {
+    id: "md-marketplace-channel",
+    name: "Marketplace Channel Meta",
+    category: "Marketplace & Channel",
+    description: "Adapts the product snippet for marketplace-style browsing.",
+    template:
+      "Write a marketplace-ready product meta description under 155 characters.\n- Include product type, key benefit, and one practical detail.\n- Address fit, durability, compatibility, care, or shipping when relevant.\n- Keep it scannable for Shopify, Amazon, Etsy, or eBay shoppers.",
+  },
+  {
+    id: "md-social-ugc",
+    name: "Social & UGC Meta",
+    category: "Social & UGC",
+    description: "Uses social proof or shareable appeal in a compact snippet.",
+    template:
+      "Write a social-proof product meta description under 155 characters.\n- Reference customer favorites, reviews, styling, or community use only if provided.\n- Include the product name and one share-worthy benefit.\n- Keep it natural and trustworthy.",
+  },
+  {
+    id: "md-tone-style",
+    name: "Tone & Style Meta",
+    category: "Tone & Style",
+    description: "Creates a concise snippet in the requested brand voice.",
+    template:
+      "Write a product meta description under 155 characters in the selected brand tone.\n- Match the tone: casual, luxury, professional, minimalist, witty, or friendly.\n- Include the main benefit and one concrete product detail.\n- Avoid generic filler.",
+  },
+];
+
+const PRODUCT_META_TITLE_CATEGORY_TEMPLATES = [
+  {
+    id: "mt-brands-luxury",
+    name: "Luxury Product Title",
+    category: "Brands & Luxury",
+    description: "Signals premium quality, curation, or craftsmanship in a short title.",
+    template:
+      "Write a luxury product meta title (50-65 characters).\n- Include {product_title} and one premium keyword such as luxury, artisan, curated, or premium only when accurate.\n- Keep the title refined and specific.",
+  },
+  {
+    id: "mt-compliance-accuracy",
+    name: "Accurate Product Title",
+    category: "Compliance & Accuracy",
+    description: "Uses factual product identifiers without exaggerated claims.",
+    template:
+      "Write a factual product meta title (50-65 characters).\n- Include {product_title} and one verifiable detail such as size, material, model, or compatibility.\n- Avoid unsupported superlatives, urgency, and promotional symbols.",
+  },
+  {
+    id: "mt-marketplace-channel",
+    name: "Marketplace Product Title",
+    category: "Marketplace & Channel",
+    description: "Creates a marketplace-friendly product title with practical search terms.",
+    template:
+      "Write a marketplace-ready product meta title (50-65 characters).\n- Include product type, key feature, and {product_title}.\n- Use direct wording that works for Shopify, Amazon, Etsy, or eBay browsing.\n- Keep it readable.",
+  },
+  {
+    id: "mt-social-ugc",
+    name: "Social Proof Title",
+    category: "Social & UGC",
+    description: "Adds community, review, or favorite-style appeal to the title.",
+    template:
+      "Write a social-proof product meta title (50-65 characters).\n- Pair {product_title} with customer favorite, top-rated, creator pick, or community-loved wording only if accurate.\n- Keep the phrase trustworthy and concise.",
+  },
+  {
+    id: "mt-tone-style",
+    name: "Tone & Style Title",
+    category: "Tone & Style",
+    description: "Matches the meta title to a selected brand voice.",
+    template:
+      "Write a product meta title (50-65 characters) in the selected tone.\n- Tone options include casual, luxury, professional, minimalist, witty, or friendly.\n- Include {product_title} and one clear benefit or feature.",
+  },
+];
+
+const PRODUCT_META_TOP_UP_CATEGORIES = [
+  { slug: "brands-luxury", category: "Brands & Luxury" },
+  { slug: "compliance-accuracy", category: "Compliance & Accuracy" },
+  { slug: "lifestyle-emotion", category: "Lifestyle & Emotion" },
+  { slug: "marketing-sales", category: "Marketing & Sales" },
+  { slug: "marketplace-channel", category: "Marketplace & Channel" },
+  { slug: "product-categories", category: "Product Categories" },
+  { slug: "seasonal-events", category: "Seasonal & Events" },
+  { slug: "social-ugc", category: "Social & UGC" },
+  { slug: "technical-specs", category: "Technical & Specs" },
+  { slug: "tone-style", category: "Tone & Style" },
+];
+
+const PRODUCT_META_TITLE_TOP_UP_CATEGORIES = [
+  ...PRODUCT_META_TOP_UP_CATEGORIES,
+  { slug: "seo-optimized", category: "SEO Optimized" },
+];
+
+const PRODUCT_META_DESCRIPTION_TOP_UP_TEMPLATES = PRODUCT_META_TOP_UP_CATEGORIES.flatMap(({ slug, category }) => [
+  {
+    id: `md-${slug}-intent-match`,
+    name: `${category} Intent Match`,
+    category,
+    description: `Matches product meta description copy to ${category.toLowerCase()} search intent.`,
+    template:
+      `Write a product meta description under 155 characters for the ${category} angle.\n- Include {product_title} or the primary keyword.\n- Match the buyer's search intent in the first phrase.\n- Add one concrete product benefit.\n- Avoid filler.`,
+  },
+  {
+    id: `md-${slug}-benefit-detail`,
+    name: `${category} Benefit Detail`,
+    category,
+    description: `Adds one concrete product detail to a ${category.toLowerCase()} snippet.`,
+    template:
+      `Write a product meta description under 155 characters for the ${category} category.\n- Lead with the main benefit.\n- Include one specific detail such as material, size, use case, compatibility, proof, or style.\n- Keep the language natural and accurate.`,
+  },
+  {
+    id: `md-${slug}-trust-click`,
+    name: `${category} Trust Click`,
+    category,
+    description: `Builds click confidence for ${category.toLowerCase()} shoppers.`,
+    template:
+      `Write a trust-building product meta description under 155 characters for the ${category} angle.\n- Include one trust signal, selection cue, guarantee, review, standard, or practical reassurance when available.\n- End with a clear reason to click.`,
+  },
+]);
+
+const PRODUCT_META_TITLE_TOP_UP_TEMPLATES = PRODUCT_META_TITLE_TOP_UP_CATEGORIES.flatMap(({ slug, category }) => [
+  {
+    id: `mt-${slug}-keyword-focus`,
+    name: `${category} Keyword Focus`,
+    category,
+    description: `Creates a search-ready product meta title for ${category.toLowerCase()} intent.`,
+    template:
+      `Write a product meta title (50-65 characters) for the ${category} angle.\n- Include {product_title} and one high-intent keyword.\n- Put the most searchable phrase near the beginning.\n- Keep it readable.`,
+  },
+  {
+    id: `mt-${slug}-benefit-focus`,
+    name: `${category} Benefit Focus`,
+    category,
+    description: `Pairs the product name with a clear ${category.toLowerCase()} benefit.`,
+    template:
+      `Write a product meta title (50-65 characters).\n- Pair {product_title} with one concise ${category} benefit or differentiator.\n- Avoid repeated words and unsupported claims.\n- Keep the title click-worthy but factual.`,
+  },
+  {
+    id: `mt-${slug}-buyer-fit`,
+    name: `${category} Buyer Fit`,
+    category,
+    description: `Targets the right buyer, use case, or browsing context for ${category.toLowerCase()}.`,
+    template:
+      `Write a product meta title (50-65 characters) for a specific buyer or use case.\n- Include {product_title}.\n- Add a short phrase for who it is for, what it solves, or where it fits.\n- Match the ${category} category.`,
+  },
+]);
+
 export const PRODUCT_META_DESCRIPTION_TEMPLATES = [
   {
     id: "md-basic-benefit",
@@ -1033,6 +1183,56 @@ export const PRODUCT_META_DESCRIPTION_TEMPLATES = [
     template:
       "Write a meta description (130–155 characters) led by social proof signals.\n- Open with \"Loved by [count or segment]:\".\n- Name {product_title} and its primary benefit.\n- Include a rating or review signal.\n- End with \"Shop now!\"",
   },
+  {
+    id: "md-seo-intent-match",
+    name: "SEO Meta Description (Intent-Match)",
+    category: "SEO Optimized",
+    description: "Matches search intent with a primary keyword and direct benefit under 155 characters.",
+    template:
+      "Write a meta description under 155 characters using the primary keyword and a clear benefit. Avoid fluff.",
+  },
+  {
+    id: "md-long-tail-keyword",
+    name: "Long-tail Keyword Meta Description",
+    category: "SEO Optimized",
+    description: "Targets specific long-tail search phrases and question-based intent under 155 characters.",
+    template:
+      "Write a long-tail keyword meta description under 155 characters:\n- Target specific search phrases (\"best X for Y\", \"how to choose Z\")\n- Include question-based keywords naturally\n- Address specific user intent and pain points\n- Use semantic keywords and related terms\n- Include clear benefit or solution\n- End with compelling value proposition",
+  },
+  {
+    id: "md-local-seo",
+    name: "Local SEO Meta Description",
+    category: "SEO Optimized",
+    description: "Adds city, service area, delivery, pickup, and community signals under 155 characters.",
+    template:
+      "Create a local SEO meta description under 155 characters:\n- Include specific city, region, or service area\n- Target \"near me\" search behavior naturally\n- Mention local delivery, pickup, or service areas\n- Add community connection or local reputation\n- Include local business hours or availability\n- Use location-specific, community language",
+  },
+  {
+    id: "md-voice-search",
+    name: "Voice Search Meta Description",
+    category: "SEO Optimized",
+    description: "Uses conversational phrasing for voice search and natural spoken queries.",
+    template:
+      "Create a voice search optimized meta description under 155 characters:\n- Use natural, conversational phrasing\n- Include question words and natural speech patterns\n- Target how people actually speak when searching\n- Include location or context when relevant\n- Sound natural when read aloud\n- Answer common voice search questions",
+  },
+  {
+    id: "md-seasonal-trending",
+    name: "Seasonal Trending Meta Description",
+    category: "Seasonal & Events",
+    description: "Targets timely seasonal searches, events, holidays, and trend-aware benefits.",
+    template:
+      "Write a seasonal SEO meta description under 155 characters:\n- Include relevant seasonal keywords and timing\n- Reference current trends, holidays, or events\n- Add urgency for time-sensitive searches\n- Target seasonal use cases and needs\n- Include seasonal benefits or applications\n- Keep timely and trend-aware",
+  },
+  {
+    id: "md-comparison-seo",
+    name: "Comparison SEO Meta Description",
+    category: "SEO Optimized",
+    description: "Targets comparison and alternative searches with factual differentiators.",
+    template:
+      "Write a comparison-focused meta description under 155 characters:\n- Address \"vs\" and \"alternative to\" searches\n- Include key differentiators from competitors\n- Use \"better than\", \"compared to\" phrases naturally\n- Include specific advantages or unique features\n- End with clear competitive advantage\n- Keep factual and benefit-focused",
+  },
+  ...PRODUCT_META_DESCRIPTION_CATEGORY_TEMPLATES,
+  ...PRODUCT_META_DESCRIPTION_TOP_UP_TEMPLATES,
 ];
 
 export const PRODUCT_META_TITLE_TEMPLATES = [
@@ -1113,4 +1313,6 @@ export const PRODUCT_META_TITLE_TEMPLATES = [
     template:
       "Write a meta title (50–65 characters) targeting gift-shopping search queries.\n- Lead with {product_title}.\n- Add \"– Perfect Gift for [occasion or recipient]\".\n- Format: \"Product Name – Perfect Gift for Occasion\"\n- Match seasonal or occasion-based search language.",
   },
+  ...PRODUCT_META_TITLE_CATEGORY_TEMPLATES,
+  ...PRODUCT_META_TITLE_TOP_UP_TEMPLATES,
 ];

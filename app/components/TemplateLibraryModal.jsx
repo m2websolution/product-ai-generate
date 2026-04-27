@@ -75,10 +75,13 @@ const TEMPLATE_CATEGORIES = {
   "col-mt-category-seo": "SEO Optimized",
   "col-mt-shop-intent": "Marketing & Sales",
   "col-mt-quality-focus": "Brands & Luxury",
-  "col-mt-occasion-match": "Lifestyle & Emotion",
+  "col-mt-occasion": "Lifestyle & Emotion",
   "col-mt-problem-solution": "Marketing & Sales",
   "col-mt-seasonal": "Seasonal & Events",
-  "col-mt-featured-angle": "Marketing & Sales",
+  "col-mt-featured": "Marketing & Sales",
+  "col-mt-new-arrivals": "Seasonal & Events",
+  "col-mt-gift-guide": "Seasonal & Events",
+  "col-mt-bestsellers": "Marketing & Sales",
   // Collection Meta Description
   "col-md-benefit-focused": "Marketing & Sales",
   "col-md-problem-solution": "Marketing & Sales",
@@ -482,7 +485,7 @@ export function TemplateLibraryModal({ open, onClose, tabs, initialTab, template
                   </Box>
                 </Card>
 
-                <div style={{ overflowY: "auto", maxHeight: "70vh", paddingRight: "2px" }}>
+                <div>
                   <BlockStack gap="300">
                     <InlineStack gap="200" blockAlign="center">
                       <Text as="h3" variant="headingSm">Templates</Text>
