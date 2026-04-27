@@ -23,7 +23,14 @@ export function getAppBaseUrl(request) {
 }
 
 export function buildAppReturnUrl(request, params = {}) {
+  const requestUrl = new URL(request.url);
   const returnUrl = new URL("/app/billing", getAppBaseUrl(request));
+  ["shop", "host", "embedded"].forEach((key) => {
+    const value = requestUrl.searchParams.get(key);
+    if (value) {
+      returnUrl.searchParams.set(key, value);
+    }
+  });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       returnUrl.searchParams.set(key, String(value));
