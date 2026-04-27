@@ -7,6 +7,7 @@ import {
 
 const ACTIVE_STATUSES = new Set(["ACTIVE"]);
 const THIRTY_DAYS_MS = BILLING_RENEWAL_DAYS * 24 * 60 * 60 * 1000;
+const DEFAULT_SHOPIFY_APP_HANDLE = "product-ai-generate";
 
 export function getBillingTestMode() {
   const raw = String(process.env.SHOPIFY_BILLING_TEST || "").trim().toLowerCase();
@@ -22,10 +23,29 @@ export function getAppBaseUrl(request) {
   return requestUrl.origin;
 }
 
+function getShopHandle(shop) {
+  return String(shop || "")
+    .trim()
+    .replace(/\.myshopify\.com$/i, "");
+}
+
+function getShopifyAppHandle() {
+  return String(
+    process.env.SHOPIFY_APP_HANDLE ||
+      process.env.SHOPIFY_APP_SLUG ||
+      DEFAULT_SHOPIFY_APP_HANDLE,
+  ).trim();
+}
+
 export function buildAppReturnUrl(request, params = {}) {
   const requestUrl = new URL(request.url);
-  const returnUrl = new URL("/app/billing", getAppBaseUrl(request));
   const shop = params.shop || requestUrl.searchParams.get("shop");
+  const shopHandle = getShopHandle(shop);
+  const appHandle = getShopifyAppHandle();
+  const returnUrl =
+    shopHandle && appHandle
+      ? new URL(`https://admin.shopify.com/store/${shopHandle}/apps/${appHandle}/app/billing`)
+      : new URL("/app/billing", getAppBaseUrl(request));
   if (shop) {
     returnUrl.searchParams.set("shop", String(shop));
   }
