@@ -18,6 +18,9 @@ export const loader = async ({ request }) => {
       shop: session.shop,
       planKey: String(url.searchParams.get("plan") || ""),
     });
+    if (result.success) {
+      throw redirect("/app");
+    }
   } else if (type === "credits") {
     result = await activateExtraCreditPurchase({
       admin,
