@@ -1737,7 +1737,7 @@ export default function ProductsPage() {
           </div>
           <InlineStack gap="200" blockAlign="center">
             <Text as="span" variant="headingSm" tone="subdued">{credits} credits.</Text>
-            <Button onClick={() => navigate("/app/analytics")} variant="secondary">
+            <Button onClick={() => navigate("/app/pricing")} variant="secondary">
               Upgrade
             </Button>
           </InlineStack>
