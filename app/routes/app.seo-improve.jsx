@@ -75,8 +75,10 @@ const PRODUCTS_QUERY = `#graphql
       nodes {
         id
         title
+        handle
         vendor
         status
+        descriptionHtml
         seo {
           title
           description
@@ -99,6 +101,12 @@ const COLLECTIONS_QUERY = `#graphql
       nodes {
         id
         title
+        handle
+        descriptionHtml
+        image {
+          url
+          altText
+        }
         seo {
           title
           description
@@ -114,6 +122,8 @@ const PAGES_QUERY = `#graphql
       nodes {
         id
         title
+        handle
+        body
         metafields(first: 10, namespace: "global") {
           nodes {
             key
@@ -131,6 +141,11 @@ const ARTICLES_QUERY = `#graphql
       nodes {
         id
         title
+        handle
+        body
+        blog {
+          title
+        }
         metafields(first: 10, namespace: "global") {
           nodes {
             key
@@ -138,6 +153,63 @@ const ARTICLES_QUERY = `#graphql
           }
         }
       }
+    }
+  }
+`;
+
+const SHOP_QUERY = `#graphql
+  query SeoImproveShop {
+    shop {
+      name
+      myshopifyDomain
+      primaryDomain {
+        host
+      }
+    }
+  }
+`;
+
+const PRODUCT_UPDATE_MUTATION = `#graphql
+  mutation SeoImproveProductUpdate($product: ProductUpdateInput!) {
+    productUpdate(product: $product) {
+      product { id title descriptionHtml seo { title description } }
+      userErrors { field message }
+    }
+  }
+`;
+
+const COLLECTION_UPDATE_MUTATION = `#graphql
+  mutation SeoImproveCollectionUpdate($input: CollectionInput!) {
+    collectionUpdate(input: $input) {
+      collection { id title descriptionHtml seo { title description } }
+      userErrors { field message }
+    }
+  }
+`;
+
+const PAGE_UPDATE_MUTATION = `#graphql
+  mutation SeoImprovePageUpdate($id: ID!, $page: PageUpdateInput!) {
+    pageUpdate(id: $id, page: $page) {
+      page { id title body }
+      userErrors { field message }
+    }
+  }
+`;
+
+const ARTICLE_UPDATE_MUTATION = `#graphql
+  mutation SeoImproveArticleUpdate($id: ID!, $article: ArticleUpdateInput!) {
+    articleUpdate(id: $id, article: $article) {
+      article { id title body }
+      userErrors { field message }
+    }
+  }
+`;
+
+const METAFIELDS_SET_MUTATION = `#graphql
+  mutation SeoImproveMetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      metafields { key value }
+      userErrors { field message }
     }
   }
 `;
@@ -188,6 +260,33 @@ function getSeoFields(type, node) {
   };
 }
 
+function getDescriptionHtml(type, node) {
+  if (type === "products" || type === "collections") return node?.descriptionHtml || "";
+  if (type === "pages" || type === "blogs") return node?.body || "";
+  return "";
+}
+
+function getResourcePath(type, node) {
+  const handle = node?.handle || "";
+  if (!handle) return type;
+  if (type === "products") return `products/${handle}`;
+  if (type === "collections") return `collections/${handle}`;
+  if (type === "pages") return `pages/${handle}`;
+  if (type === "blogs") return `blogs/${handle}`;
+  return handle;
+}
+
+function getPrimaryImage(type, node) {
+  if (type === "products") {
+    const image = node?.images?.nodes?.[0];
+    return image ? { src: image.url || "", altText: image.altText || "" } : null;
+  }
+  if (type === "collections" && node?.image?.url) {
+    return { src: node.image.url || "", altText: node.image.altText || "" };
+  }
+  return null;
+}
+
 function getIssues({ title, keyword, seoTitle, seoDescription }) {
   const issues = [];
   if (!textValue(seoTitle)) issues.push("Missing SEO title");
@@ -206,10 +305,15 @@ function normalizeContentItem(type, node) {
   const issues = getIssues({ title: node?.title, keyword, seoTitle, seoDescription });
   return {
     id: node?.id || "",
+    resourceType: type,
+    handle: node?.handle || "",
+    path: getResourcePath(type, node),
     title: node?.title || "Untitled",
     keyword,
+    descriptionHtml: getDescriptionHtml(type, node),
     seoTitle,
     seoDescription,
+    image: getPrimaryImage(type, node),
     issues,
     issuesCount: issues.length,
   };
@@ -227,8 +331,9 @@ export const loader = async ({ request }) => {
     select: { globalSettingsJson: true, billingPlanKey: true },
   });
 
-  const [shopData, productsJson, collectionsJson, pagesJson, articlesJson] = await Promise.all([
+  const [shopData, shopJson, productsJson, collectionsJson, pagesJson, articlesJson] = await Promise.all([
     shopDataPromise,
+    graphqlJson(admin, SHOP_QUERY, {}).catch(() => ({ data: { shop: null } })),
     graphqlJson(admin, PRODUCTS_QUERY, { first: 100 }).catch(() => ({ data: { products: { nodes: [] } } })),
     graphqlJson(admin, COLLECTIONS_QUERY, { first: 100 }).catch(() => ({ data: { collections: { nodes: [] } } })),
     graphqlJson(admin, PAGES_QUERY, { first: 100 }).catch(() => ({ data: { pages: { nodes: [] } } })),
@@ -268,6 +373,12 @@ export const loader = async ({ request }) => {
   const altGenerated = images.filter((image) => textValue(image.altText)).length;
   const altMissing = Math.max(totalImages - altGenerated, 0);
   const settings = readSeoSettingsFromShop(shopData);
+  let parsedGlobalSettings = {};
+  try {
+    parsedGlobalSettings = JSON.parse(shopData?.globalSettingsJson || "{}");
+  } catch {
+    parsedGlobalSettings = {};
+  }
   const performanceEnabled = Number(settings.performance.instantPageEnabled) + Number(settings.performance.quickLinkEnabled);
   const schemaEnabled = Object.values(settings.schema.enabledTypes).filter(Boolean).length;
 
@@ -282,6 +393,12 @@ export const loader = async ({ request }) => {
     images,
     settings,
     plan: shopData?.billingPlanKey || "free",
+    shopInfo: {
+      name: shopJson?.data?.shop?.name || "Your Store",
+      domain: shopJson?.data?.shop?.primaryDomain?.host || shopJson?.data?.shop?.myshopifyDomain || session.shop,
+      myshopifyDomain: shopJson?.data?.shop?.myshopifyDomain || session.shop,
+    },
+    outputLanguage: parsedGlobalSettings.language || "English",
     summary: {
       totalScore,
       contentScore,
@@ -302,9 +419,65 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
+
+  if (intent === "update_content_seo") {
+    const resourceType = String(formData.get("resourceType") || "");
+    const id = String(formData.get("id") || "");
+    const title = String(formData.get("title") || "").trim();
+    const descriptionHtml = String(formData.get("descriptionHtml") || "");
+    const seoTitle = String(formData.get("seoTitle") || "").trim();
+    const seoDescription = String(formData.get("seoDescription") || "").trim();
+
+    if (!id || !resourceType) {
+      return { success: false, error: "Missing content resource." };
+    }
+
+    let responseJson;
+    if (resourceType === "products") {
+      responseJson = await graphqlJson(admin, PRODUCT_UPDATE_MUTATION, {
+        product: { id, title, descriptionHtml, seo: { title: seoTitle, description: seoDescription } },
+      });
+      const errors = responseJson?.data?.productUpdate?.userErrors || [];
+      if (errors.length) return { success: false, error: errors.map((error) => error.message).join(", ") };
+    } else if (resourceType === "collections") {
+      responseJson = await graphqlJson(admin, COLLECTION_UPDATE_MUTATION, {
+        input: { id, title, descriptionHtml, seo: { title: seoTitle, description: seoDescription } },
+      });
+      const errors = responseJson?.data?.collectionUpdate?.userErrors || [];
+      if (errors.length) return { success: false, error: errors.map((error) => error.message).join(", ") };
+    } else if (resourceType === "pages") {
+      responseJson = await graphqlJson(admin, PAGE_UPDATE_MUTATION, { id, page: { title, body: descriptionHtml } });
+      const pageErrors = responseJson?.data?.pageUpdate?.userErrors || [];
+      if (pageErrors.length) return { success: false, error: pageErrors.map((error) => error.message).join(", ") };
+      const metafieldJson = await graphqlJson(admin, METAFIELDS_SET_MUTATION, {
+        metafields: [
+          { ownerId: id, namespace: "global", key: "title_tag", type: "single_line_text_field", value: seoTitle },
+          { ownerId: id, namespace: "global", key: "description_tag", type: "single_line_text_field", value: seoDescription },
+        ],
+      });
+      const metafieldErrors = metafieldJson?.data?.metafieldsSet?.userErrors || [];
+      if (metafieldErrors.length) return { success: false, error: metafieldErrors.map((error) => error.message).join(", ") };
+    } else if (resourceType === "blogs") {
+      responseJson = await graphqlJson(admin, ARTICLE_UPDATE_MUTATION, { id, article: { title, body: descriptionHtml } });
+      const articleErrors = responseJson?.data?.articleUpdate?.userErrors || [];
+      if (articleErrors.length) return { success: false, error: articleErrors.map((error) => error.message).join(", ") };
+      const metafieldJson = await graphqlJson(admin, METAFIELDS_SET_MUTATION, {
+        metafields: [
+          { ownerId: id, namespace: "global", key: "title_tag", type: "single_line_text_field", value: seoTitle },
+          { ownerId: id, namespace: "global", key: "description_tag", type: "single_line_text_field", value: seoDescription },
+        ],
+      });
+      const metafieldErrors = metafieldJson?.data?.metafieldsSet?.userErrors || [];
+      if (metafieldErrors.length) return { success: false, error: metafieldErrors.map((error) => error.message).join(", ") };
+    } else {
+      return { success: false, error: "Unsupported content resource type." };
+    }
+
+    return { success: true, message: "SEO content updated." };
+  }
 
   if (intent !== "save_seo_settings") {
     return { success: false, error: "Unknown SEO Improve action." };
@@ -578,8 +751,319 @@ function truncateText(value, max = 42) {
   return text.length > max ? `${text.slice(0, max - 3)}...` : text;
 }
 
-function ContentView({ content }) {
+function countWords(value) {
+  const plain = textValue(value);
+  return plain ? plain.split(" ").filter(Boolean).length : 0;
+}
+
+function firstParagraph(value) {
+  const raw = String(value || "");
+  const match = raw.match(/<p[^>]*>(.*?)<\/p>/i);
+  return textValue(match ? match[1] : raw.split(/\n{2,}/)[0]);
+}
+
+function includesKeyword(value, keyword) {
+  const key = textValue(keyword).toLowerCase();
+  return Boolean(key && textValue(value).toLowerCase().includes(key));
+}
+
+function startsWithKeyword(value, keyword) {
+  const key = textValue(keyword).toLowerCase();
+  return Boolean(key && textValue(value).toLowerCase().startsWith(key));
+}
+
+function buildDetailChecks(item, values) {
+  const keywordWords = textValue(values.keyword).split(" ").filter(Boolean).length;
+  const descriptionWords = countWords(values.descriptionHtml);
+  const seoTitleLength = textValue(values.seoTitle).length;
+  const metaDescriptionLength = textValue(values.seoDescription).length;
+  const checks = [
+    {
+      id: "keyword_length",
+      passed: keywordWords >= 1 && keywordWords <= 5,
+      message: keywordWords >= 1 && keywordWords <= 5 ? "Focus keyword length is clear." : "Focus keyword should be 1-5 words.",
+    },
+    {
+      id: "title_keyword",
+      passed: includesKeyword(values.title, values.keyword),
+      message: includesKeyword(values.title, values.keyword) ? "Focus keyword is included in the title." : "Focus keyword should appear in the title.",
+    },
+    {
+      id: "description_first_paragraph",
+      passed: includesKeyword(firstParagraph(values.descriptionHtml), values.keyword),
+      message: includesKeyword(firstParagraph(values.descriptionHtml), values.keyword)
+        ? "Focus keyword appears in the first paragraph."
+        : "Focus keyword should appear in the first paragraph.",
+    },
+    {
+      id: "description_length",
+      passed: descriptionWords >= 60,
+      message: descriptionWords >= 60 ? "Description length is ideal (60+ words)." : "Description should contain at least 60 words.",
+    },
+    {
+      id: "seo_title_keyword",
+      passed: includesKeyword(values.seoTitle, values.keyword),
+      message: includesKeyword(values.seoTitle, values.keyword) ? "Focus keyword appears in the SEO title." : "Focus keyword should appear in the SEO title.",
+    },
+    {
+      id: "seo_title_length",
+      passed: seoTitleLength >= 30 && seoTitleLength <= 60,
+      message: seoTitleLength >= 30 && seoTitleLength <= 60 ? "SEO title length is ideal." : "SEO title should be 30-60 characters.",
+    },
+    {
+      id: "seo_title_start",
+      passed: startsWithKeyword(values.seoTitle, values.keyword),
+      message: startsWithKeyword(values.seoTitle, values.keyword)
+        ? "Focus keyword is near the beginning of the SEO title."
+        : "Focus keyword should be in the beginning of the SEO title.",
+    },
+    {
+      id: "meta_description_keyword",
+      passed: includesKeyword(values.seoDescription, values.keyword),
+      message: includesKeyword(values.seoDescription, values.keyword)
+        ? "Focus keyword is included in the SEO description."
+        : "Focus keyword should appear in the SEO description.",
+    },
+    {
+      id: "meta_description_length",
+      passed: metaDescriptionLength >= 120 && metaDescriptionLength <= 160,
+      message: metaDescriptionLength >= 120 && metaDescriptionLength <= 160
+        ? "SEO description length is ideal (120-160 chars)."
+        : "SEO description should be 120-160 characters.",
+    },
+    {
+      id: "image",
+      passed: Boolean(item.image?.src && textValue(item.image?.altText)),
+      message: item.image?.src
+        ? textValue(item.image?.altText)
+          ? "Image has meaningful alt text."
+          : "Image should have meaningful alt text."
+        : "No image found. There should be an image with meaningful alt text.",
+    },
+  ];
+  return checks;
+}
+
+function CheckRow({ passed, children }) {
+  return (
+    <InlineStack gap="200" blockAlign="center" wrap={false}>
+      <span className={`detail-check-icon ${passed ? "detail-check-icon--pass" : "detail-check-icon--fail"}`}>
+        {passed ? "OK" : "!"}
+      </span>
+      <Text as="span" tone={passed ? undefined : "critical"}>{children}</Text>
+    </InlineStack>
+  );
+}
+
+function DetailCheckList({ checks }) {
+  return (
+    <Box background="bg-surface-secondary" borderRadius="300" padding="400">
+      <BlockStack gap="250">
+        {checks.map((check) => (
+          <CheckRow key={check.id} passed={check.passed}>{check.message}</CheckRow>
+        ))}
+      </BlockStack>
+    </Box>
+  );
+}
+
+function ContentDetailView({ item, shopInfo, outputLanguage, onBack }) {
+  const saveFetcher = useFetcher();
+  const revalidator = useRevalidator();
+  const [values, setValues] = useState(() => ({
+    keyword: item.keyword || item.title || "",
+    title: item.title || "",
+    descriptionHtml: item.descriptionHtml || "",
+    seoTitle: item.seoTitle || item.title || "",
+    seoDescription: item.seoDescription || "",
+  }));
+  const isSaving = saveFetcher.state !== "idle";
+  const checks = buildDetailChecks(item, values);
+  const passedChecks = checks.filter((check) => check.passed).length;
+  const score = Math.round((passedChecks / checks.length) * 100);
+  const titleChecks = checks.filter((check) => check.id === "title_keyword");
+  const descriptionChecks = checks.filter((check) => check.id.startsWith("description_"));
+  const seoTitleChecks = checks.filter((check) => check.id.startsWith("seo_title_"));
+  const metaDescriptionChecks = checks.filter((check) => check.id.startsWith("meta_description_"));
+  const imageChecks = checks.filter((check) => check.id === "image");
+  const resourcePath = item.path || item.resourceType;
+
+  function update(field) {
+    return (value) => setValues((current) => ({ ...current, [field]: value }));
+  }
+
+  function useDefaultKeyword() {
+    setValues((current) => ({ ...current, keyword: item.title || current.keyword }));
+  }
+
+  function handleSave() {
+    const payload = new FormData();
+    payload.append("intent", "update_content_seo");
+    payload.append("resourceType", item.resourceType);
+    payload.append("id", item.id);
+    payload.append("title", values.title);
+    payload.append("descriptionHtml", values.descriptionHtml);
+    payload.append("seoTitle", values.seoTitle);
+    payload.append("seoDescription", values.seoDescription);
+    saveFetcher.submit(payload, { method: "post" });
+    setTimeout(() => revalidator.revalidate(), 800);
+  }
+
+  return (
+    <BlockStack gap="500">
+      <InlineStack gap="300" blockAlign="start" wrap={false}>
+        <Button onClick={onBack} accessibilityLabel="Back to content list">Back</Button>
+        <BlockStack gap="100">
+          <Text as="h2" variant="headingLg">Content Optimization</Text>
+          <Text as="p" tone="subdued">Set a focus keyword and optimize this content for better rankings.</Text>
+        </BlockStack>
+      </InlineStack>
+
+      <Grid columns={{ xs: 1, sm: 1, md: 3, lg: 3, xl: 3 }}>
+        <Grid.Cell columnSpan={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2 }}>
+          <BlockStack gap="500">
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h3" variant="headingMd">Focus Keyword</Text>
+                <Text as="p" tone="subdued">What would customers search to find this on Google? The ideal keyword length is 1-5 words.</Text>
+                <TextField label="Focus keyword" labelHidden value={values.keyword} onChange={update("keyword")} autoComplete="off" />
+                <InlineStack gap="300">
+                  <Button onClick={useDefaultKeyword}>Use default keyword</Button>
+                  <Button variant="plain" onClick={useDefaultKeyword}>Reset from title</Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h3" variant="headingMd">Title</Text>
+                <TextField label="Title" labelHidden value={values.title} onChange={update("title")} autoComplete="off" />
+                <DetailCheckList checks={titleChecks} />
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h3" variant="headingMd">Description</Text>
+                <TextField
+                  label="Description"
+                  labelHidden
+                  value={values.descriptionHtml}
+                  onChange={update("descriptionHtml")}
+                  multiline={10}
+                  autoComplete="off"
+                  helpText={`${countWords(values.descriptionHtml)} words`}
+                />
+                <DetailCheckList checks={descriptionChecks} />
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h3" variant="headingMd">Search Engine Listing</Text>
+                <Box borderColor="border" borderWidth="025" borderRadius="300" padding="400">
+                  <BlockStack gap="200">
+                    <Text as="span" variant="headingMd">Google</Text>
+                    <Text as="span" tone="subdued">{shopInfo.name} / {shopInfo.domain} / {resourcePath}</Text>
+                    <Text as="p" variant="headingMd">{values.seoTitle || values.title}</Text>
+                    <Text as="p" tone="subdued">{values.seoDescription || textValue(values.descriptionHtml).slice(0, 160)}</Text>
+                  </BlockStack>
+                </Box>
+                <TextField
+                  label="SEO Title"
+                  value={values.seoTitle}
+                  onChange={update("seoTitle")}
+                  autoComplete="off"
+                  helpText={`${textValue(values.seoTitle).length}/60 characters`}
+                />
+                <DetailCheckList checks={seoTitleChecks} />
+                <TextField
+                  label="Meta Description"
+                  value={values.seoDescription}
+                  onChange={update("seoDescription")}
+                  multiline={3}
+                  autoComplete="off"
+                  helpText={`${textValue(values.seoDescription).length}/160 characters`}
+                />
+                <DetailCheckList checks={metaDescriptionChecks} />
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h3" variant="headingMd">Image</Text>
+                  <Button disabled>Upload Image</Button>
+                </InlineStack>
+                <Box borderColor="border" borderWidth="025" borderRadius="300" padding="500">
+                  {item.image?.src ? (
+                    <InlineStack gap="300" blockAlign="center">
+                      <img className="detail-image-preview" src={item.image.src} alt={item.image.altText || item.title} />
+                      <BlockStack gap="100">
+                        <Text as="span" fontWeight="semibold">{item.title}</Text>
+                        <Text as="span" tone={item.image.altText ? "success" : "critical"}>
+                          {item.image.altText || "Alt text missing"}
+                        </Text>
+                      </BlockStack>
+                    </InlineStack>
+                  ) : (
+                    <BlockStack gap="200" align="center">
+                      <Box background="bg-surface-secondary" borderRadius="300" padding="600">
+                        <Icon source={ImageIcon} tone="subdued" />
+                      </Box>
+                      <Text as="p" tone="subdued">No image added</Text>
+                    </BlockStack>
+                  )}
+                </Box>
+                <DetailCheckList checks={imageChecks} />
+              </BlockStack>
+            </Card>
+
+            <InlineStack gap="300">
+              <Button onClick={onBack}>Cancel</Button>
+              <Button variant="primary" loading={isSaving} disabled={isSaving} onClick={handleSave}>Save Changes</Button>
+            </InlineStack>
+          </BlockStack>
+        </Grid.Cell>
+
+        <Grid.Cell>
+          <BlockStack gap="500">
+            <Card>
+              <BlockStack gap="300" align="center">
+                <ScoreRing value={score} tone={score >= 70 ? "green" : "red"} label="SEO" />
+                <Badge tone={score >= 70 ? "success" : "attention"}>{score >= 70 ? "Good" : "Needs work"}</Badge>
+                <Text as="p" tone="subdued">{passedChecks} of {checks.length} checks passed</Text>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="400">
+                <InlineStack gap="300" blockAlign="center">
+                  <Button variant="primary">Optimize</Button>
+                  <Button disabled>History</Button>
+                </InlineStack>
+                <Text as="p" fontWeight="semibold">Boost this content's SEO with a single review pass.</Text>
+                <Text as="p" tone="subdued">Saved focus keyword will be used for optimization.</Text>
+                <Select
+                  label="Output Language"
+                  options={[{ label: outputLanguage, value: outputLanguage }]}
+                  value={outputLanguage}
+                  onChange={() => {}}
+                />
+                <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>Optimize (3 credits)</Button>
+                {saveFetcher.data?.error ? <Text as="p" tone="critical">{saveFetcher.data.error}</Text> : null}
+                {saveFetcher.data?.success ? <Text as="p" tone="success">Saved successfully.</Text> : null}
+              </BlockStack>
+            </Card>
+          </BlockStack>
+        </Grid.Cell>
+      </Grid>
+    </BlockStack>
+  );
+}
+
+function ContentView({ content, shopInfo, outputLanguage }) {
   const [contentTab, setContentTab] = useState("collections");
+  const [selectedItem, setSelectedItem] = useState(null);
   const [query, setQuery] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
   const rows = useMemo(() => {
@@ -591,6 +1075,18 @@ function ContentView({ content }) {
     return filtered.sort((a, b) => sortDesc ? b.issuesCount - a.issuesCount : a.issuesCount - b.issuesCount);
   }, [content, contentTab, query, sortDesc]);
   const label = contentTab === "collections" ? "collections" : contentTab;
+
+  if (selectedItem) {
+    return (
+      <ContentDetailView
+        key={selectedItem.id}
+        item={selectedItem}
+        shopInfo={shopInfo}
+        outputLanguage={outputLanguage}
+        onBack={() => setSelectedItem(null)}
+      />
+    );
+  }
 
   return (
     <Card>
@@ -651,7 +1147,10 @@ function ContentView({ content }) {
                   {item.issuesCount} {item.issuesCount === 1 ? "suggestion" : "suggestions"}
                 </Text>
               </InlineStack>
-              <Button accessibilityLabel={item.issues.length ? item.issues.join(". ") : "No SEO issues found"}>
+              <Button
+                onClick={() => setSelectedItem(item)}
+                accessibilityLabel={item.issues.length ? item.issues.join(". ") : "No SEO issues found"}
+              >
                 View Details
               </Button>
             </div>
@@ -807,12 +1306,20 @@ function ImagesView({ images, settings, onSettingsChange, plan }) {
           </div>
           <Divider />
           <div className="seo-card-body">
-            <div className="warning-strip">
-              <InlineStack gap="200" blockAlign="center" wrap={false}>
-                <Icon source={AlertTriangleIcon} tone="base" />
-                <Text as="span" fontWeight="semibold">Upgrade to Standard or PRO Plan</Text>
-              </InlineStack>
-            </div>
+            {!canCompress ? (
+              <div className="warning-strip">
+                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                  <Icon source={AlertTriangleIcon} tone="base" />
+                  <Text as="span" fontWeight="semibold">Upgrade to Standard or PRO Plan</Text>
+                </InlineStack>
+              </div>
+            ) : (
+              <Box background="bg-surface-success" borderRadius="300" padding="300">
+                <Text as="p" tone="success">
+                  Image compression is available on your current plan.
+                </Text>
+              </Box>
+            )}
             {!canCompress ? (
               <Box paddingBlockStart="400">
                 <Text as="p" tone="subdued">
@@ -967,7 +1474,27 @@ function ImageLibrary({ images, totalImages }) {
   );
 }
 
-function AssetsView() {
+function AssetsView({ settings, onSettingsChange, plan }) {
+  const canCompress = plan === "standard" || plan === "pro";
+  const compressionEnabled = Boolean(settings.images.compressionEnabled);
+  const assetItems = [
+    {
+      title: "CSS minification",
+      enabled: compressionEnabled && canCompress,
+      description: canCompress ? "Theme CSS optimization follows the image compression toggle." : "Ready to configure after upgrade.",
+    },
+    {
+      title: "JavaScript minification",
+      enabled: compressionEnabled && canCompress,
+      description: canCompress ? "Theme JavaScript optimization follows the image compression toggle." : "Ready to configure after upgrade.",
+    },
+    {
+      title: "Unused asset report",
+      enabled: canCompress,
+      description: canCompress ? "Available for your current plan." : "Ready to configure after upgrade.",
+    },
+  ];
+
   return (
     <BlockStack gap="500">
       <Card>
@@ -977,21 +1504,35 @@ function AssetsView() {
               <Text as="h2" variant="headingMd">Asset Compression</Text>
               <Text as="p" tone="subdued">Minify CSS and JavaScript files to improve storefront load speed.</Text>
             </BlockStack>
-            <Badge tone="attention">Standard plan required</Badge>
-          </InlineStack>
-          <div className="warning-strip">
             <InlineStack gap="200" blockAlign="center">
-              <Icon source={AlertTriangleIcon} tone="base" />
-              <Text as="span" fontWeight="semibold">Upgrade to enable automatic asset compression.</Text>
+              <Badge tone={canCompress ? "success" : "attention"}>
+                {canCompress ? `${plan.toUpperCase()} plan` : "Standard plan required"}
+              </Badge>
+              <ToggleSwitch
+                checked={compressionEnabled && canCompress}
+                onChange={(value) => canCompress && onSettingsChange("images", "compressionEnabled", value)}
+                label="Toggle asset compression"
+              />
             </InlineStack>
-          </div>
+          </InlineStack>
+          {!canCompress ? (
+            <div className="warning-strip">
+              <InlineStack gap="200" blockAlign="center">
+                <Icon source={AlertTriangleIcon} tone="base" />
+                <Text as="span" fontWeight="semibold">Upgrade to enable automatic asset compression.</Text>
+              </InlineStack>
+            </div>
+          ) : null}
           <Grid columns={{ xs: 1, sm: 3, md: 3, lg: 3, xl: 3 }}>
-            {["CSS minification", "JavaScript minification", "Unused asset report"].map((item) => (
-              <Grid.Cell key={item}>
+            {assetItems.map((item) => (
+              <Grid.Cell key={item.title}>
                 <Box background="bg-surface-secondary" borderRadius="300" padding="400">
                   <BlockStack gap="100">
-                    <Text as="h3" variant="headingSm">{item}</Text>
-                    <Text as="p" tone="subdued">Ready to configure after upgrade.</Text>
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text as="h3" variant="headingSm">{item.title}</Text>
+                      <Badge tone={item.enabled ? "success" : "attention"}>{item.enabled ? "On" : "Off"}</Badge>
+                    </InlineStack>
+                    <Text as="p" tone="subdued">{item.description}</Text>
                   </BlockStack>
                 </Box>
               </Grid.Cell>
@@ -1003,11 +1544,24 @@ function AssetsView() {
   );
 }
 
-function SchemaView({ settings, onSettingsChange }) {
+function SchemaView({ settings, onSettingsChange, shopInfo, content }) {
   const schemaSettings = settings.schema;
   const activeSchema = schemaSettings.activeType || "product";
 
   const selected = useMemo(() => schemaTypes.find((item) => item.id === activeSchema) || schemaTypes[1], [activeSchema]);
+  const previewItem =
+    content.products[0] ||
+    content.collections[0] ||
+    content.pages[0] ||
+    content.blogs[0] || {
+      title: shopInfo.name,
+      seoTitle: shopInfo.name,
+      seoDescription: `Browse ${shopInfo.name} online.`,
+      path: "",
+    };
+  const previewTitle = previewItem.seoTitle || previewItem.title || shopInfo.name;
+  const previewDescription = previewItem.seoDescription || textValue(previewItem.descriptionHtml).slice(0, 160) || `Browse ${shopInfo.name} online.`;
+  const previewPath = previewItem.path || "products";
   const updateSchema = (key, value) => onSettingsChange("schema", key, value);
   const updateSchemaType = (schemaId, value) => {
     onSettingsChange("schema", "enabledTypes", {
@@ -1172,10 +1726,10 @@ function SchemaView({ settings, onSettingsChange }) {
                 <Text as="h3" variant="headingMd">Google Search Preview</Text>
                 <Box background="bg-surface-secondary" borderRadius="300" padding="400">
                   <BlockStack gap="200">
-                    <Text as="span" tone="subdued">yourstore.com &gt; products</Text>
-                    <Text as="p" fontWeight="semibold">Premium Wireless Headphones - Your Store</Text>
-                    <Text as="span">$49.99</Text>
-                    <Text as="span">4.5 rating (128 reviews)</Text>
+                    <Text as="span" tone="subdued">{shopInfo.domain} / {previewPath}</Text>
+                    <Text as="p" fontWeight="semibold">{previewTitle}</Text>
+                    <Text as="span">{previewDescription}</Text>
+                    <Text as="span">{schemaSettings.enabledTypes.product ? "Product schema enabled" : "Product schema inactive"}</Text>
                   </BlockStack>
                 </Box>
               </BlockStack>
@@ -1216,7 +1770,7 @@ function SchemaView({ settings, onSettingsChange }) {
 }
 
 export default function SeoImprovePage() {
-  const { content, images, settings: initialSettings, summary, plan } = useLoaderData();
+  const { content, images, settings: initialSettings, summary, plan, shopInfo, outputLanguage } = useLoaderData();
   const navigate = useNavigate();
   const location = useLocation();
   const settingsFetcher = useFetcher();
@@ -1260,11 +1814,11 @@ export default function SeoImprovePage() {
   }
 
   function renderSection() {
-    if (activeSection === "content") return <ContentView content={content} />;
+    if (activeSection === "content") return <ContentView content={content} shopInfo={shopInfo} outputLanguage={outputLanguage} />;
     if (activeSection === "performance") return <PerformanceView settings={settings} onSettingsChange={handleSettingsChange} />;
     if (activeSection === "images") return <ImagesView images={images} settings={settings} onSettingsChange={handleSettingsChange} plan={plan} />;
-    if (activeSection === "assets") return <AssetsView />;
-    if (activeSection === "schema") return <SchemaView settings={settings} onSettingsChange={handleSettingsChange} />;
+    if (activeSection === "assets") return <AssetsView settings={settings} onSettingsChange={handleSettingsChange} plan={plan} />;
+    if (activeSection === "schema") return <SchemaView settings={settings} onSettingsChange={handleSettingsChange} shopInfo={shopInfo} content={content} />;
     return <DashboardView summary={liveSummary} onOpen={setActiveSection} onSync={() => revalidator.revalidate()} />;
   }
 
@@ -1272,6 +1826,7 @@ export default function SeoImprovePage() {
     <Page
       title="SEO Improve"
       subtitle="Optimize content, performance, images, assets, and structured data."
+      fullWidth
       backAction={{ content: "Dashboard", onAction: () => navigateWithCurrentSearch(navigate, location, "/app") }}
     >
       <BlockStack gap="500">
@@ -1390,6 +1945,31 @@ export default function SeoImprovePage() {
         }
         .issue-dot--critical {
           background: #d72c0d;
+        }
+        .detail-check-icon {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          font-size: 10px;
+          font-weight: 700;
+          border: 2px solid currentColor;
+        }
+        .detail-check-icon--pass {
+          color: #008060;
+        }
+        .detail-check-icon--fail {
+          color: #d72c0d;
+        }
+        .detail-image-preview {
+          width: 96px;
+          height: 96px;
+          border-radius: 8px;
+          object-fit: cover;
+          border: 1px solid #dfe3e8;
         }
         .seo-switch {
           appearance: none;
