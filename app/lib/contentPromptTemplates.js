@@ -12,13 +12,23 @@ function normalizeText(value, fallback = "Not available") {
 }
 
 function parseLengthRange(lengthOption) {
-  const match = /(\d+)\s*-\s*(\d+)/.exec(lengthOption || "");
-  if (!match) return { min: 50, max: 150 };
+  const raw = String(lengthOption || "");
+  const rangeMatch = /(\d+)\s*-\s*(\d+)/.exec(raw);
+  if (rangeMatch) {
+    return {
+      min: Number(rangeMatch[1]),
+      max: Number(rangeMatch[2]),
+      exact: null,
+    };
+  }
 
-  return {
-    min: Number(match[1]),
-    max: Number(match[2]),
-  };
+  const exactMatch = /(\d+)\s*words?/i.exec(raw);
+  if (exactMatch) {
+    const exact = Number(exactMatch[1]);
+    return { min: exact, max: exact, exact };
+  }
+
+  return { min: 50, max: 150, exact: null };
 }
 
 function parseMinimumWordTarget(lengthOption) {
@@ -31,9 +41,17 @@ function parseMinimumWordTarget(lengthOption) {
   if (aroundMatch) return Number(aroundMatch[1]);
 
   const rangeMatch = /(\d+)\s*-\s*(\d+)/.exec(raw);
-  if (rangeMatch) return Number(rangeMatch[1]);
+  if (rangeMatch) return Number(rangeMatch[2]);
+
+  const exactMatch = /(\d+)\s*words?/i.exec(raw);
+  if (exactMatch) return Number(exactMatch[1]);
 
   return null;
+}
+
+function getLengthTargetLabel(lengthOption) {
+  const { min, max, exact } = parseLengthRange(lengthOption);
+  return exact ? `${exact} words` : `${min}-${max} words`;
 }
 
 function toFocusLabel(intent) {
@@ -59,7 +77,7 @@ export function buildProductContentPrompt({
   metaDescriptionPromptTemplate,
   intent = "all",
 }) {
-  const { min, max } = parseLengthRange(lengthOption);
+  const lengthTargetLabel = getLengthTargetLabel(lengthOption);
   const descriptionTemplate = normalizeText(descriptionPromptTemplate, "");
   const seoTitleTemplate = normalizeText(metaTitlePromptTemplate, "");
   const seoDescriptionTemplate = normalizeText(metaDescriptionPromptTemplate, "");
@@ -77,7 +95,7 @@ export function buildProductContentPrompt({
     "Inputs:",
     `- Language: ${normalizeLanguage(language)}`,
     `- Tone: ${normalizeText(tone, "Neutral")}`,
-    `- Description length target: ${min}-${max} words`,
+    `- Description length target: ${lengthTargetLabel}`,
     `- Description format: ${normalizeText(format, "Single paragraph")}`,
     `- Product title: ${normalizeText(title, "Untitled product")}`,
     `- Current product description: ${normalizeText(descriptionText)}`,
@@ -105,6 +123,7 @@ export function buildProductContentPrompt({
     "",
     "Rules:",
     '- "productDescription" must be well-structured Shopify-safe HTML.',
+    `- "productDescription" must be approximately ${lengthTargetLabel}; do not ignore this target.`,
     '- Use a compelling <h2> as the main heading, followed by a short introductory <p>.',
     '- Then 2–3 <h3> subheadings each followed by a <p> explaining a key benefit or feature.',
     '- End with a <ul>/<li> list of 3–5 key highlights or specifications.',
@@ -131,7 +150,7 @@ export function buildCollectionContentPrompt({
   metaDescriptionPromptTemplate,
   intent = "all",
 }) {
-  const { min, max } = parseLengthRange(lengthOption);
+  const lengthTargetLabel = getLengthTargetLabel(lengthOption);
   const descriptionTemplate = normalizeText(descriptionPromptTemplate, "");
   const seoTitleTemplate = normalizeText(metaTitlePromptTemplate, "");
   const seoDescriptionTemplate = normalizeText(metaDescriptionPromptTemplate, "");
@@ -149,7 +168,7 @@ export function buildCollectionContentPrompt({
     "Inputs:",
     `- Language: ${normalizeLanguage(language)}`,
     `- Tone: ${normalizeText(tone, "Neutral")}`,
-    `- Description length target: ${min}-${max} words`,
+    `- Description length target: ${lengthTargetLabel}`,
     `- Description format: ${normalizeText(format, "Single paragraph")}`,
     `- Collection title: ${normalizeText(title, "Untitled collection")}`,
     `- Current collection description: ${normalizeText(descriptionText)}`,
@@ -177,6 +196,7 @@ export function buildCollectionContentPrompt({
     "",
     "Rules:",
     '- "collectionDescription" must be well-structured Shopify-safe HTML.',
+    `- "collectionDescription" must be approximately ${lengthTargetLabel}; do not ignore this target.`,
     '- Start with a prominent <h2> heading for the collection, then a 2–3 sentence introductory <p>.',
     '- Add 2 <h3> subheadings (e.g., "Why Shop This Collection", "What\'s Inside") each with a descriptive <p>.',
     '- Close with a <ul>/<li> listing 4–5 product categories or collection highlights.',
@@ -245,7 +265,7 @@ export function buildPageContentPrompt({
     '- Begin with a bold <h1> or <h2> page title heading.',
     '- Divide content into clearly labelled sections each with an <h2> or <h3> heading followed by 1–3 <p> paragraphs.',
     '- Use <ul>/<li> for any lists, features, or FAQs. Keep each <p> to 3–5 readable sentences.',
-    ...(minimumWords ? [`- "pageBody" should be at least ${minimumWords} words unless input constraints make that impossible.`] : []),
+    ...(minimumWords ? [`- "pageBody" should be approximately ${minimumWords} words unless input constraints make that impossible.`] : []),
     `- "seoTitle" must be <= ${META_TITLE_MAX} characters, include the page name and primary keyword.`,
     `- "seoDescription" must be <= ${META_DESCRIPTION_MAX} characters, concise and action-oriented.`,
     "- Do not return markdown. Return HTML only for pageBody.",

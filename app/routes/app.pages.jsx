@@ -7,7 +7,7 @@ import db from "../db.server";
 import { buildPageContentPrompt } from "../lib/contentPromptTemplates";
 import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
 import { RichTextEditor } from "../components/RichTextEditor";
-import { readGlobalSettings } from "../lib/globalSettings";
+import { getExactWordLengthOption, normalizeStoredGlobalSettings, readGlobalSettings } from "../lib/globalSettings";
 import {
   readStoredPagePromptTemplateSelection,
   PAGE_BODY_TEMPLATES,
@@ -42,6 +42,14 @@ import { PageIcon } from "@shopify/polaris-icons";
 
 const PAGE_CONTENT_TYPES = ["body", "meta_title", "meta_description"];
 const DEFAULT_PAGE_CONTENT_TYPES = ["body", "meta_title", "meta_description"];
+
+function parseShopGlobalSettings(shopData) {
+  try {
+    return normalizeStoredGlobalSettings(JSON.parse(shopData?.globalSettingsJson || "{}"));
+  } catch {
+    return normalizeStoredGlobalSettings();
+  }
+}
 
 // ─── GraphQL ────────────────────────────────────────────────────────────────
 
@@ -103,7 +111,7 @@ async function generateContentWithAnthropic(input, apiKey) {
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 3500,
       messages: [{ role: "user", content: input.prompt }],
     }),
   });
@@ -127,7 +135,7 @@ async function generateContentWithOpenAI(input, shopApiKey) {
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
-      max_tokens: 1024,
+      max_tokens: 3500,
       messages: [{ role: "user", content: input.prompt }],
     }),
   });
@@ -367,7 +375,7 @@ export const action = async ({ request }) => {
     const bulkPages = JSON.parse(pagesJson);
     const language = formData.get("language") || "en";
     const tone = formData.get("tone") || "professional";
-    const length = formData.get("length") || "medium";
+    let length = formData.get("length") || "medium";
     const format = formData.get("format") || "paragraphs";
     const pageType = formData.get("pageType") || "About Us";
     const contextKeywords = formData.get("contextKeywords") || "";
@@ -408,8 +416,16 @@ export const action = async ({ request }) => {
 
     const shopData = await db.shop.findUnique({
       where: { shop: session.shop },
-      select: { openaiApiKey: true, anthropicApiKey: true, credits: true, creditsUsedTotal: true },
+      select: {
+        openaiApiKey: true,
+        anthropicApiKey: true,
+        credits: true,
+        creditsUsedTotal: true,
+        globalSettingsJson: true,
+      },
     });
+    const globalSettings = parseShopGlobalSettings(shopData);
+    length = getExactWordLengthOption(globalSettings, "pageContentWords");
     const availableCredits = shopData?.credits ?? 100;
     const requiredCredits = creditsForBatch(selectedContentTypes, bulkPages.length);
     if (availableCredits < requiredCredits) {

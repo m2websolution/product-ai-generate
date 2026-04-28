@@ -70,3 +70,22 @@ export function writeGlobalSettings(settings) {
 export function getDefaultGlobalSettings() {
   return normalizeStoredGlobalSettings();
 }
+
+export function getWordTarget(settings, key, fallback = "150") {
+  const normalized = normalizeStoredGlobalSettings(settings);
+  const value = Number.parseInt(normalized[key], 10);
+  const defaultValue = Number.parseInt(DEFAULTS[key], 10);
+  const fallbackValue = Number.parseInt(fallback, 10);
+  const safeValue = Number.isFinite(value) && value > 0
+    ? value
+    : Number.isFinite(defaultValue) && defaultValue > 0
+      ? defaultValue
+      : Number.isFinite(fallbackValue) && fallbackValue > 0
+        ? fallbackValue
+        : 150;
+  return safeValue;
+}
+
+export function getExactWordLengthOption(settings, key, fallback = "150") {
+  return `${getWordTarget(settings, key, fallback)} words`;
+}

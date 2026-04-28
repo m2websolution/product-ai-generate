@@ -79,7 +79,7 @@ export const action = async ({ request }) => {
 };
 
 const LANGUAGE_OPTIONS = [
-  "English", "English (British)", "English (US)", "Arabic", "Bengali", "Bulgarian",
+  "English", "Arabic", "Bengali", "Bulgarian",
   "Chinese", "Chinese (Simplified)", "Chinese (Traditional)", "Croatian", "Czech",
   "Danish", "Dutch", "Finnish", "French", "German", "Greek", "Hebrew", "Hindi",
   "Hungarian", "Indonesian", "Italian", "Japanese", "Korean", "Malay", "Norwegian",

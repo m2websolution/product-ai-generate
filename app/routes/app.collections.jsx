@@ -40,7 +40,7 @@ import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { buildCollectionContentPrompt } from "../lib/contentPromptTemplates";
 import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
-import { readGlobalSettings } from "../lib/globalSettings";
+import { getExactWordLengthOption, normalizeStoredGlobalSettings, readGlobalSettings } from "../lib/globalSettings";
 import {
   readStoredCollectionPromptTemplateSelection,
   COLLECTION_DESCRIPTION_TEMPLATES,
@@ -81,6 +81,14 @@ const LANGUAGE_OPTIONS = [
   "Polish", "Portuguese", "Romanian", "Russian", "Spanish", "Swedish", "Tamil",
   "Telugu", "Thai", "Turkish", "Ukrainian", "Urdu", "Vietnamese",
 ].map((l) => ({ label: l, value: l }));
+
+function parseShopGlobalSettings(shopData) {
+  try {
+    return normalizeStoredGlobalSettings(JSON.parse(shopData?.globalSettingsJson || "{}"));
+  } catch {
+    return normalizeStoredGlobalSettings();
+  }
+}
 
 
 const DEFAULT_COLLECTION_DESCRIPTION_CUSTOM_PROMPT = `Write a clear, engaging, and SEO-friendly collection description for the given collection.
@@ -594,7 +602,7 @@ async function generateContentWithAnthropic(input, apiKey) {
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 2500,
       system:
         "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown, no code fences.",
       messages: [{ role: "user", content: buildGenerationPrompt(input) }],
@@ -1059,8 +1067,15 @@ export const action = async ({ request }) => {
 
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
-    select: { openaiApiKey: true, anthropicApiKey: true, credits: true, creditsUsedTotal: true },
+    select: {
+      openaiApiKey: true,
+      anthropicApiKey: true,
+      credits: true,
+      creditsUsedTotal: true,
+      globalSettingsJson: true,
+    },
   });
+  const globalSettings = parseShopGlobalSettings(shopData);
 
   try {
     if (intent === BULK_GENERATE_INTENT) {
@@ -1081,7 +1096,7 @@ export const action = async ({ request }) => {
       if (bulkMode === COLLECTION_PRODUCTS_MODE) {
         const language = readFormString(formData, "language") || "English";
         const tone = readFormString(formData, "tone") || "Neutral";
-        const lengthOption = readFormString(formData, "length") || "50 - 150 words";
+        const lengthOption = getExactWordLengthOption(globalSettings, "productDescWords");
         const formatOption = readFormString(formData, "format") || "Single paragraph";
         const contextKeywords = readFormString(formData, "contextKeywords");
         const descriptionPromptTemplate = readFormString(formData, "descriptionPromptTemplate");
@@ -1410,7 +1425,7 @@ export const action = async ({ request }) => {
 
       const language = readFormString(formData, "language") || "English";
       const tone = readFormString(formData, "tone") || "Neutral";
-      const lengthOption = readFormString(formData, "length") || "50 - 150 words";
+      const lengthOption = getExactWordLengthOption(globalSettings, "collectionDescWords");
       const formatOption = readFormString(formData, "format") || "Single paragraph";
       const contextKeywords = readFormString(formData, "contextKeywords");
       const descriptionPromptTemplate = readFormString(formData, "descriptionPromptTemplate");

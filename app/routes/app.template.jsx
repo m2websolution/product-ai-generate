@@ -49,6 +49,7 @@ import {
   writeStoredPagePromptTemplateSelection,
 } from "../lib/pagePromptTemplateLibrary";
 import { buildDescriptionStructuredPreview, buildMetaPreviewText } from "../lib/templatePreviewFormat";
+import { getWordTarget, readGlobalSettings } from "../lib/globalSettings";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -693,13 +694,6 @@ function extractPromptLengthTarget(templateText = "") {
   return null;
 }
 
-const PREVIEW_FILLER_SENTENCES = [
-  "This preview expands the sample copy to match the word guidance in the selected template prompt.",
-  "It keeps the structure merchant friendly while showing the expected amount of generated description content.",
-  "Use this length preview to compare templates before applying one to products, collections, or pages.",
-  "The final AI output will use real store data, brand voice, product details, and the selected prompt instructions.",
-];
-
 function getPreviewWordTarget(target) {
   if (!target || target.unit !== "words") return 0;
   return Number(target.max || target.min || 0);
@@ -717,7 +711,7 @@ function fitPreviewToTarget(text = "", target) {
     let words = cleaned.split(/\s+/).filter(Boolean);
     const desiredWords = getPreviewWordTarget(target);
     if (desiredWords && words.length < desiredWords) {
-      const fillerWords = PREVIEW_FILLER_SENTENCES.join(" ").split(/\s+/).filter(Boolean);
+      const fillerWords = [...words];
       let fillerIndex = 0;
       while (words.length < desiredWords && fillerWords.length > 0) {
         words.push(fillerWords[fillerIndex % fillerWords.length]);
@@ -1404,7 +1398,24 @@ function getPreviewHtml(templateId, resourceId, typeId) {
 
 function buildTemplateCardPreview(template, typeId) {
   const prompt = template?.template || "";
-  const target = extractPromptLengthTarget(prompt);
+  const settings = readGlobalSettings();
+  const settingsWordTargetByResource = {
+    product: getWordTarget(settings, "productDescWords"),
+    collection: getWordTarget(settings, "collectionDescWords"),
+    page: getWordTarget(settings, "pageContentWords"),
+  };
+  const settingsWordTarget = typeId === "description"
+    ? settingsWordTargetByResource[template?.resource]
+    : null;
+  const promptTarget = extractPromptLengthTarget(prompt);
+  const target = settingsWordTarget
+    ? {
+        unit: "words",
+        min: settingsWordTarget,
+        max: settingsWordTarget,
+        label: `${settingsWordTarget} words from Settings`,
+      }
+    : promptTarget;
   const promptWords = countPreviewWords(prompt);
   const promptCharacters = stripPreviewText(prompt).length;
   const resourceId = template?.resource || "product";
