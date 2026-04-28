@@ -58,7 +58,7 @@ import {
 const FETCH_BATCH_SIZE = 250;
 const BULK_GENERATE_INTENT = "bulk_generate";
 const COLLECTION_PRODUCTS_MODE = "collection-products";
-const MAX_BULK_ITEMS = 50;
+const MAX_BULK_ITEMS = 500;
 const MIN_BULK_COLLECTION_SELECTION_ERROR = "Select at least one collection for bulk generation.";
 const MAX_BULK_COLLECTION_SELECTION_ERROR = `You can bulk generate up to ${MAX_BULK_ITEMS} collections at a time.`;
 const COLLECTION_CONTENT_TYPES = ["description", "meta_title", "meta_description"];
@@ -2609,7 +2609,7 @@ export default function CollectionsPage() {
             <div style={{ fontSize: "24px", fontWeight: 800, color: "#111827", marginBottom: "4px", letterSpacing: "-0.3px" }}>
               Collections
             </div>
-            <div style={{ fontSize: "12px", color: "#6b7280", lineHeight: 1.4, fontWeight: 600 }}>
+            <div style={{ fontSize: "12px", color: "#6b7280", lineHeight: 1.4, fontWeight: 500,marginTop: "10px" }}>
               <Text as="p" variant="bodySm" tone="subdued">- You can select multiple collections (up to {MAX_BULK_ITEMS}) for bulk content generation</Text>
               <Text as="p" variant="bodySm" tone="subdued">
                 {isCollectionProductsMode
