@@ -1507,6 +1507,14 @@ export default function BlogPage() {
     () => blogs.find((blog) => blog.id === selectedBlogId)?.title || "",
     [blogs, selectedBlogId],
   );
+
+  function handlePromotionChange(nextPromotion) {
+    setPromotion(nextPromotion);
+    if (!isDiscountPromotion(nextPromotion)) {
+      setOfferText("");
+    }
+  }
+
   useEffect(() => {
     if (!selectedBlogId && blogs?.[0]?.id) {
       setSelectedBlogId(blogs[0].id);
@@ -1796,9 +1804,9 @@ export default function BlogPage() {
                   {activeTabKey === TAB_KEYS.HOLIDAY ? (
                     <div className="blog-generator-fields">
                       <Select label="Holiday" options={holidayOptions} value={holiday} onChange={setHoliday} />
-                      <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+                      <Select label="Promotion" options={promotionOptions} value={promotion} onChange={handlePromotionChange} />
                       {showOfferTextField ? (
-                        <TextField label="Type your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
+                        <TextField label="Write your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
                       ) : null}
                       <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
                       <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
@@ -1809,9 +1817,9 @@ export default function BlogPage() {
 
                   {activeTabKey === TAB_KEYS.PROMOTION ? (
                     <div className="blog-generator-fields">
-                      <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+                      <Select label="Promotion" options={promotionOptions} value={promotion} onChange={handlePromotionChange} />
                       {showOfferTextField ? (
-                        <TextField label="Type your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
+                        <TextField label="Write your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
                       ) : null}
                       <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
                       <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
@@ -2027,9 +2035,9 @@ export default function BlogPage() {
             {activeTabKey === TAB_KEYS.HOLIDAY ? (
               <div className="blog-generator-fields">
                 <Select label="Holiday" options={holidayOptions} value={holiday} onChange={setHoliday} />
-                <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+                <Select label="Promotion" options={promotionOptions} value={promotion} onChange={handlePromotionChange} />
                 {showOfferTextField ? (
-                  <TextField label="Type your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
+                  <TextField label="Write your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
                 ) : null}
                 <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
                 <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
@@ -2040,9 +2048,9 @@ export default function BlogPage() {
 
             {activeTabKey === TAB_KEYS.PROMOTION ? (
               <div className="blog-generator-fields">
-                <Select label="Promotion" options={promotionOptions} value={promotion} onChange={setPromotion} />
+                <Select label="Promotion" options={promotionOptions} value={promotion} onChange={handlePromotionChange} />
                 {showOfferTextField ? (
-                  <TextField label="Type your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
+                  <TextField label="Write your offer here" value={offerText} onChange={setOfferText} autoComplete="off" placeholder="40% off" />
                 ) : null}
                 <Select label="Post length" options={POST_LENGTH_OPTIONS} value={postLength} onChange={setPostLength} />
                 <Select label="Post tone" options={toneOptions} value={tone} onChange={setTone} />
