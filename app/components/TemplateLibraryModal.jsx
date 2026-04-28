@@ -223,6 +223,137 @@ function fitTextToWordRange(value = "", minWords = 160, maxWords = 220) {
   return words.join(" ");
 }
 
+function takeWords(value = "", limit = 0) {
+  const words = stripPreviewText(value).split(/\s+/).filter(Boolean);
+  if (limit <= 0 || words.length === 0) return "";
+  return words.slice(0, limit).join(" ");
+}
+
+function extractStructuredPreviewFromHtml(html = "", fallbackPreview = null) {
+  const source = String(html || "");
+  const elements = [];
+  const elementPattern = /<(h1|h2|h3|p|li)[^>]*>([\s\S]*?)<\/\1>/gi;
+  let match;
+
+  while ((match = elementPattern.exec(source))) {
+    const text = stripPreviewText(match[2]);
+    if (text) elements.push({ tag: match[1].toLowerCase(), text });
+  }
+
+  if (!elements.length && fallbackPreview) return fallbackPreview;
+
+  let heading = "";
+  let subheading = "";
+  const sections = [];
+  let currentSection = null;
+
+  elements.forEach((element) => {
+    if ((element.tag === "h1" || element.tag === "h2") && !heading) {
+      heading = element.text;
+      return;
+    }
+
+    if (element.tag === "h3") {
+      currentSection = { title: element.text, paragraphs: [], points: [] };
+      sections.push(currentSection);
+      return;
+    }
+
+    if (element.tag === "p") {
+      if (!subheading) {
+        subheading = element.text;
+        return;
+      }
+      if (!currentSection) {
+        currentSection = { title: "Overview", paragraphs: [], points: [] };
+        sections.push(currentSection);
+      }
+      currentSection.paragraphs.push(element.text);
+      return;
+    }
+
+    if (element.tag === "li") {
+      if (!currentSection) {
+        currentSection = { title: "Key Points", paragraphs: [], points: [] };
+        sections.push(currentSection);
+      }
+      currentSection.points.push(element.text);
+    }
+  });
+
+  return {
+    heading: heading || fallbackPreview?.heading || "Description Preview",
+    subheading,
+    sections: sections.length ? sections : fallbackPreview?.sections || [],
+  };
+}
+
+function fitStructuredPreviewToWordRange(preview, minWords = 160, maxWords = 220) {
+  if (!preview) return null;
+
+  const sourceText = flattenDescriptionPreview(preview);
+  const output = {
+    heading: preview.heading || "Description Preview",
+    subheading: "",
+    sections: [],
+  };
+  let remaining = Math.max(0, maxWords - countWords(output.heading));
+
+  if (preview.subheading && remaining > 0) {
+    output.subheading = takeWords(preview.subheading, remaining);
+    remaining -= countWords(output.subheading);
+  }
+
+  for (const section of preview.sections || []) {
+    if (remaining <= 0) break;
+
+    const nextSection = {
+      title: takeWords(section.title || "Details", remaining),
+      paragraphs: [],
+      points: [],
+    };
+    remaining -= countWords(nextSection.title);
+
+    for (const paragraph of section.paragraphs || []) {
+      if (remaining <= 0) break;
+      const nextParagraph = takeWords(paragraph, remaining);
+      if (nextParagraph) {
+        nextSection.paragraphs.push(nextParagraph);
+        remaining -= countWords(nextParagraph);
+      }
+    }
+
+    for (const point of section.points || []) {
+      if (remaining <= 0) break;
+      const nextPoint = takeWords(point, remaining);
+      if (nextPoint) {
+        nextSection.points.push(nextPoint);
+        remaining -= countWords(nextPoint);
+      }
+    }
+
+    if (nextSection.title || nextSection.paragraphs.length || nextSection.points.length) {
+      output.sections.push(nextSection);
+    }
+  }
+
+  const currentWords = countWords(flattenDescriptionPreview(output));
+  if (currentWords < minWords) {
+    const filler = takeWords(sourceText, Math.min(maxWords - currentWords, minWords - currentWords));
+    if (filler) {
+      const lastSection = output.sections[output.sections.length - 1] || {
+        title: "Details",
+        paragraphs: [],
+        points: [],
+      };
+      lastSection.paragraphs.push(filler);
+      if (!output.sections.length) output.sections.push(lastSection);
+    }
+  }
+
+  return output;
+}
+
 // ─── Preview Panel ────────────────────────────────────────────────────────────
 function PreviewPanel({
   tabs,
@@ -286,12 +417,12 @@ function PreviewPanel({
         : previewTabId;
     return getPreviewHtml(currentTemplate.id, resourceId, typeId);
   }, [currentTemplate, previewTabId, resourceId]);
-  const rangeDescriptionPreviewText = useMemo(() => {
-    if (!isDescriptionPreview || (resourceId !== "product" && resourceId !== "collection")) return "";
-    const sourceText = htmlPreview || flattenDescriptionPreview(descriptionPreview);
-    return fitTextToWordRange(sourceText, 160, 220);
+  const rangeDescriptionPreview = useMemo(() => {
+    if (!isDescriptionPreview || (resourceId !== "product" && resourceId !== "collection")) return null;
+    const structuredPreview = extractStructuredPreviewFromHtml(htmlPreview, descriptionPreview);
+    return fitStructuredPreviewToWordRange(structuredPreview, 160, 220);
   }, [descriptionPreview, htmlPreview, isDescriptionPreview, resourceId]);
-  const rangeDescriptionWordCount = countWords(rangeDescriptionPreviewText);
+  const rangeDescriptionWordCount = countWords(flattenDescriptionPreview(rangeDescriptionPreview));
 
   return (
     <BlockStack gap="300">
@@ -363,15 +494,49 @@ function PreviewPanel({
                         ? "Meta Description Preview"
                         : "Description Preview"}
                   </Text>
-                  {rangeDescriptionPreviewText ? (
-                    <div style={{ border: "1px solid #e1e3e5", borderRadius: "8px", padding: "12px" }}>
-                      <BlockStack gap="150">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Preview length: {rangeDescriptionWordCount} words (target 160-220 words)
-                        </Text>
-                        <Text as="p" variant="bodySm">
-                          {rangeDescriptionPreviewText}
-                        </Text>
+                  {rangeDescriptionPreview ? (
+                    <div style={{ border: "1px solid #e1e3e5", borderRadius: "8px", padding: "16px" }}>
+                      <BlockStack gap="250">
+                        <BlockStack gap="150">
+                          <Text as="h5" variant="headingMd">
+                            {rangeDescriptionPreview.heading}
+                          </Text>
+                          {rangeDescriptionPreview.subheading ? (
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                              {rangeDescriptionPreview.subheading}
+                            </Text>
+                          ) : null}
+                        </BlockStack>
+                        {rangeDescriptionPreview.sections.map((section, sectionIndex) => (
+                          <BlockStack key={`${section.title}-${sectionIndex}`} gap="100">
+                            {section.title ? (
+                              <Text as="h6" variant="headingSm">
+                                {section.title}
+                              </Text>
+                            ) : null}
+                            {section.paragraphs.map((paragraph, paragraphIndex) => (
+                              <Text
+                                key={`${section.title}-paragraph-${paragraphIndex}`}
+                                as="p"
+                                variant="bodySm"
+                                tone="subdued"
+                              >
+                                {paragraph}
+                              </Text>
+                            ))}
+                            {section.points.length > 0 ? (
+                              <ul style={{ margin: "4px 0 0", paddingLeft: "20px" }}>
+                                {section.points.map((point, pointIndex) => (
+                                  <li key={`${section.title}-point-${pointIndex}`} style={{ marginBottom: "6px" }}>
+                                    <Text as="span" variant="bodySm" tone="subdued">
+                                      {point}
+                                    </Text>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </BlockStack>
+                        ))}
                       </BlockStack>
                     </div>
                   ) : htmlPreview ? (
