@@ -2,7 +2,7 @@
 
 client_id = "3c547ccca21c77a2e4894a02c124a7b4"
 name = "Content AI – SEO Generator"
-application_url = "https://product-ai-generate.vercel.app"
+application_url = "https://ai-content-generation-nine.vercel.app"
 embedded = true
 handle = "content-ai-seo-generator"
 [build]
@@ -30,7 +30,7 @@ scopes = "write_products,read_content,write_content,write_files,read_files"
 
 [auth]
 redirect_urls = [
-  "https://product-ai-generate.vercel.app/auth/callback",
-  "https://product-ai-generate.vercel.app/shopify/callback",
-  "https://product-ai-generate.vercel.app/api/auth/callback"
+  "https://ai-content-generation-nine.vercel.app/auth/callback",
+  "https://ai-content-generation-nine.vercel.app/shopify/callback",
+  "https://ai-content-generation-nine.vercel.app/api/auth/callback"
 ]

@@ -31,12 +31,23 @@ export function AppPageHeader({ title, description, ownerName, ownerLabel = "Own
             <Text as="span" variant="headingSm" tone="subdued">
               Available credits: {formattedCredits}
             </Text>
-            <Button
+            <button
               onClick={() => navigate({ pathname: "/app/pricing", search: location.search })}
-              variant="secondary"
+              style={{
+                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "6px",
+                padding: "8px 18px",
+                fontWeight: 700,
+                fontSize: "13px",
+                cursor: "pointer",
+                letterSpacing: "0.3px",
+                boxShadow: "0 2px 8px rgba(99,102,241,0.4)",
+              }}
             >
-              Upgrade
-            </Button>
+              ⚡ Upgrade
+            </button>
           </InlineStack>
         </InlineStack>
       </Card>

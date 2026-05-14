@@ -14,6 +14,7 @@ import {
   Page,
   Banner,
   Card,
+  Divider,
   Grid,
   BlockStack,
   InlineStack,
@@ -94,8 +95,20 @@ export const loader = async ({ request }) => {
     return plain.split(" ").filter(Boolean).length;
   };
 
-  const [productGeneratedRows, collectionGeneratedRows, collectionProductGeneratedRows, pageGeneratedRows] =
+  const [appliedProducts, appliedCollections, appliedPages, productGeneratedRows, collectionGeneratedRows, collectionProductGeneratedRows, pageGeneratedRows] =
     await Promise.all([
+      db.productGeneratedContent.findMany({
+        where: { shop: session.shop, appliedToProduct: true },
+        select: { seoTitle: true, seoDescription: true },
+      }),
+      db.collectionGeneratedContent.findMany({
+        where: { shop: session.shop, appliedToCollection: true },
+        select: { seoTitle: true, seoDescription: true },
+      }),
+      db.pageGeneratedContent.findMany({
+        where: { shop: session.shop, appliedToPage: true },
+        select: { seoTitle: true, seoDescription: true },
+      }),
       db.productGeneratedContent.findMany({
         where: { shop: session.shop },
         select: { descriptionHtml: true, seoTitle: true, seoDescription: true },
@@ -288,6 +301,30 @@ export const loader = async ({ request }) => {
     pageMetaDescriptionCount +
     blogContentCount;
 
+  const seoStats = {
+    products: {
+      total: appliedProducts.length,
+      withTitle: appliedProducts.filter((p) => p.seoTitle).length,
+      withDesc: appliedProducts.filter((p) => p.seoDescription).length,
+    },
+    collections: {
+      total: appliedCollections.length,
+      withTitle: appliedCollections.filter((c) => c.seoTitle).length,
+      withDesc: appliedCollections.filter((c) => c.seoDescription).length,
+    },
+    pages: {
+      total: appliedPages.length,
+      withTitle: appliedPages.filter((p) => p.seoTitle).length,
+      withDesc: appliedPages.filter((p) => p.seoDescription).length,
+    },
+  };
+  const seoTotalItems = seoStats.products.total + seoStats.collections.total + seoStats.pages.total;
+  const seoTotalCovered =
+    seoStats.products.withTitle + seoStats.products.withDesc +
+    seoStats.collections.withTitle + seoStats.collections.withDesc +
+    seoStats.pages.withTitle + seoStats.pages.withDesc;
+  const seoScore = seoTotalItems > 0 ? Math.round((seoTotalCovered / (seoTotalItems * 2)) * 100) : null;
+
   const timeSavedHours = Number((generatedWords / 600).toFixed(1));
   const creditsLeft = Number(shopData?.credits ?? 0);
   const creditsUsedTotal = Number(shopData?.creditsUsedTotal ?? 0);
@@ -300,6 +337,8 @@ export const loader = async ({ request }) => {
     hasSubmittedReview: Boolean(shopData?.reviewSubmittedAt),
     shopOwnerName,
     generationStats,
+    seoStats,
+    seoScore,
     timeSavedHours,
     generatedWords,
     totalCredits,
@@ -457,12 +496,39 @@ function formatPrice(price) {
   })}/month`;
 }
 
+function SeoDonut({ score }) {
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const color = score >= 70 ? "#008060" : score >= 40 ? "#B98900" : "#C9201F";
+  const label = score >= 70 ? "Good" : score >= 40 ? "Fair" : "Needs work";
+  return (
+    <div style={{ position: "relative", width: 120, height: 120 }}>
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="#f0f0f0" strokeWidth="11" />
+        <circle
+          cx="60" cy="60" r={radius} fill="none"
+          stroke={color} strokeWidth="11"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          strokeLinecap="round" transform="rotate(-90 60 60)"
+        />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+        <span style={{ fontSize: "20px", fontWeight: 800, color, lineHeight: 1 }}>{score}%</span>
+        <span style={{ fontSize: "10px", color: "#6b7280", fontWeight: 500 }}>{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Index() {
   const {
     shouldShowReviewPopup,
     hasSubmittedReview,
     shopOwnerName,
     generationStats,
+    seoStats,
+    seoScore,
     timeSavedHours,
     generatedWords,
     totalCredits,
@@ -723,46 +789,109 @@ export default function Index() {
             </Banner>
           ) : null}
 
-          <BlockStack gap="200">
-            <Text as="h2" variant="headingMd">Specific Generated Count</Text>
-            <Grid columns={{ xs: 1, sm: 1, md: 2, lg: 3, xl: 3 }}>
-              {specificCountBoxes.map((box) => (
-                <Grid.Cell key={box.id}>
-                  <Card>
+          <div className="dashboard-seo-grid">
+            {/* SEO Score */}
+            <Card>
+              <BlockStack gap="400">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h2" variant="headingMd">SEO Score</Text>
+                  <Button size="slim" variant="plain" onClick={() => openDashboardShortcut("/app/analytics")}>
+                    Details →
+                  </Button>
+                </InlineStack>
+
+                {seoScore === null ? (
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Apply generated content to your store to see your SEO coverage score.
+                    </Text>
+                    <Button size="slim" onClick={() => openDashboardShortcut("/app/content-management")}>
+                      Apply content
+                    </Button>
+                  </BlockStack>
+                ) : (
+                  <>
+                    <InlineStack align="center">
+                      <SeoDonut score={seoScore} />
+                    </InlineStack>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Based on applied content across products, collections and pages.
+                    </Text>
+                    <Divider />
                     <BlockStack gap="200">
-                      <Text as="h3" variant="headingSm">{box.title}</Text>
-                      <BlockStack gap="100">
-                        {box.rows.map((row) => (
-                          <InlineStack key={row.label} align="space-between" blockAlign="center" wrap={false}>
-                            <Text as="span" variant="bodySm" tone="subdued">{row.label}</Text>
-                            <div
-                              style={{
-                                minWidth: "30px",
-                                height: "28px",
-                                padding: "0 10px",
-                                borderRadius: "10px",
-                                background: "#dbeafe",
-                                color: "#1e3a8a",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontWeight: 700,
-                                fontSize: "12px",
-                                lineHeight: 1,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {row.value}
+                      {[
+                        { label: "Products", ...seoStats.products, color: "#008060", url: "/app/products" },
+                        { label: "Collections", ...seoStats.collections, color: "#2C6ECB", url: "/app/collections" },
+                        { label: "Pages", ...seoStats.pages, color: "#8456CD", url: "/app/pages" },
+                      ].map(({ label, total, withTitle, withDesc, color, url }) => {
+                        const pct = total > 0 ? Math.round(((withTitle + withDesc) / (total * 2)) * 100) : 0;
+                        const missing = (total - withTitle) + (total - withDesc);
+                        return (
+                          <BlockStack key={label} gap="100">
+                            <InlineStack align="space-between" blockAlign="center">
+                              <button
+                                onClick={() => openDashboardShortcut(url)}
+                                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: "12px", fontWeight: 500, color: "#374151" }}
+                              >
+                                {label}
+                              </button>
+                              <Text as="span" variant="bodySm" tone="subdued">{pct}%</Text>
+                            </InlineStack>
+                            <div style={{ background: "#f0f0f0", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                              <div style={{ width: `${pct}%`, background: color, height: "100%", borderRadius: 4 }} />
                             </div>
-                          </InlineStack>
-                        ))}
-                      </BlockStack>
+                            {missing > 0 && total > 0 && (
+                              <Text as="p" variant="bodySm" tone="subdued">{missing} fields missing</Text>
+                            )}
+                          </BlockStack>
+                        );
+                      })}
                     </BlockStack>
-                  </Card>
-                </Grid.Cell>
-              ))}
-            </Grid>
-          </BlockStack>
+                    <Button size="slim" fullWidth onClick={() => openDashboardShortcut("/app/analytics")}>
+                      Fix missing SEO
+                    </Button>
+                  </>
+                )}
+              </BlockStack>
+            </Card>
+
+            {/* Content Generated */}
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h2" variant="headingMd">Content Generated</Text>
+                  <Button size="slim" variant="plain" onClick={() => openDashboardShortcut("/app/content-management")}>
+                    View all →
+                  </Button>
+                </InlineStack>
+                <div className="dashboard-count-grid">
+                  {specificCountBoxes.map((box) => {
+                    const typeColors = { product: "#008060", collection: "#2C6ECB", collectionProduct: "#8456CD", pages: "#E07D10", blog: "#B98900" };
+                    const color = typeColors[box.id] || "#6b7280";
+                    const total = box.rows.reduce((s, r) => s + r.value, 0);
+                    return (
+                      <div key={box.id} style={{ background: "#f9fafb", borderRadius: 10, padding: "14px 16px", borderLeft: `3px solid ${color}` }}>
+                        <BlockStack gap="200">
+                          <InlineStack align="space-between" blockAlign="center">
+                            <Text as="h3" variant="headingSm" fontWeight="semibold">{box.title}</Text>
+                            <span style={{ fontSize: "20px", fontWeight: 800, color }}>{total}</span>
+                          </InlineStack>
+                          <BlockStack gap="050">
+                            {box.rows.map((row) => (
+                              <InlineStack key={row.label} align="space-between" blockAlign="center">
+                                <Text as="span" variant="bodySm" tone="subdued">{row.label}</Text>
+                                <Text as="span" variant="bodySm" fontWeight="semibold">{row.value}</Text>
+                              </InlineStack>
+                            ))}
+                          </BlockStack>
+                        </BlockStack>
+                      </div>
+                    );
+                  })}
+                </div>
+              </BlockStack>
+            </Card>
+          </div>
 
           <Card>
             <BlockStack gap="400">
@@ -947,6 +1076,30 @@ export default function Index() {
         @media (max-width: 640px) {
           .dashboard-shortcuts {
             padding: 16px;
+          }
+        }
+        .dashboard-seo-grid {
+          display: grid;
+          grid-template-columns: 280px 1fr;
+          gap: 16px;
+          align-items: start;
+        }
+        .dashboard-count-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+        @media (max-width: 900px) {
+          .dashboard-seo-grid {
+            grid-template-columns: 1fr;
+          }
+          .dashboard-count-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (max-width: 480px) {
+          .dashboard-count-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
