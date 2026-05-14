@@ -4,7 +4,7 @@ import { useLoaderData, useNavigate, useFetcher, useLocation } from "react-route
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { buildPageContentPrompt } from "../lib/contentPromptTemplates";
+import { buildPageContentPrompt, getPageSystemPrompt } from "../lib/contentPromptTemplates";
 import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { getExactWordLengthOption, normalizeStoredGlobalSettings, readGlobalSettings } from "../lib/globalSettings";
@@ -143,7 +143,7 @@ async function generateContentWithGemini(input, apiKey) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       system_instruction: {
-        parts: [{ text: "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown, no code fences." }],
+        parts: [{ text: getPageSystemPrompt() }],
       },
       contents: [{ role: "user", parts: [{ text: input.prompt }] }],
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
@@ -179,7 +179,10 @@ async function generateContentWithOpenAI(input, shopApiKey) {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       max_tokens: 3500,
-      messages: [{ role: "user", content: input.prompt }],
+      messages: [
+        { role: "system", content: getPageSystemPrompt() },
+        { role: "user", content: input.prompt },
+      ],
     }),
   });
   if (!response.ok) {

@@ -47,6 +47,7 @@ import {
   buildProductContentPrompt,
   buildCollectionContentPrompt,
   buildPageContentPrompt,
+  getSystemPromptForContentType,
 } from "../lib/contentPromptTemplates";
 import { buildInsufficientCreditsError, deductCredits } from "../lib/credits.server";
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -457,7 +458,7 @@ function parseGenerationContent(rawContent, modelName, meta = {}) {
   };
 }
 
-async function generateContentWithOpenAI(prompt, shopApiKey, preferredModel = null) {
+async function generateContentWithOpenAI(prompt, shopApiKey, preferredModel = null, systemPrompt = null) {
   const apiKey = shopApiKey || process.env.OPENAI_API_KEY;
   const configuredModel = preferredModel || process.env.OPENAI_MODEL || DEFAULT_AI_MODEL;
   if (!apiKey) throw new Error("OpenAI API key is not configured.");
@@ -467,7 +468,7 @@ async function generateContentWithOpenAI(prompt, shopApiKey, preferredModel = nu
     temperature: 0.7,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: "You are an expert Shopify copywriter. Always return valid JSON with the requested keys." },
+      { role: "system", content: systemPrompt || "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown. No code fences." },
       { role: "user", content: prompt },
     ],
   });
@@ -505,7 +506,7 @@ async function generateContentWithOpenAI(prompt, shopApiKey, preferredModel = nu
   return send(configuredModel);
 }
 
-async function generateContentWithAnthropic(prompt, apiKey, preferredModel = null) {
+async function generateContentWithAnthropic(prompt, apiKey, preferredModel = null, systemPrompt = null) {
   const key = apiKey || process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("Anthropic API key is not configured.");
   const model = preferredModel || (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001").trim();
@@ -516,7 +517,7 @@ async function generateContentWithAnthropic(prompt, apiKey, preferredModel = nul
     body: JSON.stringify({
       model,
       max_tokens: 2500,
-      system: "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown, no code fences.",
+      system: systemPrompt || "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown. No code fences.",
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -529,7 +530,7 @@ async function generateContentWithAnthropic(prompt, apiKey, preferredModel = nul
   return parseGenerationContent(data?.content?.[0]?.text, data?.model || model, { aiProvider: "anthropic", inputTokens, outputTokens, generationMs });
 }
 
-async function generateContentWithGemini(prompt, apiKey, preferredModel = null) {
+async function generateContentWithGemini(prompt, apiKey, preferredModel = null, systemPrompt = null) {
   const key = apiKey || process.env.GOOGLE_GEMINI_API_KEY;
   if (!key) throw new Error("Gemini API key is not configured.");
   const model = preferredModel || (process.env.GEMINI_MODEL || "gemini-2.5-flash-lite").trim();
@@ -540,7 +541,7 @@ async function generateContentWithGemini(prompt, apiKey, preferredModel = null) 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       system_instruction: {
-        parts: [{ text: "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown, no code fences." }],
+        parts: [{ text: systemPrompt || "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown. No code fences." }],
       },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
@@ -556,7 +557,7 @@ async function generateContentWithGemini(prompt, apiKey, preferredModel = null) 
   return parseGenerationContent(rawContent, model, { aiProvider: "gemini", inputTokens, outputTokens, generationMs });
 }
 
-async function generateContentWithOllama(prompt, preferredModel = null) {
+async function generateContentWithOllama(prompt, preferredModel = null, systemPrompt = null) {
   const model = preferredModel || process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
   const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
   const startMs = Date.now();
@@ -566,7 +567,7 @@ async function generateContentWithOllama(prompt, preferredModel = null) {
     body: JSON.stringify({
       model, stream: false, format: "json", options: { temperature: 0.7 },
       messages: [
-        { role: "system", content: "You are an expert Shopify copywriter. Always return valid JSON with the requested keys." },
+        { role: "system", content: systemPrompt || "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown. No code fences." },
         { role: "user", content: prompt },
       ],
     }),
@@ -582,20 +583,20 @@ async function generateContentWithOllama(prompt, preferredModel = null) {
 
 async function runGeneration(
   prompt,
-  { aiProvider = "auto", preferredModel = null, shopOpenaiKey = null, shopAnthropicKey = null, shopGeminiKey = null } = {},
+  { aiProvider = "auto", preferredModel = null, shopOpenaiKey = null, shopAnthropicKey = null, shopGeminiKey = null, systemPrompt = null } = {},
 ) {
   const openaiKey = shopOpenaiKey || process.env.OPENAI_API_KEY;
   const anthropicKey = shopAnthropicKey || process.env.ANTHROPIC_API_KEY;
   const geminiKey = shopGeminiKey || process.env.GOOGLE_GEMINI_API_KEY;
 
-  if (aiProvider === "gemini") return generateContentWithGemini(prompt, geminiKey, preferredModel);
-  if (aiProvider === "anthropic") return generateContentWithAnthropic(prompt, anthropicKey, preferredModel);
-  if (aiProvider === "ollama") return generateContentWithOllama(prompt, preferredModel);
+  if (aiProvider === "gemini") return generateContentWithGemini(prompt, geminiKey, preferredModel, systemPrompt);
+  if (aiProvider === "anthropic") return generateContentWithAnthropic(prompt, anthropicKey, preferredModel, systemPrompt);
+  if (aiProvider === "ollama") return generateContentWithOllama(prompt, preferredModel, systemPrompt);
   if (aiProvider === "openai") {
-    try { return await generateContentWithOpenAI(prompt, openaiKey, preferredModel); }
+    try { return await generateContentWithOpenAI(prompt, openaiKey, preferredModel, systemPrompt); }
     catch (err) {
       if (OPENAI_OLLAMA_FALLBACK_ERROR_PATTERN.test(err?.message || "") && canUseOllamaFallback())
-        return generateContentWithOllama(prompt, preferredModel);
+        return generateContentWithOllama(prompt, preferredModel, systemPrompt);
       throw err;
     }
   }
@@ -610,10 +611,10 @@ async function runGeneration(
   let lastError = null;
   for (const p of providerChain) {
     try {
-      if (p === "gemini") return await generateContentWithGemini(prompt, geminiKey, preferredModel);
-      if (p === "anthropic") return await generateContentWithAnthropic(prompt, anthropicKey, preferredModel);
-      if (p === "ollama") return await generateContentWithOllama(prompt, preferredModel);
-      return await generateContentWithOpenAI(prompt, openaiKey, preferredModel); // default / "openai"
+      if (p === "gemini") return await generateContentWithGemini(prompt, geminiKey, preferredModel, systemPrompt);
+      if (p === "anthropic") return await generateContentWithAnthropic(prompt, anthropicKey, preferredModel, systemPrompt);
+      if (p === "ollama") return await generateContentWithOllama(prompt, preferredModel, systemPrompt);
+      return await generateContentWithOpenAI(prompt, openaiKey, preferredModel, systemPrompt); // default / "openai"
     } catch (err) {
       lastError = err;
     }
@@ -1310,6 +1311,7 @@ export const action = async ({ request }) => {
         shopOpenaiKey: shopData?.openaiApiKey || null,
         shopAnthropicKey: shopData?.anthropicApiKey || null,
         shopGeminiKey: shopData?.geminiApiKey || null,
+        systemPrompt: getSystemPromptForContentType(contentType),
       });
 
       if (shouldGenerateMain && !stripHtml(generated.description || "")) {

@@ -31,7 +31,7 @@ import {
 import { ProductIcon, CollectionIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon, XIcon } from "@shopify/polaris-icons";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
-import { buildProductContentPrompt } from "../lib/contentPromptTemplates";
+import { buildProductContentPrompt, getProductSystemPrompt } from "../lib/contentPromptTemplates";
 import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
 import { getExactWordLengthOption, normalizeStoredGlobalSettings, readGlobalSettings } from "../lib/globalSettings";
 import {
@@ -561,8 +561,7 @@ async function generateContentWithAnthropic(input, apiKey) {
     body: JSON.stringify({
       model: (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001").trim(),
       max_tokens: 2500,
-      system:
-        "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown, no code fences.",
+      system: getProductSystemPrompt(),
       messages: [{ role: "user", content: buildGenerationPrompt(input) }],
     }),
   });
@@ -599,7 +598,7 @@ async function generateContentWithGemini(input, apiKey) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       system_instruction: {
-        parts: [{ text: "You are an expert Shopify copywriter. Always return valid JSON with the requested keys. No markdown, no code fences." }],
+        parts: [{ text: getProductSystemPrompt() }],
       },
       contents: [{ role: "user", parts: [{ text: buildGenerationPrompt(input) }] }],
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
@@ -631,8 +630,7 @@ async function generateContentWithOpenAI(input, shopApiKey) {
     messages: [
       {
         role: "system",
-        content:
-          "You are an expert Shopify copywriter. Always return valid JSON with the requested keys.",
+        content: getProductSystemPrompt(),
       },
       {
         role: "user",
@@ -802,8 +800,7 @@ async function generateContentWithOllama(input) {
         messages: [
           {
             role: "system",
-            content:
-              "You are an expert Shopify copywriter. Always return valid JSON with the requested keys.",
+            content: getProductSystemPrompt(),
           },
           {
             role: "user",
