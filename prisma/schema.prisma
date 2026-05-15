@@ -314,6 +314,6 @@ model BulkJob {
   updatedAt        DateTime  @updatedAt
   completedAt      DateTime?
 
-  @@index([shop, createdAt])
+  @@index([shop, createdAt], map: "bulk_jobs_shop_createdAt_idx")
   @@map("bulk_jobs")
 }
