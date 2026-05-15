@@ -30,6 +30,7 @@ import {
 } from "@shopify/polaris";
 import { ProductIcon, CollectionIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon, XIcon } from "@shopify/polaris-icons";
 import db from "../db.server";
+import { inngest } from "../inngest/client";
 import { authenticate } from "../shopify.server";
 import { buildProductContentPrompt, getProductSystemPrompt } from "../lib/contentPromptTemplates";
 import { TemplateLibraryModal } from "../components/TemplateLibraryModal";
@@ -1010,165 +1011,62 @@ export const action = async ({ request }) => {
         reservedCreditsUsedTotal = creditSnapshot.creditsUsedTotal;
       }
 
-      const results = await Promise.allSettled(
-        bulkProducts.map(async (p) => {
-          const generated = await generateContent(
-            {
-              title: p.title,
-              descriptionText: stripHtml(p.descriptionHtml || ""),
-              seoTitle: p.seoTitleValue || "",
-              seoDescription: p.seoDescriptionValue || "",
-              language,
-              tone,
-              lengthOption,
-              format: formatOption,
-              contextKeywords,
-              descriptionPromptTemplate,
-              metaTitlePromptTemplate,
-              metaDescriptionPromptTemplate,
-              intent: shouldUpdateMetaTitle && !shouldUpdateDescription && !shouldUpdateMetaDescription
-                ? "seo_title"
-                : !shouldUpdateMetaTitle && !shouldUpdateDescription && shouldUpdateMetaDescription
-                  ? "seo_description"
-                  : "all",
-            },
-            {
-              aiProvider,
-              shopOpenaiKey: shopData?.openaiApiKey || null,
-              shopAnthropicKey: shopData?.anthropicApiKey || null,
-              shopGeminiKey: shopData?.geminiApiKey || null,
-            },
-          );
+      const jobSettings = {
+        language,
+        tone,
+        lengthOption,
+        format: formatOption,
+        contextKeywords: contextKeywords || "",
+        descriptionPromptTemplate: descriptionPromptTemplate || "",
+        metaTitlePromptTemplate: metaTitlePromptTemplate || "",
+        metaDescriptionPromptTemplate: metaDescriptionPromptTemplate || "",
+        contentTypes: selectedContentTypes,
+        aiProvider,
+        addTitleAsHeading: addTitleAsHeadingFlag,
+        preserveOldDescription: preserveOldDescriptionFlag,
+        removeImages: removeImagesFlag,
+      };
 
-          let nextDescription = shouldUpdateDescription
-            ? (generated.productDescription
-              ? normalizeGeneratedHtml(generated.productDescription)
-              : p.descriptionHtml || "")
-            : p.descriptionHtml || "";
-          if (shouldUpdateDescription && generated.productDescription) {
-            if (removeImagesFlag) {
-              nextDescription = nextDescription.replace(/<img\b[^>]*>/gi, "").replace(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi, "");
-            }
-            if (preserveOldDescriptionFlag && p.descriptionHtml) {
-              const oldHtml = removeImagesFlag
-                ? p.descriptionHtml.replace(/<img\b[^>]*>/gi, "").replace(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi, "")
-                : p.descriptionHtml;
-              nextDescription = nextDescription + oldHtml;
-            }
-            if (addTitleAsHeadingFlag && p.title) {
-              nextDescription = withSingleTitleHeading(nextDescription, p.title);
-            }
-          }
-          const nextSeoTitle = shouldUpdateMetaTitle
-            ? (generated.seoTitle || p.seoTitleValue || "")
-            : (p.seoTitleValue || "");
-          const nextSeoDescription = shouldUpdateMetaDescription
-            ? (generated.seoDescription || p.seoDescriptionValue || "")
-            : (p.seoDescriptionValue || "");
-
-          const updateRes = await admin.graphql(PRODUCT_UPDATE_MUTATION, {
-            variables: {
-              product: {
-                id: p.id,
-                descriptionHtml: nextDescription,
-                seo: { title: nextSeoTitle, description: nextSeoDescription },
-              },
-            },
-          });
-          const updateJson = await updateRes.json();
-          const userErrors = updateJson?.data?.productUpdate?.userErrors || [];
-          if (userErrors.length > 0) throw new Error(userErrors.map((e) => e.message).join(", "));
-
-          await writeGenerationLog({
-            shop: session.shop,
-            productId: p.id,
-            productTitle: p.title || null,
-            intent: "product_bulk_generate",
-            resourceType: "product",
-            language: language || null,
-            tone: tone || null,
-            lengthOption: lengthOption || null,
-            formatOption: formatOption || null,
-            contextKeywords: contextKeywords || null,
-            aiModel: generated.aiModel || null,
-            aiProvider: generated.aiProvider || null,
-            inputTokens: generated.inputTokens || 0,
-            outputTokens: generated.outputTokens || 0,
-            generationMs: generated.generationMs || null,
-            generatedDescription: nextDescription || null,
-            generatedSeoTitle: nextSeoTitle || null,
-            generatedSeoDescription: nextSeoDescription || null,
-            creditsUsed: creditsPerItem,
-            appliedToProduct: true,
-          });
-
-          await upsertProductContent({
-            shop: session.shop,
-            productId: p.id,
-            productTitle: p.title || null,
-            language: language || null,
-            tone: tone || null,
-            lengthOption: lengthOption || null,
-            formatOption: formatOption || null,
-            contextKeywords: contextKeywords || null,
-            descriptionPromptTemplate: descriptionPromptTemplate || null,
-            metaTitlePromptTemplate: metaTitlePromptTemplate || null,
-            metaDescriptionPromptTemplate: metaDescriptionPromptTemplate || null,
-            aiModel: generated.aiModel || null,
-            aiProvider: generated.aiProvider || null,
-            inputTokens: generated.inputTokens || 0,
-            outputTokens: generated.outputTokens || 0,
-            generationMs: generated.generationMs || null,
-            descriptionHtml: nextDescription || null,
-            seoTitle: nextSeoTitle || null,
-            seoDescription: nextSeoDescription || null,
-            creditsUsed: creditsPerItem,
-            appliedToProduct: true,
-          });
-
-          return { id: p.id, title: p.title, seoTitle: nextSeoTitle, seoDescription: nextSeoDescription, description: nextDescription };
-        }),
-      );
-
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.filter((r) => r.status === "rejected").length;
-      const creditsUsed = succeeded * creditsPerItem;
-      const creditsToRefund = requiredCredits - creditsUsed;
-      let newCredits = reservedCredits;
-      let creditsUsedTotal = reservedCreditsUsedTotal;
-      let creditWarning = null;
-
-      if (creditsToRefund > 0) {
-        try {
-          const creditSnapshot = await refundCredits({ shopDomain: session.shop, creditsRefunded: creditsToRefund });
-          newCredits = creditSnapshot.credits;
-          creditsUsedTotal = creditSnapshot.creditsUsedTotal;
-        } catch (creditError) {
-          creditWarning = creditError?.message || "Unused credits could not be refunded automatically.";
-        }
-      }
-
-      const itemResults = results.map((r, i) => ({
-        id: bulkProducts[i].id,
-        title: bulkProducts[i].title,
-        status: r.status === "fulfilled" ? "success" : "failed",
-        error: r.status === "rejected" ? r.reason?.message : null,
-        seoTitle: r.status === "fulfilled" ? r.value.seoTitle : null,
-        seoDescription: r.status === "fulfilled" ? r.value.seoDescription : null,
+      const jobItems = bulkProducts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        descriptionHtml: p.descriptionHtml || "",
+        seoTitle: p.seoTitleValue || "",
+        seoDescription: p.seoDescriptionValue || "",
       }));
+
+      const job = await db.bulkJob.create({
+        data: {
+          shop: session.shop,
+          jobType: "product",
+          status: "pending",
+          totalItems: bulkProducts.length,
+          contentTypes: JSON.stringify(selectedContentTypes),
+          settings: JSON.stringify(jobSettings),
+          itemsData: JSON.stringify(jobItems),
+          creditsAllocated: requiredCredits,
+        },
+      });
+
+      await inngest.send({
+        name: "content/bulk.generate",
+        data: {
+          jobId: job.id,
+          shop: session.shop,
+          jobType: "product",
+          items: jobItems,
+          settings: jobSettings,
+        },
+      });
+
       return {
         ok: true,
         intent,
-        succeeded,
-        failed,
+        queued: true,
+        jobId: job.id,
         total: bulkProducts.length,
-        results: itemResults,
-        contentTypes: selectedContentTypes,
-        creditsPerItem,
-        creditsUsed,
-        newCredits,
-        creditsUsedTotal,
-        creditWarning,
+        newCredits: reservedCredits,
+        creditsUsedTotal: reservedCreditsUsedTotal,
       };
     }
 
@@ -1707,13 +1605,20 @@ export default function ProductsPage() {
     }
     if (response.ok) {
       setBulkValidationMessage(null);
-      revalidator.revalidate();
-      const creditsMessage =
-        typeof response.creditsUsed === "number"
-          ? ` ${response.creditsUsed} credits used${typeof response.newCredits === "number" ? `. Remaining: ${response.newCredits}` : ""}.`
-          : "";
-      shopify.toast.show(`Bulk generate complete: ${response.succeeded}/${response.total} updated.${creditsMessage}`);
-      window.setTimeout(() => navigateInApp("/app/content-management", "?tab=products&filter=all"), 600);
+      setQueueStatusById({});
+      if (queueIntervalRef.current) { clearInterval(queueIntervalRef.current); queueIntervalRef.current = null; }
+      if (response.queued) {
+        shopify.toast.show(`Generating ${response.total} products in the background.`);
+        window.setTimeout(() => navigateInApp("/app/jobs", ""), 600);
+      } else {
+        const creditsMessage =
+          typeof response.creditsUsed === "number"
+            ? ` ${response.creditsUsed} credits used${typeof response.newCredits === "number" ? `. Remaining: ${response.newCredits}` : ""}.`
+            : "";
+        shopify.toast.show(`Bulk generate complete: ${response.succeeded}/${response.total} updated.${creditsMessage}`);
+        window.setTimeout(() => navigateInApp("/app/content-management", "?tab=products&filter=all"), 600);
+        revalidator.revalidate();
+      }
       return;
     }
     setBulkValidationMessage(response.error || "Bulk generation failed.");
