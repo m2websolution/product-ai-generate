@@ -7,10 +7,5 @@ const handler = serve({
   functions: [bulkGenerateFunction],
 });
 
-export async function loader({ request }) {
-  return handler(request);
-}
-
-export async function action({ request }) {
-  return handler(request);
-}
+export const loader = handler;
+export const action = handler;
