@@ -1738,8 +1738,6 @@ export default function CollectionsPage() {
   ]);
 
   const exceedsBulkLimit = targetCollectionsForBulk.length > MAX_BULK_ITEMS;
-  const requiredBulkCredits = estimatedTargetItems * bulkContentTypes.length;
-  const insufficientCredits = requiredBulkCredits > 0 && requiredBulkCredits > credits;
   const hasRequiredBulkTemplates = useMemo(() => {
     if (bulkContentTypes.includes("description")) {
       if (!useCustomDescInstructions || !String(bulkDescTemplate || "").trim()) return false;
@@ -2026,6 +2024,9 @@ export default function CollectionsPage() {
     selectedCollections.length,
     targetCollectionsForBulk,
   ]);
+
+  const requiredBulkCredits = estimatedTargetItems * bulkContentTypes.length;
+  const insufficientCredits = requiredBulkCredits > 0 && requiredBulkCredits > credits;
 
   const allVisibleSelected =
     visibleCollectionIds.length > 0 && selectedCollectionIds.length === visibleCollectionIds.length;
