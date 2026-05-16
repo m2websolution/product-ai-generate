@@ -553,7 +553,10 @@ function includeCampaignDetails(bodyHtml, { promotion, offerText, holiday, tabTy
   const cleanOfferText = cleanText(offerText);
   const shouldMentionHoliday =
     tabType === TAB_KEYS.HOLIDAY && cleanHoliday && cleanHoliday !== "Choose a holiday to promote";
-  const shouldMentionPromotion = promotionOffer && promotionOffer !== "No promotion";
+  const shouldMentionPromotion =
+    (tabType === TAB_KEYS.PROMOTION || tabType === TAB_KEYS.HOLIDAY) &&
+    promotionOffer &&
+    promotionOffer !== "No promotion";
   if (!shouldMentionHoliday && !shouldMentionPromotion) return normalizedBody;
 
   const bodyText = stripHtml(normalizedBody).toLowerCase();
