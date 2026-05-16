@@ -1041,7 +1041,7 @@ function ContentDetailView({ item, shopInfo, outputLanguage, onBack }) {
                   <Button variant="primary">Optimize</Button>
                   <Button disabled>History</Button>
                 </InlineStack>
-                <Text as="p" fontWeight="semibold">Boost this content's SEO with a single review pass.</Text>
+                <Text as="p" fontWeight="semibold">{"Boost this content's SEO with a single review pass."}</Text>
                 <Text as="p" tone="subdued">Saved focus keyword will be used for optimization.</Text>
                 <Select
                   label="Output Language"
@@ -1659,7 +1659,7 @@ function SchemaView({ settings, onSettingsChange, shopInfo, content }) {
                   onChange={(value) => updateSchema("pricingType", value)}
                 />
                 <Text as="p" tone="subdued">
-                  "Single price" shows one price. "Price range" shows the lowest and highest variant prices.
+                  {'"Single price" shows one price. "Price range" shows the lowest and highest variant prices.'}
                 </Text>
                 <Divider />
                 <InlineStack align="space-between" blockAlign="center">

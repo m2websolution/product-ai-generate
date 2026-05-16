@@ -2012,16 +2012,15 @@ export default function ProductsPage() {
                 )}
 
                 {selectedKeywords.length < 5 && (
-                  <div onKeyDown={handleKeywordKeyDown}>
-                    <TextField
-                      label="Add keyword"
-                      labelHidden
-                      value={keywordInput}
-                      onChange={setKeywordInput}
-                      autoComplete="off"
-                      placeholder="Type a keyword, press Tab or Enter to add"
-                    />
-                  </div>
+                  <TextField
+                    label="Add keyword"
+                    labelHidden
+                    value={keywordInput}
+                    onChange={setKeywordInput}
+                    onKeyDown={handleKeywordKeyDown}
+                    autoComplete="off"
+                    placeholder="Type a keyword, press Tab or Enter to add"
+                  />
                 )}
 
                 {keywordLibrary.filter((k) => !selectedKeywords.includes(k)).length > 0 && (

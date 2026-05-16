@@ -389,15 +389,15 @@ function ResourceTab({ items, resourceType, onSelectItem }) {
   }
 
   const rows = items.map((item) => [
-    <Button variant="plain" textAlign="left" onClick={() => onSelectItem(item)}>
+    <Button key="title" variant="plain" textAlign="left" onClick={() => onSelectItem(item)}>
       {item.title}
     </Button>,
-    <ScoreBadge score={item.score} />,
-    item.hasSchema ? <Badge tone="success">Yes</Badge> : <Badge tone="critical">No</Badge>,
+    <ScoreBadge key="score" score={item.score} />,
+    item.hasSchema ? <Badge key="schema" tone="success">Yes</Badge> : <Badge key="schema" tone="critical">No</Badge>,
     resourceType !== "page"
-      ? (item.hasFaq ? <Badge tone="success">Yes</Badge> : <Badge tone="critical">No</Badge>)
-      : <Text tone="subdued">N/A</Text>,
-    <Button size="slim" variant="plain" onClick={() => onSelectItem(item)}>View</Button>,
+      ? (item.hasFaq ? <Badge key="faq" tone="success">Yes</Badge> : <Badge key="faq" tone="critical">No</Badge>)
+      : <Text key="faq" tone="subdued">N/A</Text>,
+    <Button key="action" size="slim" variant="plain" onClick={() => onSelectItem(item)}>View</Button>,
   ]);
 
   return (

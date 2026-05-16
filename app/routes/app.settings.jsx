@@ -305,24 +305,23 @@ export default function SettingsPage() {
             </BlockStack>
 
             <BlockStack gap="200">
-              <div onKeyDown={handleKeywordKeyDown}>
-                <TextField
-                  label="Add keywords"
-                  labelHidden
-                  value={keywordInput}
-                  onChange={setKeywordInput}
-                  autoComplete="off"
-                  placeholder="Type keywords separated by commas, press Tab or Enter to add"
-                  connectedRight={
-                    <Button
-                      onClick={() => { addKeywords(keywordInput); setKeywordInput(""); }}
-                      disabled={!keywordInput.trim()}
-                    >
-                      Add
-                    </Button>
-                  }
-                />
-              </div>
+              <TextField
+                label="Add keywords"
+                labelHidden
+                value={keywordInput}
+                onChange={setKeywordInput}
+                onKeyDown={handleKeywordKeyDown}
+                autoComplete="off"
+                placeholder="Type keywords separated by commas, press Tab or Enter to add"
+                connectedRight={
+                  <Button
+                    onClick={() => { addKeywords(keywordInput); setKeywordInput(""); }}
+                    disabled={!keywordInput.trim()}
+                  >
+                    Add
+                  </Button>
+                }
+              />
               <Text as="p" variant="bodySm" tone="subdued">
                 e.g. handmade, eco-friendly, sterling silver
               </Text>

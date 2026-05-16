@@ -2048,7 +2048,7 @@ export const loader = async ({ request }) => {
     const json = await res.json();
     const ownerName = cleanText(json?.data?.shop?.owner?.name);
     if (ownerName) shopOwnerName = ownerName;
-  } catch {}
+  } catch { /* ignore */ }
 
   return { blogs, articles, settingsLanguage, settingsTone, products, collections, shopDomain: session.shop, shopOwnerName };
 };
@@ -2088,7 +2088,7 @@ export const action = async ({ request }) => {
     const offerText = cleanText(formData.get("offerText"));
     const holiday = cleanText(formData.get("holiday")) || "Choose a holiday to promote";
     let productLinks = [];
-    try { productLinks = JSON.parse(formData.get("productUrls") || "[]"); } catch {}
+    try { productLinks = JSON.parse(formData.get("productUrls") || "[]"); } catch { /* ignore */ }
     const productUrl = productLinks[0]?.url || normalizeProductUrl(formData.get("productUrl") || "");
     const rawProductContext = await resolveProductContext(admin, productUrl);
     const shopName = getDefaultAuthorName(session.shop);
@@ -2152,7 +2152,7 @@ export const action = async ({ request }) => {
     const offerText = cleanText(formData.get("offerText"));
     const holiday = cleanText(formData.get("holiday")) || "Choose a holiday to promote";
     let productLinks = [];
-    try { productLinks = JSON.parse(formData.get("productUrls") || "[]"); } catch {}
+    try { productLinks = JSON.parse(formData.get("productUrls") || "[]"); } catch { /* ignore */ }
     const productUrl = productLinks[0]?.url || normalizeProductUrl(formData.get("productUrl") || "");
 
     if (!outlineTitle) return { ok: false, intent, error: "No outline selected." };
@@ -2296,7 +2296,7 @@ export const action = async ({ request }) => {
         const json = await res.json();
         const ownerName = cleanText(json?.data?.shop?.owner?.name);
         if (ownerName) authorName = ownerName;
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     let article;
@@ -2405,7 +2405,7 @@ export const action = async ({ request }) => {
     const offerText = cleanText(formData.get("offerText"));
     const holiday = cleanText(formData.get("holiday")) || "Choose a holiday to promote";
     let productLinks = [];
-    try { productLinks = JSON.parse(formData.get("productUrls") || "[]"); } catch {}
+    try { productLinks = JSON.parse(formData.get("productUrls") || "[]"); } catch { /* ignore */ }
     const productUrl = productLinks[0]?.url || normalizeProductUrl(formData.get("productUrl") || "");
     const rawProductContext = await resolveProductContext(admin, productUrl);
     const shopName = getDefaultAuthorName(session.shop);
@@ -2518,7 +2518,7 @@ export const action = async ({ request }) => {
       if (!mutPayload?.userErrors?.length && mutPayload?.article) {
         updatedArticle = normalizeArticle(mutPayload.article);
       }
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
 
     try {
       await db.generatedContentLog.create({
@@ -2537,7 +2537,7 @@ export const action = async ({ request }) => {
           aiProvider: cleanText(shopRecord?.defaultAiProvider) !== "auto" ? cleanText(shopRecord?.defaultAiProvider) : null,
         },
       });
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
 
     return {
       ok: true,
