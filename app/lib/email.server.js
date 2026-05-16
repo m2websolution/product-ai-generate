@@ -21,7 +21,7 @@ function createTransporter() {
 }
 
 async function sendMail({ to, subject, html }) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("[email] SMTP not configured — skipping email to:", to);
     return;
   }
