@@ -32,7 +32,6 @@ import {
 
 const BLOG_BODY_CREDIT_COST = 3;
 const BLOG_PILLAR_CREDIT_COST = 10;
-const BLOG_REGENERATE_CREDIT_COST = 10;
 const BLOG_OPENAI_MODEL = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
 const BLOG_ANTHROPIC_MODEL = (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001").trim();
 
@@ -2440,18 +2439,19 @@ export const action = async ({ request }) => {
             ? `${topic}: A Guide from ${productName}`
             : seed || `Shop ${productName} — Discover Our Collection`;
 
+    const regenCreditCost = tabType === TAB_KEYS.PILLAR ? BLOG_PILLAR_CREDIT_COST : BLOG_BODY_CREDIT_COST;
     const regenCreditBalance = await getOrCreateShopCredits(session.shop);
-    if ((regenCreditBalance?.credits ?? 0) < BLOG_REGENERATE_CREDIT_COST) {
+    if ((regenCreditBalance?.credits ?? 0) < regenCreditCost) {
       return {
         ok: false,
         intent,
-        error: buildInsufficientCreditsError(BLOG_REGENERATE_CREDIT_COST, regenCreditBalance?.credits ?? 0),
+        error: buildInsufficientCreditsError(regenCreditCost, regenCreditBalance?.credits ?? 0),
       };
     }
 
     const regenCreditSnapshot = await deductCredits({
       shopDomain: session.shop,
-      creditsUsed: BLOG_REGENERATE_CREDIT_COST,
+      creditsUsed: regenCreditCost,
     });
 
     let title = fallbackTitle;
@@ -2532,7 +2532,7 @@ export const action = async ({ request }) => {
           tone,
           lengthOption: postLength,
           generatedDescription: body,
-          creditsUsed: BLOG_REGENERATE_CREDIT_COST,
+          creditsUsed: regenCreditCost,
           appliedToProduct: true,
           aiProvider: cleanText(shopRecord?.defaultAiProvider) !== "auto" ? cleanText(shopRecord?.defaultAiProvider) : null,
         },
@@ -2543,7 +2543,7 @@ export const action = async ({ request }) => {
       ok: true,
       intent,
       article: updatedArticle,
-      creditsUsed: BLOG_REGENERATE_CREDIT_COST,
+      creditsUsed: regenCreditCost,
       newCredits: regenCreditSnapshot.credits,
       creditsUsedTotal: regenCreditSnapshot.creditsUsedTotal,
     };
@@ -2555,21 +2555,8 @@ export const action = async ({ request }) => {
     const title = cleanText(formData.get("title"));
     const body = String(formData.get("body") || "").trim();
     const status = cleanText(formData.get("status")) || "draft";
-    const consumeCreditOnSave = String(formData.get("consumeCreditOnSave") || "") === "1";
-
     if (!articleId) return { ok: false, intent, error: "Missing article id." };
     if (!title) return { ok: false, intent, error: "Title is required." };
-
-    if (consumeCreditOnSave) {
-      const creditBalance = await getOrCreateShopCredits(session.shop);
-      if ((creditBalance?.credits ?? 0) < BLOG_BODY_CREDIT_COST) {
-        return {
-          ok: false,
-          intent,
-          error: buildInsufficientCreditsError(BLOG_BODY_CREDIT_COST, creditBalance?.credits ?? 0),
-        };
-      }
-    }
 
     const saveExcerpt = String(formData.get("excerpt") || "").trim();
     const saveTagsRaw = String(formData.get("tags") || "").trim();
@@ -2627,41 +2614,13 @@ export const action = async ({ request }) => {
       aiProvider: saveAiProvider !== "auto" ? saveAiProvider : null,
     });
 
-    let creditSnapshot = null;
-    if (consumeCreditOnSave) {
-      creditSnapshot = await deductCredits({
-        shopDomain: session.shop,
-        creditsUsed: BLOG_BODY_CREDIT_COST,
-      });
-      try {
-        await db.generatedContentLog.create({
-          data: {
-            shop: session.shop,
-            productId: article.id,
-            productTitle: article.title,
-            intent: "blog_regenerate",
-            resourceType: "blog",
-            language,
-            tone: saveTone || null,
-            lengthOption: saveLengthOption || null,
-            generatedDescription: body,
-            creditsUsed: BLOG_BODY_CREDIT_COST,
-            appliedToProduct: true,
-            aiProvider: saveAiProvider !== "auto" ? saveAiProvider : null,
-          },
-        });
-      } catch (_) {
-        // Non-critical logging failure should not block response.
-      }
-    }
-
     return {
       ok: true,
       intent,
       article,
-      creditsUsed: consumeCreditOnSave ? BLOG_BODY_CREDIT_COST : 0,
-      newCredits: creditSnapshot?.credits,
-      creditsUsedTotal: creditSnapshot?.creditsUsedTotal,
+      creditsUsed: 0,
+      newCredits: null,
+      creditsUsedTotal: null,
     };
   }
 
@@ -3102,20 +3061,24 @@ export default function BlogPage() {
               </Button>
               <Button
                 size="slim"
-                onClick={() => setRegenerateConfirmTarget({
-                  articleId: article.id,
-                  blogId: article.blogId,
-                  title: article.title,
-                  status: article.publishedAt ? "published" : "draft",
-                  tabType: article.genTabType || null,
-                  tone: article.genTone || null,
-                  postLength: article.genLength || null,
-                  targetAudience: article.genAudience || null,
-                  promotion: article.genPromotion || null,
-                  offerText: article.genOfferText || null,
-                  holiday: article.genHoliday || null,
-                  topic: article.genTopic || null,
-                })}
+                onClick={() => {
+                  const resolvedTabType = article.genTabType || activeTabKey;
+                  setRegenerateConfirmTarget({
+                    articleId: article.id,
+                    blogId: article.blogId,
+                    title: article.title,
+                    status: article.publishedAt ? "published" : "draft",
+                    tabType: article.genTabType || null,
+                    tone: article.genTone || null,
+                    postLength: article.genLength || null,
+                    targetAudience: article.genAudience || null,
+                    promotion: article.genPromotion || null,
+                    offerText: article.genOfferText || null,
+                    holiday: article.genHoliday || null,
+                    topic: article.genTopic || null,
+                    creditCost: resolvedTabType === TAB_KEYS.PILLAR ? BLOG_PILLAR_CREDIT_COST : BLOG_BODY_CREDIT_COST,
+                  });
+                }}
                 disabled={fetcher.state !== "idle"}
               >
                 Regenerate
@@ -3478,7 +3441,7 @@ export default function BlogPage() {
         onClose={() => setRegenerateConfirmTarget(null)}
         title="Regenerate article?"
         primaryAction={{
-          content: "Regenerate (10 credits)",
+          content: `Regenerate (${regenerateConfirmTarget?.creditCost ?? BLOG_BODY_CREDIT_COST} credits)`,
           onAction: submitRegenerate,
           loading: fetcher.state !== "idle" && String(fetcher.formData?.get("intent")) === "regenerate_blog",
           destructive: false,
