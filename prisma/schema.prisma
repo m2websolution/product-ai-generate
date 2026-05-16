@@ -71,6 +71,7 @@ model shop {
   globalSettingsJson      String?   @db.LongText
   templateSelectionsJson  String?   @db.LongText
   customPromptTemplatesJson String? @db.LongText
+  themeEmbedEnabled       Boolean   @default(false)
 }
 
 model BillingSubscription {

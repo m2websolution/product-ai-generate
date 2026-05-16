@@ -4,7 +4,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import {
   Page, Layout, Card, Text, Badge, Button, DataTable, Tabs, Box, BlockStack,
-  InlineStack, ProgressBar, Banner, Collapsible,
+  InlineStack, ProgressBar, Banner, Collapsible, Modal,
 } from "@shopify/polaris";
 import {
   generateSchema,
@@ -110,7 +110,7 @@ export const loader = async ({ request }) => {
     db.aiVisibilitySchema.findMany({ where: { shop, resourceId: { in: allResourceIds } } }),
     db.aiVisibilityFaq.findMany({ where: { shop, resourceId: { in: allResourceIds } } }),
     db.aiVisibilityLlmsTxt.findUnique({ where: { shop } }),
-    db.shop.findUnique({ where: { shop }, select: { credits: true } }),
+    db.shop.findUnique({ where: { shop }, select: { credits: true, themeEmbedEnabled: true } }),
   ]);
 
   const schemaMap = Object.fromEntries(schemas.map((s) => [s.resourceId, s]));
@@ -147,6 +147,7 @@ export const loader = async ({ request }) => {
     shopDomain,
     shop,
     credits: shopData?.credits ?? 0,
+    themeEmbedEnabled: shopData?.themeEmbedEnabled ?? false,
     llmsTxtCredits: calcLlmsTxtCredits(products.length + articles.length + pages.length),
   };
 };
@@ -208,6 +209,12 @@ export const action = async ({ request }) => {
       return { ok: true, intent, ...result };
     }
 
+    if (intent === "toggle_theme_embed") {
+      const enabled = formData.get("enabled") === "true";
+      await db.shop.update({ where: { shop }, data: { themeEmbedEnabled: enabled } });
+      return { ok: true, intent, themeEmbedEnabled: enabled };
+    }
+
     return { ok: false, error: "Unknown intent." };
   } catch (err) {
     console.error("[AI Visibility action]", err);
@@ -229,7 +236,7 @@ function ScoreBadge({ score }) {
 // Item Drawer
 // ---------------------------------------------------------------------------
 
-function ItemDrawer({ item, onClose, onGenerate, generatingKey }) {
+function ItemModal({ item, onClose, onGenerate, generatingKey }) {
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   if (!item) return null;
   const canFaq = item.resourceType !== "page";
@@ -238,138 +245,134 @@ function ItemDrawer({ item, onClose, onGenerate, generatingKey }) {
   const combinedKey = `combined_${item.id}`;
 
   return (
-    <Box
-      background="bg-surface-secondary"
-      borderColor="border"
-      borderWidth="025"
-      borderRadius="200"
-      padding="400"
+    <Modal
+      open
+      onClose={onClose}
+      title={item.title}
+      size="large"
     >
-      <BlockStack gap="400">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text variant="headingMd" as="h3">{item.title}</Text>
-          <Button variant="plain" onClick={onClose}>Close</Button>
-        </InlineStack>
+      <Modal.Section>
+        <BlockStack gap="400">
+          <InlineStack gap="200">
+            <ScoreBadge score={item.score} />
+            {item.hasSchema && <Badge tone="success">Schema</Badge>}
+            {item.hasFaq && <Badge tone="success">FAQ</Badge>}
+          </InlineStack>
 
-        <InlineStack gap="200">
-          <ScoreBadge score={item.score} />
-          {item.hasSchema && <Badge tone="success">Schema</Badge>}
-          {item.hasFaq && <Badge tone="success">FAQ</Badge>}
-        </InlineStack>
-
-        <Box>
-          <Text variant="headingSm">Score Breakdown</Text>
-          <BlockStack gap="100">
-            {item.breakdown.map((b) => (
-              <InlineStack key={b.signal} gap="200" blockAlign="center">
-                <Text tone={b.achieved ? "success" : "critical"}>{b.achieved ? "+" : "-"}</Text>
-                <Text>{b.signal}</Text>
-                <Text tone="subdued">+{b.points} pts</Text>
-              </InlineStack>
-            ))}
-          </BlockStack>
-        </Box>
-
-        <InlineStack gap="200" wrap>
-          {item.resourceType === "product" && !item.hasSchema && !item.hasFaq && (
-            <Button
-              variant="primary"
-              loading={generatingKey === combinedKey}
-              onClick={() => onGenerate("generate_combined", item)}
-            >
-              Generate Schema + FAQ ({CREDITS_COMBINED} credits)
-            </Button>
-          )}
-          {(item.hasSchema || item.resourceType !== "product" || item.hasFaq) && (
-            <Button
-              loading={generatingKey === schemaKey}
-              onClick={() => onGenerate("generate_schema", item)}
-            >
-              {item.hasSchema ? `Regenerate Schema (${CREDITS_SCHEMA} credits)` : `Generate Schema (${CREDITS_SCHEMA} credits)`}
-            </Button>
-          )}
-          {canFaq && (
-            <Button
-              loading={generatingKey === faqKey}
-              onClick={() => onGenerate("generate_faq", item)}
-            >
-              {item.hasFaq ? `Regenerate FAQ (${CREDITS_FAQ} credits)` : `Generate FAQ (${CREDITS_FAQ} credits)`}
-            </Button>
-          )}
-        </InlineStack>
-
-        {item.schemaJson && (
           <Box>
-            <InlineStack align="space-between" blockAlign="center">
-              <Text variant="headingSm">Schema JSON-LD</Text>
-              <Button
-                variant="plain"
-                onClick={() => {
-                  if (typeof navigator !== "undefined") navigator.clipboard.writeText(item.schemaJson);
-                }}
-              >
-                Copy
-              </Button>
-            </InlineStack>
-            <Box paddingBlockStart="200">
-              <div
-                style={{
-                  background: "#1e1e1e",
-                  color: "#d4d4d4",
-                  padding: "12px",
-                  borderRadius: "6px",
-                  fontFamily: "monospace",
-                  fontSize: "12px",
-                  overflow: "auto",
-                  maxHeight: "200px",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {JSON.stringify(JSON.parse(item.schemaJson), null, 2)}
-              </div>
-            </Box>
+            <Text variant="headingSm">Score Breakdown</Text>
+            <BlockStack gap="100">
+              {item.breakdown.map((b) => (
+                <InlineStack key={b.signal} gap="200" blockAlign="center">
+                  <Text tone={b.achieved ? "success" : "critical"}>{b.achieved ? "+" : "-"}</Text>
+                  <Text>{b.signal}</Text>
+                  <Text tone="subdued">+{b.points} pts</Text>
+                </InlineStack>
+              ))}
+            </BlockStack>
           </Box>
-        )}
 
-        {item.faqJson && (() => {
-          try {
-            const faqPage = JSON.parse(item.faqJson);
-            const entities = faqPage.mainEntity || [];
-            return (
-              <Box>
-                <Text variant="headingSm">FAQ Content</Text>
-                <BlockStack gap="100">
-                  {entities.map((qa, i) => (
-                    <Box
-                      key={i}
-                      background="bg-surface"
-                      borderRadius="200"
-                      padding="300"
-                    >
-                      <Button
-                        variant="plain"
-                        textAlign="left"
-                        fullWidth
-                        onClick={() => setExpandedFaqIndex(expandedFaqIndex === i ? null : i)}
-                      >
-                        <Text fontWeight="semibold">{qa.name}</Text>
-                      </Button>
-                      <Collapsible open={expandedFaqIndex === i} id={`faq-${item.id}-${i}`} transition={{ duration: "150ms", timingFunction: "ease" }}>
-                        <Box paddingBlockStart="200">
-                          <Text tone="subdued">{qa.acceptedAnswer?.text}</Text>
-                        </Box>
-                      </Collapsible>
-                    </Box>
-                  ))}
-                </BlockStack>
+          <InlineStack gap="200" wrap>
+            {item.resourceType === "product" && !item.hasSchema && !item.hasFaq && (
+              <Button
+                variant="primary"
+                loading={generatingKey === combinedKey}
+                onClick={() => onGenerate("generate_combined", item)}
+              >
+                Generate Schema + FAQ ({CREDITS_COMBINED} credits)
+              </Button>
+            )}
+            {(item.hasSchema || item.resourceType !== "product" || item.hasFaq) && (
+              <Button
+                loading={generatingKey === schemaKey}
+                onClick={() => onGenerate("generate_schema", item)}
+              >
+                {item.hasSchema ? `Regenerate Schema (${CREDITS_SCHEMA} credits)` : `Generate Schema (${CREDITS_SCHEMA} credits)`}
+              </Button>
+            )}
+            {canFaq && (
+              <Button
+                loading={generatingKey === faqKey}
+                onClick={() => onGenerate("generate_faq", item)}
+              >
+                {item.hasFaq ? `Regenerate FAQ (${CREDITS_FAQ} credits)` : `Generate FAQ (${CREDITS_FAQ} credits)`}
+              </Button>
+            )}
+          </InlineStack>
+
+          {item.schemaJson && (
+            <Box>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text variant="headingSm">Schema JSON-LD</Text>
+                <Button
+                  variant="plain"
+                  onClick={() => {
+                    if (typeof navigator !== "undefined") navigator.clipboard.writeText(item.schemaJson);
+                  }}
+                >
+                  Copy
+                </Button>
+              </InlineStack>
+              <Box paddingBlockStart="200">
+                <div
+                  style={{
+                    background: "#1e1e1e",
+                    color: "#d4d4d4",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    fontFamily: "monospace",
+                    fontSize: "12px",
+                    overflow: "auto",
+                    maxHeight: "220px",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {JSON.stringify(JSON.parse(item.schemaJson), null, 2)}
+                </div>
               </Box>
-            );
-          } catch {
-            return null;
-          }
-        })()}
-      </BlockStack>
-    </Box>
+            </Box>
+          )}
+
+          {item.faqJson && (() => {
+            try {
+              const faqPage = JSON.parse(item.faqJson);
+              const entities = faqPage.mainEntity || [];
+              return (
+                <Box>
+                  <Text variant="headingSm">FAQ Content</Text>
+                  <BlockStack gap="100">
+                    {entities.map((qa, i) => (
+                      <Box
+                        key={i}
+                        background="bg-surface-secondary"
+                        borderRadius="200"
+                        padding="300"
+                      >
+                        <Button
+                          variant="plain"
+                          textAlign="left"
+                          fullWidth
+                          onClick={() => setExpandedFaqIndex(expandedFaqIndex === i ? null : i)}
+                        >
+                          <Text fontWeight="semibold">{qa.name}</Text>
+                        </Button>
+                        <Collapsible open={expandedFaqIndex === i} id={`faq-${item.id}-${i}`} transition={{ duration: "150ms", timingFunction: "ease" }}>
+                          <Box paddingBlockStart="200">
+                            <Text tone="subdued">{qa.acceptedAnswer?.text}</Text>
+                          </Box>
+                        </Collapsible>
+                      </Box>
+                    ))}
+                  </BlockStack>
+                </Box>
+              );
+            } catch {
+              return null;
+            }
+          })()}
+        </BlockStack>
+      </Modal.Section>
+    </Modal>
   );
 }
 
@@ -444,13 +447,15 @@ function ResourceTab({ items, resourceType, onSelectItem }) {
 // ---------------------------------------------------------------------------
 
 export default function AiVisibilityPage() {
-  const { products, articles, pages, llmsTxt, shop, credits, llmsTxtCredits } =
+  const { products, articles, pages, llmsTxt, shop, credits, themeEmbedEnabled: initialEmbedEnabled, llmsTxtCredits } =
     useLoaderData();
   const fetcher = useFetcher();
+  const embedFetcher = useFetcher();
   const [selectedTab, setSelectedTab] = useState(0);
   const [selectedItem, setSelectedItem] = useState(null);
   const [generatingKey, setGeneratingKey] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [embedEnabled, setEmbedEnabled] = useState(initialEmbedEnabled);
 
   const isSubmitting = fetcher.state !== "idle";
 
@@ -466,6 +471,19 @@ export default function AiVisibilityPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.state, fetcher.data]);
+
+  useEffect(() => {
+    if (embedFetcher.state === "idle" && embedFetcher.data?.intent === "toggle_theme_embed") {
+      setEmbedEnabled(embedFetcher.data.themeEmbedEnabled);
+    }
+  }, [embedFetcher.state, embedFetcher.data]);
+
+  const handleToggleEmbed = useCallback((enabled) => {
+    const fd = new FormData();
+    fd.append("intent", "toggle_theme_embed");
+    fd.append("enabled", String(enabled));
+    embedFetcher.submit(fd, { method: "post" });
+  }, [embedFetcher]);
 
   const allItems = [...products, ...articles, ...pages];
   const totalScore =
@@ -587,17 +605,52 @@ export default function AiVisibilityPage() {
             <div style={{ flex: 1 }}>
               <Card>
                 <BlockStack gap="300">
-                  <Text variant="headingMd">Theme Embed</Text>
-                  <Text tone="subdued">
-                    Enable the AI Visibility App Embed in your theme to auto-inject schema markup into product, article, and page pages.
-                  </Text>
-                  <Button
-                    url={`https://${shop}/admin/themes/current/editor?context=apps`}
-                    external
-                    size="slim"
-                  >
-                    Open Theme Editor
-                  </Button>
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text variant="headingMd">Schema Injection</Text>
+                    {embedEnabled
+                      ? <Badge tone="success">Active</Badge>
+                      : <Badge tone="warning">Not enabled</Badge>}
+                  </InlineStack>
+                  {embedEnabled ? (
+                    <Text tone="subdued">
+                      Schema markup is automatically injected into your product, blog, and page templates. Search engines and AI crawlers can read your structured data.
+                    </Text>
+                  ) : (
+                    <Text tone="subdued">
+                      Enable the App Embed in your theme to automatically inject schema markup. This tells Google and AI search engines exactly what each page is about.
+                    </Text>
+                  )}
+                  <InlineStack gap="200" wrap>
+                    {!embedEnabled && (
+                      <Button
+                        url={`https://${shop}/admin/themes/current/editor?context=apps`}
+                        external
+                        size="slim"
+                        variant="primary"
+                      >
+                        Enable in Theme Editor
+                      </Button>
+                    )}
+                    {embedEnabled ? (
+                      <Button
+                        size="slim"
+                        variant="plain"
+                        tone="critical"
+                        loading={embedFetcher.state !== "idle"}
+                        onClick={() => handleToggleEmbed(false)}
+                      >
+                        Mark as disabled
+                      </Button>
+                    ) : (
+                      <Button
+                        size="slim"
+                        loading={embedFetcher.state !== "idle"}
+                        onClick={() => handleToggleEmbed(true)}
+                      >
+                        {"I've enabled it"}
+                      </Button>
+                    )}
+                  </InlineStack>
                 </BlockStack>
               </Card>
             </div>
@@ -618,17 +671,16 @@ export default function AiVisibilityPage() {
           </Card>
         </Layout.Section>
 
-        {selectedItem && (
-          <Layout.Section>
-            <ItemDrawer
-              item={selectedItem}
-              onClose={() => setSelectedItem(null)}
-              onGenerate={handleGenerate}
-              generatingKey={generatingKey}
-            />
-          </Layout.Section>
-        )}
       </Layout>
+
+      {selectedItem && (
+        <ItemModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onGenerate={handleGenerate}
+          generatingKey={generatingKey}
+        />
+      )}
     </Page>
   );
 }

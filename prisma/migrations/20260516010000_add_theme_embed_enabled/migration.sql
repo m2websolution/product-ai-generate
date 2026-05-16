@@ -1,0 +1,1 @@
+ALTER TABLE `shop` ADD COLUMN `themeEmbedEnabled` BOOLEAN NOT NULL DEFAULT false;
