@@ -4,7 +4,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import {
   Page, Layout, Card, Text, Badge, Button, DataTable, Tabs, Box, BlockStack,
-  InlineStack, ProgressBar, Banner,
+  InlineStack, ProgressBar, Banner, Collapsible,
 } from "@shopify/polaris";
 import {
   generateSchema,
@@ -232,6 +232,7 @@ function ScoreBadge({ score }) {
 // ---------------------------------------------------------------------------
 
 function ItemDrawer({ item, onClose, onGenerate, generatingKey }) {
+  const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   if (!item) return null;
   const canFaq = item.resourceType !== "page";
   const schemaKey = `schema_${item.id}`;
@@ -339,16 +340,27 @@ function ItemDrawer({ item, onClose, onGenerate, generatingKey }) {
             return (
               <Box>
                 <Text variant="headingSm">FAQ Content</Text>
-                <BlockStack gap="200">
+                <BlockStack gap="100">
                   {entities.map((qa, i) => (
                     <Box
                       key={i}
-                      padding="300"
                       background="bg-surface"
                       borderRadius="200"
+                      padding="300"
                     >
-                      <Text fontWeight="semibold">{qa.name}</Text>
-                      <Text tone="subdued">{qa.acceptedAnswer?.text}</Text>
+                      <Button
+                        variant="plain"
+                        textAlign="left"
+                        fullWidth
+                        onClick={() => setExpandedFaqIndex(expandedFaqIndex === i ? null : i)}
+                      >
+                        <Text fontWeight="semibold">{qa.name}</Text>
+                      </Button>
+                      <Collapsible open={expandedFaqIndex === i} id={`faq-${item.id}-${i}`} transition={{ duration: "150ms", timingFunction: "ease" }}>
+                        <Box paddingBlockStart="200">
+                          <Text tone="subdued">{qa.acceptedAnswer?.text}</Text>
+                        </Box>
+                      </Collapsible>
                     </Box>
                   ))}
                 </BlockStack>
