@@ -647,7 +647,6 @@ export default function AiVisibilityPage() {
   const [banner, setBanner] = useState(null);
   const [embedEnabled, setEmbedEnabled] = useState(initialEmbedEnabled);
   const [credits, setCredits] = useState(initialCredits);
-  const [bulkSchemaEnabled, setBulkSchemaEnabled] = useState(false);
   const [selectedIdsByType, setSelectedIdsByType] = useState({ product: [], article: [], page: [] });
 
   // Derive selectedItem from live list state so modal updates instantly after generation
@@ -862,10 +861,6 @@ export default function AiVisibilityPage() {
   }, []);
 
   const handleGenerateBulkSchema = useCallback(() => {
-    if (!bulkSchemaEnabled) {
-      setBanner({ tone: "warning", text: "Enable bulk schema generation first." });
-      return;
-    }
     if (selectedItems.length === 0) {
       setBanner({ tone: "warning", text: "Select at least one item for bulk schema generation." });
       return;
@@ -881,7 +876,7 @@ export default function AiVisibilityPage() {
     fd.append("resourceType", activeResourceType);
     fd.append("resourcesJson", JSON.stringify(selectedItems));
     fetcher.submit(fd, { method: "post" });
-  }, [activeResourceType, bulkSchemaCredits, bulkSchemaEnabled, credits, fetcher, selectedItems]);
+  }, [activeResourceType, bulkSchemaCredits, credits, fetcher, selectedItems]);
 
   return (
     <Page title="AI Visibility" subtitle="Optimize your store for AI-powered search engines">
@@ -1008,11 +1003,6 @@ export default function AiVisibilityPage() {
             <Box padding="400" borderColor="border" borderBlockEndWidth="025">
               <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
                 <BlockStack gap="100">
-                  <Checkbox
-                    label="Generate bulk Schema"
-                    checked={bulkSchemaEnabled}
-                    onChange={setBulkSchemaEnabled}
-                  />
                   <Text as="p" variant="bodySm" tone={bulkSchemaCredits > credits ? "critical" : "subdued"}>
                     Credits used: {bulkSchemaCredits} ({selectedItems.length} items x {CREDITS_SCHEMA} credits)
                     {bulkSchemaCredits > credits ? ` - not enough credits (${credits} available)` : ""}
@@ -1020,7 +1010,7 @@ export default function AiVisibilityPage() {
                 </BlockStack>
                 <Button
                   variant="primary"
-                  disabled={!bulkSchemaEnabled || selectedItems.length === 0 || bulkSchemaCredits > credits}
+                  disabled={selectedItems.length === 0 || bulkSchemaCredits > credits}
                   loading={isSubmitting && generatingKey === "bulk_schema"}
                   onClick={handleGenerateBulkSchema}
                 >

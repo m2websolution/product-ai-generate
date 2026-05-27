@@ -53,13 +53,12 @@ const BULK_GENERATE_INTENT = "bulk_generate";
 const MAX_BULK_ITEMS = 1000;
 const MIN_BULK_PRODUCT_SELECTION_ERROR = "Select at least one product for bulk generation.";
 const MAX_BULK_PRODUCT_SELECTION_ERROR = `You can bulk generate up to ${MAX_BULK_ITEMS} products at a time.`;
-const PRODUCT_CONTENT_TYPES = ["description", "meta_title", "meta_description", "schema", "faq"];
+const PRODUCT_CONTENT_TYPES = ["description", "meta_title", "meta_description", "faq"];
 const DEFAULT_PRODUCT_CONTENT_TYPES = ["description", "meta_title", "meta_description"];
 const PRODUCT_CONTENT_TYPE_CREDIT_COSTS = {
   description: 1,
   meta_title: 1,
   meta_description: 1,
-  schema: 2,
   faq: 5,
 };
 const DEFAULT_AI_MODEL = "gpt-4o-mini";
@@ -971,6 +970,7 @@ export const action = async ({ request }) => {
           error: MAX_BULK_PRODUCT_SELECTION_ERROR,
         };
       }
+      const collectionId = readFormString(formData, "collectionId") || "";
       const language = readFormString(formData, "language") || "English";
       const tone = readFormString(formData, "tone") || "Neutral";
       const lengthOption = getExactWordLengthOption(globalSettings, "productDescWords");
@@ -1047,6 +1047,7 @@ export const action = async ({ request }) => {
         addTitleAsHeading: addTitleAsHeadingFlag,
         preserveOldDescription: preserveOldDescriptionFlag,
         removeImages: removeImagesFlag,
+        collectionId: collectionId || "",
       };
 
       const jobItems = bulkProducts.map((p) => ({
@@ -1578,6 +1579,7 @@ export default function ProductsPage() {
     payload.append("addTitleAsHeading", addTitleAsHeading ? "1" : "");
     payload.append("preserveOldDescription", preserveOldDescription ? "1" : "");
     payload.append("removeImagesFromDescription", removeImagesFromDescription ? "1" : "");
+    payload.append("collectionId", filters.collectionId || "");
     bulkFetcher.submit(payload, { method: "post" });
   }, [
     selectedKeywords,
@@ -1596,6 +1598,7 @@ export default function ProductsPage() {
     preserveOldDescription,
     removeImagesFromDescription,
     selectedProducts,
+    filters,
   ]);
 
   const isBulkGenerating = bulkFetcher.state !== "idle";
@@ -1976,7 +1979,6 @@ export default function ProductsPage() {
                     bulkContentTypes.includes("description") ? "Descriptions" : null,
                     bulkContentTypes.includes("meta_description") ? "Meta Descriptions" : null,
                     bulkContentTypes.includes("meta_title") ? "Meta Titles" : null,
-                    bulkContentTypes.includes("schema") ? "Schema Markup" : null,
                     bulkContentTypes.includes("faq") ? "FAQ" : null,
                   ].filter(Boolean).join(", ")} will be generated for {selectedProducts.length} product{selectedProducts.length !== 1 ? "s" : ""}
                 </Text>
@@ -1990,7 +1992,6 @@ export default function ProductsPage() {
                   { id: "description", label: "Description" },
                   { id: "meta_description", label: "Meta Description" },
                   { id: "meta_title", label: "Meta Title" },
-                  { id: "schema", label: "Schema Markup" },
                   { id: "faq", label: "FAQ" },
                 ].map((type) => {
                   const isSelected = bulkContentTypes.includes(type.id);
