@@ -1121,6 +1121,7 @@ export const loader = async ({ request }) => {
       defaultAiProvider: true,
       credits: true,
       creditsUsedTotal: true,
+      globalSettingsJson: true,
       ownerName: true,
       name: true,
     },
@@ -1258,10 +1259,19 @@ export const loader = async ({ request }) => {
     };
   });
 
+  let parsedGlobalSettings = {};
+  try { parsedGlobalSettings = JSON.parse(shopData?.globalSettingsJson || "{}"); } catch { /* ignore */ }
+  const keywordLibrary = mergeUniqueKeywords(
+    splitKeywordString(parsedGlobalSettings.productDescKeywords),
+    splitKeywordString(parsedGlobalSettings.productMetaTitleKeywords),
+    splitKeywordString(parsedGlobalSettings.productMetaDescKeywords),
+  );
+
   return {
     filters: { search, status, collectionId },
     collections,
     products,
+    keywordLibrary,
     hasOpenaiKey: !!(shopData?.openaiApiKey || process.env.OPENAI_API_KEY),
     hasAnthropicKey: !!(shopData?.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
     hasGeminiKey: !!(shopData?.geminiApiKey || process.env.GOOGLE_GEMINI_API_KEY),
@@ -1299,7 +1309,7 @@ function readArrayState(value, fallback = []) {
 }
 
 export default function ProductsPage() {
-  const { filters, products, collections, defaultAiProvider, credits, shopOwnerName } = useLoaderData();
+  const { filters, products, collections, keywordLibrary, defaultAiProvider, credits, shopOwnerName } = useLoaderData();
   const navigation = useNavigation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1315,9 +1325,6 @@ export default function ProductsPage() {
   const [bulkMetaTitleTemplate, setBulkMetaTitleTemplate] = useState("");
   const [selectedKeywords, setSelectedKeywords] = useState([]);
   const [keywordInput, setKeywordInput] = useState("");
-  const keywordLibrary = useMemo(() => {
-    return readProductKeywordDefaults();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [bulkSettings, setBulkSettings] = useState(() => {
     const gs = readGlobalSettings();
     return {

@@ -551,10 +551,6 @@ function ResourceTab({ items, resourceType, onSelectItem, selectedIds, onToggleI
         : <Badge key="schema">No</Badge>,
     ];
 
-    if (showFaqColumn) {
-      baseRow.push(item.hasFaq ? <Badge key="faq" tone="success">Yes</Badge> : <Badge key="faq">No</Badge>);
-    }
-
     baseRow.push(<Button key="action" size="slim" onClick={() => onSelectItem(item)}>View</Button>);
     return baseRow;
   });
@@ -562,7 +558,7 @@ function ResourceTab({ items, resourceType, onSelectItem, selectedIds, onToggleI
   return (
     <BlockStack gap="0">
       <DataTable
-        columnContentTypes={showFaqColumn ? ["text", "text", "text", "text", "text", "text"] : ["text", "text", "text", "text", "text"]}
+        columnContentTypes={["text", "text", "text", "text", "text"]}
         headings={[
           <Checkbox
             key="select-page"
@@ -572,7 +568,7 @@ function ResourceTab({ items, resourceType, onSelectItem, selectedIds, onToggleI
             indeterminate={pageSelectionIndeterminate}
             onChange={(checked) => onTogglePage(pageItems.map((item) => item.id), checked)}
           />,
-          ...(showFaqColumn ? ["Title", "AI Score", "Schema", "FAQ", ""] : ["Title", "AI Score", "Schema", ""]),
+          "Title", "AI Score", "Schema", "",
         ]}
         rows={rows}
       />
