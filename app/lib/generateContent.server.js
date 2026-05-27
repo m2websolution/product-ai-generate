@@ -1086,6 +1086,158 @@ const COLLECTION_ADD_PRODUCTS_MUTATION = `
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Shopify content apply helpers
+// ---------------------------------------------------------------------------
+
+const SHOPIFY_PRODUCT_UPDATE_MUTATION = `
+  mutation productUpdate($product: ProductUpdateInput!) {
+    productUpdate(product: $product) {
+      product { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+const SHOPIFY_COLLECTION_UPDATE_MUTATION = `
+  mutation collectionUpdate($input: CollectionInput!) {
+    collectionUpdate(input: $input) {
+      collection { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+const SHOPIFY_METAFIELDS_SET_MUTATION = `
+  mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      metafields { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+async function shopifyGraphQL(shop, accessToken, query, variables) {
+  const response = await fetch(
+    `https://${shop}/admin/api/${SHOPIFY_ADMIN_API_VERSION}/graphql.json`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": accessToken,
+      },
+      body: JSON.stringify({ query, variables }),
+    },
+  );
+  return response.json();
+}
+
+export async function applyProductToShopify(shop, accessToken, productId, contentTypes) {
+  if (!shop || !accessToken || !productId) return;
+  try {
+    const content = await db.productGeneratedContent.findUnique({
+      where: { shop_productId: { shop, productId } },
+    });
+    if (!content) return;
+
+    const hasDesc = contentTypes.includes("description") || contentTypes.includes("faq");
+    const hasMetaTitle = contentTypes.includes("meta_title");
+    const hasMetaDesc = contentTypes.includes("meta_description");
+    const hasFaq = contentTypes.includes("faq");
+
+    const productInput = { id: productId };
+    if (hasDesc) productInput.descriptionHtml = content.descriptionHtml || "";
+    const seo = {};
+    if (hasMetaTitle) seo.title = content.seoTitle || "";
+    if (hasMetaDesc) seo.description = content.seoDescription || "";
+    if (Object.keys(seo).length > 0) productInput.seo = seo;
+
+    const result = await shopifyGraphQL(shop, accessToken, SHOPIFY_PRODUCT_UPDATE_MUTATION, { product: productInput });
+    const userErrors = result?.data?.productUpdate?.userErrors || [];
+    if (userErrors.length > 0) {
+      console.error("applyProductToShopify productUpdate errors:", userErrors);
+      return;
+    }
+
+    if (hasFaq && content.faqJson) {
+      const mfResult = await shopifyGraphQL(shop, accessToken, SHOPIFY_METAFIELDS_SET_MUTATION, {
+        metafields: [{ ownerId: productId, namespace: "content_ai_geo", key: "faq_schema", type: "json", value: content.faqJson }],
+      });
+      const mfErrors = mfResult?.data?.metafieldsSet?.userErrors || [];
+      if (mfErrors.length > 0) console.error("applyProductToShopify metafield errors:", mfErrors);
+    }
+
+    await db.productGeneratedContent.update({
+      where: { shop_productId: { shop, productId } },
+      data: { appliedToProduct: true },
+    });
+  } catch (err) {
+    console.error("applyProductToShopify failed:", err?.message);
+  }
+}
+
+export async function applyCollectionToShopify(shop, accessToken, collectionId, contentTypes) {
+  if (!shop || !accessToken || !collectionId) return;
+  try {
+    const content = await db.collectionGeneratedContent.findUnique({
+      where: { shop_collectionId: { shop, collectionId } },
+    });
+    if (!content) return;
+
+    const collectionInput = { id: collectionId };
+    if (contentTypes.includes("description")) collectionInput.descriptionHtml = content.descriptionHtml || "";
+    const seo = {};
+    if (contentTypes.includes("meta_title")) seo.title = content.seoTitle || "";
+    if (contentTypes.includes("meta_description")) seo.description = content.seoDescription || "";
+    if (Object.keys(seo).length > 0) collectionInput.seo = seo;
+
+    const result = await shopifyGraphQL(shop, accessToken, SHOPIFY_COLLECTION_UPDATE_MUTATION, { input: collectionInput });
+    const userErrors = result?.data?.collectionUpdate?.userErrors || [];
+    if (userErrors.length > 0) {
+      console.error("applyCollectionToShopify errors:", userErrors);
+      return;
+    }
+
+    await db.collectionGeneratedContent.update({
+      where: { shop_collectionId: { shop, collectionId } },
+      data: { appliedToCollection: true },
+    });
+  } catch (err) {
+    console.error("applyCollectionToShopify failed:", err?.message);
+  }
+}
+
+export async function applyCollectionProductToShopify(shop, accessToken, collectionId, productId, contentTypes) {
+  if (!shop || !accessToken || !collectionId || !productId) return;
+  try {
+    const content = await db.collectionProductGeneratedContent.findUnique({
+      where: { shop_collectionId_productId: { shop, collectionId, productId } },
+    });
+    if (!content) return;
+
+    const productInput = { id: productId };
+    if (contentTypes.includes("description")) productInput.descriptionHtml = content.descriptionHtml || "";
+    const seo = {};
+    if (contentTypes.includes("meta_title")) seo.title = content.seoTitle || "";
+    if (contentTypes.includes("meta_description")) seo.description = content.seoDescription || "";
+    if (Object.keys(seo).length > 0) productInput.seo = seo;
+
+    const result = await shopifyGraphQL(shop, accessToken, SHOPIFY_PRODUCT_UPDATE_MUTATION, { product: productInput });
+    const userErrors = result?.data?.productUpdate?.userErrors || [];
+    if (userErrors.length > 0) {
+      console.error("applyCollectionProductToShopify errors:", userErrors);
+      return;
+    }
+
+    await db.collectionProductGeneratedContent.update({
+      where: { shop_collectionId_productId: { shop, collectionId, productId } },
+      data: { appliedToProduct: true },
+    });
+  } catch (err) {
+    console.error("applyCollectionProductToShopify failed:", err?.message);
+  }
+}
+
 export async function addProductsToCollection(shop, accessToken, collectionId, productIds) {
   if (!shop || !accessToken || !collectionId || !productIds?.length) return;
   try {
