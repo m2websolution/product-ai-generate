@@ -7,6 +7,9 @@ import {
   generateCollectionProductItem,
   updateJobProgress,
   addProductsToCollection,
+  applyProductToShopify,
+  applyCollectionToShopify,
+  applyCollectionProductToShopify,
 } from "../lib/generateContent.server";
 import { generateBulkFaq, generateProductSchemaForBulk } from "../lib/aiVisibility.server";
 import { refundCredits } from "../lib/credits.server";
@@ -118,6 +121,7 @@ export const bulkGenerateFunction = inngest.createFunction(
 
         const successfulItems = chunks[i].filter((_, idx) => results[idx].status === "fulfilled");
         if (successfulItems.length > 0 && shopData?.accessToken) {
+          // Add products to their Shopify collection
           if (jobType === "collection_product") {
             const byCollection = {};
             successfulItems.forEach((item) => {
@@ -136,6 +140,34 @@ export const bulkGenerateFunction = inngest.createFunction(
               settingsWithShop.collectionId,
               successfulItems.map((item) => item.id),
             );
+          }
+
+          // Auto-apply generated content to Shopify Admin
+          const applyableTypes = (settingsWithShop.contentTypes || []).filter((t) =>
+            ["description", "meta_title", "meta_description", "faq"].includes(t),
+          );
+          if (applyableTypes.length > 0) {
+            if (jobType === "product") {
+              await Promise.allSettled(
+                successfulItems.map((item) =>
+                  applyProductToShopify(shop, shopData.accessToken, item.id, applyableTypes),
+                ),
+              );
+            } else if (jobType === "collection") {
+              await Promise.allSettled(
+                successfulItems.map((item) =>
+                  applyCollectionToShopify(shop, shopData.accessToken, item.id, applyableTypes),
+                ),
+              );
+            } else if (jobType === "collection_product") {
+              await Promise.allSettled(
+                successfulItems.map((item) =>
+                  applyCollectionProductToShopify(
+                    shop, shopData.accessToken, item.collectionId, item.productId, applyableTypes,
+                  ),
+                ),
+              );
+            }
           }
         }
       });
