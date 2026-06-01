@@ -1,0 +1,487 @@
+{%- liquid
+  assign bid            = block.id
+  assign heading_prefix = block.settings.heading_prefix | default: 'Frequently Asked'
+  assign heading_bold   = block.settings.heading_bold   | default: 'Questions'
+  assign subheading     = block.settings.subheading
+  assign bg_color       = block.settings.background_color
+  assign heading_color  = block.settings.heading_color
+  assign text_color     = block.settings.text_color
+  assign open_first     = block.settings.open_first
+  assign show_divider   = block.settings.show_divider
+
+  # Try AI-generated FAQ from the product metafield first.
+  # Metafield namespace: content_ai_geo, key: faq_json (type: json)
+  # Structure: { "mainEntity": [{ "name": "Q", "acceptedAnswer": { "text": "A" } }] }
+  assign ai_faq_items = nil
+  if product
+    assign faq_meta = product.metafields.content_ai_geo.faq_json
+    if faq_meta != blank
+      assign ai_faq_items = faq_meta.value.mainEntity
+    endif
+  endif
+
+  # Determine whether we have anything to render
+  assign use_ai   = false
+  assign has_any  = false
+  if ai_faq_items != blank and ai_faq_items.size > 0
+    assign use_ai  = true
+    assign has_any = true
+  elsif block.settings.q1 != blank and block.settings.a1 != blank
+    assign has_any = true
+  elsif block.settings.q2 != blank and block.settings.a2 != blank
+    assign has_any = true
+  elsif block.settings.q3 != blank and block.settings.a3 != blank
+    assign has_any = true
+  elsif block.settings.q4 != blank and block.settings.a4 != blank
+    assign has_any = true
+  elsif block.settings.q5 != blank and block.settings.a5 != blank
+    assign has_any = true
+  elsif block.settings.q6 != blank and block.settings.a6 != blank
+    assign has_any = true
+  elsif block.settings.q7 != blank and block.settings.a7 != blank
+    assign has_any = true
+  endif
+-%}
+
+{%- if has_any -%}
+
+<style>
+  #cai-faq-{{ bid }} {
+    background-color: {{ bg_color }};
+    padding: {{ block.settings.padding_top }}px 0 {{ block.settings.padding_bottom }}px;
+  }
+  #cai-faq-{{ bid }} .cai-faq__inner {
+    max-width: {{ block.settings.container_width }}px;
+    margin: 0 auto;
+    padding: 0 20px;
+    box-sizing: border-box;
+  }
+  #cai-faq-{{ bid }} .cai-faq__heading {
+    text-align: center;
+    font-size: clamp(1.25rem, 3vw, 1.65rem);
+    font-weight: 400;
+    line-height: 1.3;
+    margin: 0 0 {{ block.settings.heading_spacing }}px;
+    color: {{ heading_color }};
+  }
+  #cai-faq-{{ bid }} .cai-faq__heading strong {
+    font-weight: 700;
+    color: {{ heading_color }};
+  }
+  #cai-faq-{{ bid }} .cai-faq__subheading {
+    text-align: center;
+    font-size: 1rem;
+    color: {{ block.settings.subheading_color }};
+    margin: -8px 0 24px;
+  }
+  #cai-faq-{{ bid }} .cai-faq__list {
+    display: flex;
+    flex-direction: column;
+    gap: {{ block.settings.item_gap }}px;
+  }
+  #cai-faq-{{ bid }} .cai-faq__item {
+    background-color: {{ block.settings.card_bg }};
+    border: 1px solid {{ block.settings.card_border }};
+    border-radius: {{ block.settings.card_radius }}px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  #cai-faq-{{ bid }} .cai-faq__item--divider {
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid {{ block.settings.card_border }};
+    border-radius: 0;
+    box-shadow: none;
+  }
+  #cai-faq-{{ bid }} .cai-faq__item--divider:first-child {
+    border-top: 1px solid {{ block.settings.card_border }};
+  }
+  #cai-faq-{{ bid }} .cai-faq__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: {{ block.settings.item_pad_v }}px {{ block.settings.item_pad_h }}px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #cai-faq-{{ bid }} .cai-faq__summary::-webkit-details-marker { display: none; }
+  #cai-faq-{{ bid }} .cai-faq__summary::marker { display: none; }
+  #cai-faq-{{ bid }} .cai-faq__question {
+    flex: 1;
+    font-size: {{ block.settings.question_size }}px;
+    font-weight: {{ block.settings.question_weight }};
+    color: {{ text_color }};
+    line-height: 1.4;
+  }
+  #cai-faq-{{ bid }} .cai-faq__chevron {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid #c8c8c8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    transition: transform 0.25s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+  #cai-faq-{{ bid }} .cai-faq__item[open] .cai-faq__chevron {
+    transform: rotate(180deg);
+    border-color: {{ block.settings.accent_color }};
+    color: {{ block.settings.accent_color }};
+  }
+  #cai-faq-{{ bid }} .cai-faq__answer {
+    padding: 0 {{ block.settings.item_pad_h }}px {{ block.settings.item_pad_v }}px;
+    font-size: {{ block.settings.answer_size }}px;
+    color: {{ text_color }};
+    line-height: 1.7;
+    opacity: 0.85;
+  }
+  #cai-faq-{{ bid }} .cai-faq__answer p  { margin: 0 0 10px; }
+  #cai-faq-{{ bid }} .cai-faq__answer p:last-child { margin: 0; }
+  #cai-faq-{{ bid }} .cai-faq__answer ul,
+  #cai-faq-{{ bid }} .cai-faq__answer ol { margin: 0 0 10px; padding-left: 20px; }
+  #cai-faq-{{ bid }} .cai-faq__answer li { margin-bottom: 4px; }
+  #cai-faq-{{ bid }} .cai-faq__answer a  { color: {{ block.settings.accent_color }}; }
+</style>
+
+{%- capture faq_chevron -%}
+<span class="cai-faq__chevron" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+       viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+</span>
+{%- endcapture -%}
+
+<div id="cai-faq-{{ bid }}" class="cai-faq-block" {{ block.shopify_attributes }}>
+  <div class="cai-faq__inner">
+
+    {%- if heading_prefix != blank or heading_bold != blank -%}
+    <h2 class="cai-faq__heading">
+      {%- if heading_prefix != blank -%}{{ heading_prefix }}{%- endif -%}
+      {%- if heading_prefix != blank and heading_bold != blank %} {% endif -%}
+      {%- if heading_bold != blank -%}<strong>{{ heading_bold }}</strong>{%- endif -%}
+    </h2>
+    {%- endif -%}
+
+    {%- if subheading != blank -%}
+    <p class="cai-faq__subheading">{{ subheading }}</p>
+    {%- endif -%}
+
+    {%- assign item_class = 'cai-faq__item' -%}
+    {%- if show_divider -%}{%- assign item_class = 'cai-faq__item cai-faq__item--divider' -%}{%- endif -%}
+
+    <div class="cai-faq__list">
+
+      {%- if use_ai -%}
+        {%- comment -%} ── AI-generated FAQ from product metafield ── {%- endcomment -%}
+        {%- for entity in ai_faq_items -%}
+          {%- assign q = entity.name -%}
+          {%- assign a = entity.acceptedAnswer.text -%}
+          {%- if q != blank and a != blank -%}
+            <details class="{{ item_class }}"{% if open_first and forloop.first %} open{% endif %}>
+              <summary class="cai-faq__summary">
+                <span class="cai-faq__question">{{ q | escape }}</span>{{ faq_chevron }}
+              </summary>
+              <div class="cai-faq__answer">{{ a }}</div>
+            </details>
+          {%- endif -%}
+        {%- endfor -%}
+
+      {%- else -%}
+        {%- comment -%} ── Manual FAQ items from block settings ── {%- endcomment -%}
+        {%- assign faq_index = 0 -%}
+
+        {%- if block.settings.q1 != blank and block.settings.a1 != blank -%}
+          {%- assign faq_index = faq_index | plus: 1 -%}
+          <details class="{{ item_class }}"{% if open_first and faq_index == 1 %} open{% endif %}>
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q1 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a1 }}</div>
+          </details>
+        {%- endif -%}
+
+        {%- if block.settings.q2 != blank and block.settings.a2 != blank -%}
+          {%- assign faq_index = faq_index | plus: 1 -%}
+          <details class="{{ item_class }}"{% if open_first and faq_index == 1 %} open{% endif %}>
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q2 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a2 }}</div>
+          </details>
+        {%- endif -%}
+
+        {%- if block.settings.q3 != blank and block.settings.a3 != blank -%}
+          {%- assign faq_index = faq_index | plus: 1 -%}
+          <details class="{{ item_class }}"{% if open_first and faq_index == 1 %} open{% endif %}>
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q3 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a3 }}</div>
+          </details>
+        {%- endif -%}
+
+        {%- if block.settings.q4 != blank and block.settings.a4 != blank -%}
+          {%- assign faq_index = faq_index | plus: 1 -%}
+          <details class="{{ item_class }}"{% if open_first and faq_index == 1 %} open{% endif %}>
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q4 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a4 }}</div>
+          </details>
+        {%- endif -%}
+
+        {%- if block.settings.q5 != blank and block.settings.a5 != blank -%}
+          {%- assign faq_index = faq_index | plus: 1 -%}
+          <details class="{{ item_class }}"{% if open_first and faq_index == 1 %} open{% endif %}>
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q5 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a5 }}</div>
+          </details>
+        {%- endif -%}
+
+        {%- if block.settings.q6 != blank and block.settings.a6 != blank -%}
+          {%- assign faq_index = faq_index | plus: 1 -%}
+          <details class="{{ item_class }}"{% if open_first and faq_index == 1 %} open{% endif %}>
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q6 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a6 }}</div>
+          </details>
+        {%- endif -%}
+
+        {%- if block.settings.q7 != blank and block.settings.a7 != blank -%}
+          <details class="{{ item_class }}">
+            <summary class="cai-faq__summary"><span class="cai-faq__question">{{ block.settings.q7 | escape }}</span>{{ faq_chevron }}</summary>
+            <div class="cai-faq__answer">{{ block.settings.a7 }}</div>
+          </details>
+        {%- endif -%}
+
+      {%- endif -%}
+
+    </div>
+  </div>
+</div>
+
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "FAQ Section",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Background Color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "Heading Color",
+      "default": "#111827"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text Color",
+      "default": "#111111"
+    },
+    {
+      "type": "color",
+      "id": "subheading_color",
+      "label": "Subheading Color",
+      "default": "#6b7280"
+    },
+    {
+      "type": "color",
+      "id": "card_bg",
+      "label": "Card Background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "card_border",
+      "label": "Card Border Color",
+      "default": "#e5e7eb"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent Color",
+      "default": "#6366f1"
+    },
+    {
+      "type": "header",
+      "content": "Heading"
+    },
+    {
+      "type": "text",
+      "id": "heading_prefix",
+      "label": "Heading – normal text",
+      "default": "Frequently Asked"
+    },
+    {
+      "type": "text",
+      "id": "heading_bold",
+      "label": "Heading – bold text",
+      "default": "Questions"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading (optional)"
+    },
+    {
+      "type": "range",
+      "id": "heading_spacing",
+      "label": "Space below heading",
+      "min": 8,
+      "max": 60,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "container_width",
+      "label": "Max content width",
+      "min": 480,
+      "max": 1200,
+      "step": 40,
+      "unit": "px",
+      "default": 800
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Padding top",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Padding bottom",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "header",
+      "content": "FAQ Items"
+    },
+    {
+      "type": "checkbox",
+      "id": "open_first",
+      "label": "Open first item by default",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_divider",
+      "label": "Use divider style instead of cards",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "item_gap",
+      "label": "Space between items",
+      "min": 0,
+      "max": 24,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "item_pad_v",
+      "label": "Item vertical padding",
+      "min": 8,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "item_pad_h",
+      "label": "Item horizontal padding",
+      "min": 8,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "card_radius",
+      "label": "Card corner radius",
+      "min": 0,
+      "max": 24,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "header",
+      "content": "Typography"
+    },
+    {
+      "type": "range",
+      "id": "question_size",
+      "label": "Question font size",
+      "min": 12,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "select",
+      "id": "question_weight",
+      "label": "Question font weight",
+      "options": [
+        { "value": "400", "label": "Normal" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semibold" },
+        { "value": "700", "label": "Bold" }
+      ],
+      "default": "600"
+    },
+    {
+      "type": "range",
+      "id": "answer_size",
+      "label": "Answer font size",
+      "min": 12,
+      "max": 18,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    { "type": "text",     "id": "q1", "label": "Question 1", "default": "How do you handle security and privacy?" },
+    { "type": "richtext", "id": "a1", "label": "Answer 1",   "default": "<p>We take security and privacy seriously. All data is encrypted in transit and at rest. We never sell your data to third parties.</p>" },
+    { "type": "text",     "id": "q2", "label": "Question 2", "default": "Is there a limit to the number of messages I can send?" },
+    { "type": "richtext", "id": "a2", "label": "Answer 2",   "default": "<p>No — there is no limit. You can send as many messages as you need, on any plan.</p>" },
+    { "type": "text",     "id": "q3", "label": "Question 3", "default": "Can I send attachments?" },
+    { "type": "richtext", "id": "a3", "label": "Answer 3",   "default": "<p>Yes. You can attach images, documents, and files up to 25 MB each.</p>" },
+    { "type": "text",     "id": "q4", "label": "Question 4", "default": "How does your pricing work?" },
+    { "type": "richtext", "id": "a4", "label": "Answer 4",   "default": "<p>We offer monthly and annual plans. Annual plans save you 20%. You can upgrade or downgrade at any time.</p>" },
+    { "type": "text",     "id": "q5", "label": "Question 5", "default": "Can I use my own domain?" },
+    { "type": "richtext", "id": "a5", "label": "Answer 5",   "default": "<p>Yes — all paid plans include custom domain support. You can connect your domain in account settings within minutes.</p>" },
+    { "type": "text",     "id": "q6", "label": "Question 6" },
+    { "type": "richtext", "id": "a6", "label": "Answer 6" },
+    { "type": "text",     "id": "q7", "label": "Question 7" },
+    { "type": "richtext", "id": "a7", "label": "Answer 7" }
+  ]
+}
+{% endschema %}
