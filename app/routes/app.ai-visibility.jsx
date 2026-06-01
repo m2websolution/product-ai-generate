@@ -913,10 +913,18 @@ export default function AiVisibilityPage() {
   const bulkSchemaCredits = selectedItems.length * CREDITS_SCHEMA;
 
   const llmsTxtUrl = `https://${shop}/apps/llms-txt`;
+  // activateAppId uses the block *filename* (without .liquid), not the extension handle.
+  // blocks/app-embed.liquid → handle = "app-embed"
   const appEmbedActivation = appApiKey
-    ? `&activateAppId=${encodeURIComponent(appApiKey)}/ai-visibility-embed`
+    ? `&activateAppId=${encodeURIComponent(appApiKey)}/app-embed`
     : "";
   const themeEditorUrl = `https://${shop}/admin/themes/current/editor?context=apps${appEmbedActivation}`;
+
+  // Deep-link to the product page template in the theme editor with the FAQ Section block activated.
+  // blocks/faq-section.liquid → handle = "faq-section"
+  const faqProductPageUrl = appApiKey
+    ? `https://${shop}/admin/themes/current/editor?template=product&activateAppId=${encodeURIComponent(appApiKey)}/faq-section`
+    : `https://${shop}/admin/themes/current/editor?template=product`;
 
   const progressTone = totalScore >= 80 ? "success" : "highlight";
 
@@ -1126,13 +1134,6 @@ export default function AiVisibilityPage() {
                           </svg>
                         )}
                       </span>
-                      <Text variant="bodySm" as="span">
-                        {!verifyResult.ok
-                          ? verifyResult.error
-                          : verifyResult.enabled
-                            ? "Verified — App Embed is active. Schema & FAQ are live on your storefront."
-                            : "App Embed is not active in your theme. Use the \"Enable in Theme Editor\" button below, then click Verify again."}
-                      </Text>
                     </InlineStack>
                   </Box>
                 )}
@@ -1158,6 +1159,23 @@ export default function AiVisibilityPage() {
                     Verify
                   </Button>
                 </InlineStack>
+
+                {/* FAQ Section on Product Page */}
+                <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                  <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
+                    <BlockStack gap="050">
+                      <Text variant="bodySm" fontWeight="semibold" as="p">
+                        FAQ Section on Product Page
+                      </Text>
+                      <Text variant="bodySm" tone="subdued" as="p">
+                        Add a standalone FAQ section to your product page template in the theme editor.
+                      </Text>
+                    </BlockStack>
+                    <Button url={faqProductPageUrl} external size="slim">
+                      Add to Product Page
+                    </Button>
+                  </InlineStack>
+                </Box>
 
               </BlockStack>
             </Card>
