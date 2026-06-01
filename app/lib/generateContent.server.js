@@ -977,15 +977,16 @@ export async function updateJobProgress(jobId, chunkItems, results, creditsPerIt
     .filter(Boolean);
 
   // Single atomic UPDATE avoids read-modify-write races when chunks run concurrently.
-  // JSON_MERGE_PRESERVE appends both JSON arrays without a preceding SELECT.
+  // JSON_MERGE appends both JSON arrays atomically (compatible with MariaDB + MySQL 5.7+).
+  // JSON_MERGE_PRESERVE is MySQL 8.0+ only and fails on MariaDB.
   await db.$executeRaw`
     UPDATE bulk_jobs
     SET
       completedItems   = completedItems + ${completed},
       failedItems      = failedItems + ${failed},
       creditsUsed      = creditsUsed + ${completed * creditsPerItem},
-      failedItemIds    = JSON_MERGE_PRESERVE(COALESCE(failedItemIds,    '[]'), CAST(${JSON.stringify(newFailedItems)} AS JSON)),
-      completedItemIds = JSON_MERGE_PRESERVE(COALESCE(completedItemIds, '[]'), CAST(${JSON.stringify(newCompletedItems)} AS JSON))
+      failedItemIds    = JSON_MERGE(COALESCE(failedItemIds,    '[]'), ${JSON.stringify(newFailedItems)}),
+      completedItemIds = JSON_MERGE(COALESCE(completedItemIds, '[]'), ${JSON.stringify(newCompletedItems)})
     WHERE id = ${jobId}
   `;
 }
