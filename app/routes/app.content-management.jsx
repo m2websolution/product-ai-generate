@@ -1984,92 +1984,110 @@ export const action = async ({ request }) => {
   return { ok: false, intent, error: "Unsupported action." };
 };
 
-// ─── Rich Text Editor ─────────────────────────────────────────────────────────
 // ─── Editor Modal ─────────────────────────────────────────────────────────────
+// Each field (description, faq, seo) opens its own focused editor. No tabs —
+// avoids fragile tab-index arithmetic and keeps each editor screen unambiguous.
 function EditorModal({ open, item, field, contentType, onClose, onSave, isSaving }) {
   const [descHtml, setDescHtml] = useState("");
   const [faqHtml, setFaqHtml] = useState("");
   const [faqJson, setFaqJson] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
-  const [activeTab, setActiveTab] = useState(field === "seo" ? 1 : field === "faq" ? 2 : 0);
-  const isHydratedRef = useRef(false);
 
+  // Reset all fields whenever the modal opens for an item (or field changes).
+  // Including `open` in the dep array ensures re-opening the same item after
+  // an edit reflects the latest saved values, not the stale editor state.
   useEffect(() => {
-    isHydratedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!isHydratedRef.current || !item) return;
+    if (!open || !item) return;
     setDescHtml(item.descriptionHtml || "");
     setFaqHtml(item.faqHtml || "");
     setFaqJson(item.faqJson || "");
     setSeoTitle(item.seoTitle || "");
     setSeoDescription(item.seoDescription || "");
-    setActiveTab(field === "seo" ? 1 : field === "faq" ? 2 : 0);
-  }, [item, field]);
+  }, [open, item, field]);
 
   if (!item) return null;
 
-  const canEditFaq = (item.contentType || contentType) === "products";
-  const tabs = [
-    { id: "description", content: "Description" },
-    { id: "seo", content: "SEO" },
-    ...(canEditFaq ? [{ id: "faq", content: "FAQ" }] : []),
-  ];
+  const effectiveContentType = item.contentType || contentType;
+  const canEditFaq = effectiveContentType === "products";
+
+  const fieldLabels = {
+    description: "Description",
+    faq: "FAQ",
+    seo: "Meta Title & Description",
+    meta_title: "Meta Title & Description",
+    meta_description: "Meta Title & Description",
+  };
+  const fieldLabel = fieldLabels[field] || "Content";
+  const modalTitle = `Edit ${fieldLabel} — ${item.title}`;
 
   const handleSave = () => {
     onSave({
       itemId: item.id,
       descriptionHtml: descHtml,
-      faqHtml,
-      faqJson: faqJson || buildFaqJsonFromHtml(faqHtml),
+      faqHtml: canEditFaq ? faqHtml : (item.faqHtml || ""),
+      faqJson: canEditFaq
+        ? (faqJson || buildFaqJsonFromHtml(faqHtml))
+        : (item.faqJson || ""),
       seoTitle,
       seoDescription,
-      contentType: item.contentType || contentType,
+      contentType: effectiveContentType,
       collectionId: item.collectionId || "",
       productId: item.productId || "",
     });
   };
 
+  const isDescField = field === "description";
+  const isFaqField = field === "faq";
+  const isSeoField = field === "seo" || field === "meta_title" || field === "meta_description";
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={item.title}
+      title={modalTitle}
       size="large"
-      primaryAction={{ content: isSaving ? "Saving…" : "Save", onAction: handleSave, loading: isSaving, disabled: isSaving }}
+      primaryAction={{
+        content: isSaving ? "Saving…" : "Save to Shopify",
+        onAction: handleSave,
+        loading: isSaving,
+        disabled: isSaving,
+      }}
       secondaryActions={[{ content: "Cancel", onAction: onClose }]}
     >
-      <Modal.Section flush>
-        <div style={{ borderBottom: "1px solid #e1e3e5" }}>
-          <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab} fitted />
-        </div>
-      </Modal.Section>
-
       <Modal.Section>
-        {activeTab === 0 && (
+        {isDescField && (
           <BlockStack gap="300">
-            <Text variant="bodyMd" as="p" tone="subdued">
-              
+            <Text variant="bodySm" as="p" tone="subdued">
+              Edit the description. Changes are pushed directly to Shopify when you save.
             </Text>
             <RichTextEditor value={descHtml} onChange={setDescHtml} />
           </BlockStack>
         )}
 
-        {activeTab === 1 && (
+        {isFaqField && canEditFaq && (
+          <BlockStack gap="300">
+            <Text variant="bodySm" as="p" tone="subdued">
+              Edit FAQ content. Use <strong>H3 headings</strong> for questions and paragraph text for answers. Changes push to Shopify metafields.
+            </Text>
+            <RichTextEditor value={faqHtml} onChange={setFaqHtml} />
+          </BlockStack>
+        )}
+
+        {isSeoField && (
           <BlockStack gap="400">
             <TextField
-              label="SEO Title"
+              label="Meta Title"
               value={seoTitle}
               onChange={setSeoTitle}
               maxLength={70}
               showCharacterCount
               helpText="Recommended: 50–70 characters"
               autoComplete="off"
+              autoFocus={field === "meta_title" || field === "seo"}
             />
             <TextField
-              label="SEO Description"
+              label="Meta Description"
               value={seoDescription}
               onChange={setSeoDescription}
               maxLength={160}
@@ -2077,16 +2095,8 @@ function EditorModal({ open, item, field, contentType, onClose, onSave, isSaving
               multiline={3}
               helpText="Recommended: 120–160 characters"
               autoComplete="off"
+              autoFocus={field === "meta_description"}
             />
-          </BlockStack>
-        )}
-
-        {activeTab === 2 && canEditFaq && (
-          <BlockStack gap="300">
-            <Text variant="bodySm" as="p" tone="subdued">
-              Use heading lines for questions and paragraph text for answers.
-            </Text>
-            <RichTextEditor value={faqHtml} onChange={setFaqHtml} />
           </BlockStack>
         )}
       </Modal.Section>
@@ -3063,30 +3073,21 @@ export default function ContentManagementPage() {
 
         {/* Description – clickable to open editor */}
         <IndexTable.Cell>
-          {descText ? (
-            <button
-              type="button"
-              onClick={() => openEditor(item, "description")}
-              title="Click to edit description"
-              style={{
-                background: "none", border: "none", padding: 0, cursor: "pointer",
-                textAlign: "left", maxWidth: "260px", display: "block",
-              }}
-            >
-              <Text variant="bodySm" as="span" tone="subdued" truncate>
-                {descText}
-              </Text>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openEditor(item, "description")}
-              title="Click to add description"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-            >
-              <Text variant="bodySm" as="span" tone="subdued">—</Text>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => openEditor(item, "description")}
+            title="Click to edit description"
+            className="content-mgmt-edit-cell-btn"
+          >
+            <span className="content-mgmt-edit-cell-text">
+              {descText || <span style={{ color: "#9ca3af" }}>Add description</span>}
+            </span>
+            <span className="content-mgmt-edit-icon" aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 2.5a2.121 2.121 0 013 3L6 17H2v-4L14.5 2.5z"/>
+              </svg>
+            </span>
+          </button>
         </IndexTable.Cell>
 
         {/* FAQ */}
@@ -3097,72 +3098,59 @@ export default function ContentManagementPage() {
                 type="button"
                 onClick={() => openEditor(item, "faq")}
                 title={faqText ? "Click to edit FAQ" : "Click to add FAQ"}
-                className="content-mgmt-cell-button"
+                className="content-mgmt-edit-cell-btn"
               >
-                <Text variant="bodySm" as="span" tone="subdued" truncate>
-                  {faqText || "-"}
-                </Text>
+                <span className="content-mgmt-edit-cell-text">
+                  {faqText || <span style={{ color: "#9ca3af" }}>Add FAQ</span>}
+                </span>
+                <span className="content-mgmt-edit-icon" aria-hidden="true">
+                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14.5 2.5a2.121 2.121 0 013 3L6 17H2v-4L14.5 2.5z"/>
+                  </svg>
+                </span>
               </button>
             ) : (
-              <Text variant="bodySm" as="span" tone="subdued">-</Text>
+              <Text variant="bodySm" as="span" tone="subdued">—</Text>
             )}
           </div>
         </IndexTable.Cell>
 
         {/* SEO Title */}
         <IndexTable.Cell>
-          {seoTitleText ? (
-            <button
-              type="button"
-              onClick={() => openEditor(item, "seo")}
-              title="Click to edit SEO title"
-              style={{
-                background: "none", border: "none", padding: 0, cursor: "pointer",
-                textAlign: "left", maxWidth: "220px", display: "block",
-              }}
-            >
-              <Text variant="bodySm" as="span" tone="subdued" truncate>
-                {seoTitleText}
-              </Text>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openEditor(item, "seo")}
-              title="Click to add SEO title"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-            >
-              <Text variant="bodySm" as="span" tone="subdued">—</Text>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => openEditor(item, "meta_title")}
+            title="Click to edit meta title"
+            className="content-mgmt-edit-cell-btn"
+          >
+            <span className="content-mgmt-edit-cell-text">
+              {seoTitleText || <span style={{ color: "#9ca3af" }}>Add meta title</span>}
+            </span>
+            <span className="content-mgmt-edit-icon" aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 2.5a2.121 2.121 0 013 3L6 17H2v-4L14.5 2.5z"/>
+              </svg>
+            </span>
+          </button>
         </IndexTable.Cell>
 
-        {/* SEO Description – clickable */}
+        {/* SEO Description */}
         <IndexTable.Cell>
-          {seoDescText ? (
-            <button
-              type="button"
-              onClick={() => openEditor(item, "seo")}
-              title="Click to edit SEO"
-              style={{
-                background: "none", border: "none", padding: 0, cursor: "pointer",
-                textAlign: "left", maxWidth: "220px", display: "block",
-              }}
-            >
-              <Text variant="bodySm" as="span" tone="subdued" truncate>
-                {seoDescText}
-              </Text>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openEditor(item, "seo")}
-              title="Click to add SEO"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-            >
-              <Text variant="bodySm" as="span" tone="subdued">—</Text>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => openEditor(item, "meta_description")}
+            title="Click to edit meta description"
+            className="content-mgmt-edit-cell-btn"
+          >
+            <span className="content-mgmt-edit-cell-text">
+              {seoDescText || <span style={{ color: "#9ca3af" }}>Add meta description</span>}
+            </span>
+            <span className="content-mgmt-edit-icon" aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 2.5a2.121 2.121 0 013 3L6 17H2v-4L14.5 2.5z"/>
+              </svg>
+            </span>
+          </button>
         </IndexTable.Cell>
 
         {/* Generate button */}
@@ -3400,6 +3388,45 @@ export default function ContentManagementPage() {
           display: block;
           width: 100%;
           max-width: 100%;
+        }
+        .content-mgmt-edit-cell-btn {
+          background: none;
+          border: none;
+          padding: 3px 6px 3px 0;
+          cursor: pointer;
+          text-align: left;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          max-width: 260px;
+          width: 100%;
+          border-radius: 6px;
+          transition: background 120ms ease;
+        }
+        .content-mgmt-edit-cell-btn:hover {
+          background: #f3f4f6;
+        }
+        .content-mgmt-edit-cell-text {
+          flex: 1;
+          min-width: 0;
+          font-size: 13px;
+          color: #374151;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.4;
+        }
+        .content-mgmt-edit-icon {
+          flex-shrink: 0;
+          color: #9ca3af;
+          opacity: 0;
+          transition: opacity 120ms ease;
+          display: flex;
+          align-items: center;
+        }
+        .content-mgmt-edit-cell-btn:hover .content-mgmt-edit-icon {
+          opacity: 1;
+          color: #6366f1;
         }
         @media (max-width: 960px) {
           .content-mgmt-generate-modal__grid {

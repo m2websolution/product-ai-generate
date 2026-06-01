@@ -8,9 +8,13 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 import { fetchShopInfo, sendInstallEmails } from "./lib/email.server.js";
 
+if (!process.env.SHOPIFY_API_SECRET) {
+  throw new Error("SHOPIFY_API_SECRET environment variable is required but not set.");
+}
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
+  apiSecretKey: process.env.SHOPIFY_API_SECRET,
   apiVersion: ApiVersion.October25,
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",

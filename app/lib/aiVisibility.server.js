@@ -586,7 +586,7 @@ export async function generateCombined(shop, adminContext, resource) {
     const faqPageJson = JSON.stringify(faqPageSchema);
     const faqHtml = buildFaqHtml(faqArr);
 
-    const [schemaMetafieldId, faqMetafieldId] = await Promise.all([
+    const [schemaMetafieldId, faqMetafieldId, faqHtmlMetafieldId] = await Promise.all([
       writeResourceMetafield({
         shop,
         adminGraphQL,
@@ -637,10 +637,10 @@ export async function generateCombined(shop, adminContext, resource) {
         resourceType: "product",
         resourceId: resource.id,
         faqJson: faqPageJson,
-        metafieldId: faqMetafieldId,
+        metafieldId: faqMetafieldId || faqHtmlMetafieldId,
         creditsUsed: 0,
       },
-      update: { faqJson: faqPageJson, metafieldId: faqMetafieldId, updatedAt: new Date() },
+      update: { faqJson: faqPageJson, metafieldId: faqMetafieldId || faqHtmlMetafieldId, updatedAt: new Date() },
     });
     await db.productGeneratedContent.upsert({
       where: { shop_productId: { shop, productId: resource.id } },
