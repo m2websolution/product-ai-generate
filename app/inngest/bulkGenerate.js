@@ -235,7 +235,8 @@ export const bulkGenerateFunction = inngest.createFunction(
 
     await step.run("finalize", async () => {
       const job = await db.bulkJob.findUnique({ where: { id: jobId } });
-      const creditsToRefund = job.creditsAllocated - job.creditsUsed;
+      if (!job) return;
+      const creditsToRefund = (job.creditsAllocated ?? 0) - (job.creditsUsed ?? 0);
       if (creditsToRefund > 0) {
         await refundCredits({ shopDomain: shop, creditsRefunded: creditsToRefund });
       }

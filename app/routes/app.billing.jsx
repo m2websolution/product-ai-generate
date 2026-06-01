@@ -24,9 +24,11 @@ function buildPricingRedirect(sourceUrl, result) {
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const shopParam = String(url.searchParams.get("shop") || "").trim();
-  const authContext = shopParam
-    ? await unauthenticated.admin(shopParam)
-    : await authenticate.admin(request);
+  const isValidShopDomain = /^[a-z0-9-]+\.myshopify\.com$/.test(shopParam);
+  const authContext =
+    shopParam && isValidShopDomain
+      ? await unauthenticated.admin(shopParam)
+      : await authenticate.admin(request);
   const { admin, session } = authContext;
   const type =
     String(url.searchParams.get("type") || "") ||

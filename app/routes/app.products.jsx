@@ -48,6 +48,7 @@ import {
   parseSelectedContentTypes,
 } from "../lib/credits.server";
 const FETCH_BATCH_SIZE = 250;
+const MAX_FETCH_PAGES = 40; // cap at 10,000 products to prevent loader timeouts
 const STATUS_FILTERS = ["all", "active", "draft"];
 const BULK_GENERATE_INTENT = "bulk_generate";
 const MAX_BULK_ITEMS = 1000;
@@ -399,11 +400,6 @@ function splitKeywordString(value) {
     .split(",")
     .map((keyword) => normalizeKeyword(keyword))
     .filter(Boolean);
-}
-
-function readProductKeywordDefaults() {
-  const settings = readGlobalSettings();
-  return splitKeywordString(settings.productDescKeywords);
 }
 
 function cleanInlineText(value, maxLength) {
@@ -1122,7 +1118,9 @@ export const loader = async ({ request }) => {
   if (collectionId) {
     const query = toCollectionProductSearchQuery({ collectionId, search: searchForQuery, status });
     let afterCursor;
-    while (true) {
+    let page = 0;
+    while (page < MAX_FETCH_PAGES) {
+      page++;
       const colRes = await admin.graphql(PRODUCT_LIST_QUERY, {
         variables: {
           first: FETCH_BATCH_SIZE,
@@ -1145,7 +1143,9 @@ export const loader = async ({ request }) => {
   } else {
     const query = toSearchQuery({ search: searchForQuery, status });
     let afterCursor;
-    while (true) {
+    let page = 0;
+    while (page < MAX_FETCH_PAGES) {
+      page++;
       const response = await admin.graphql(PRODUCT_LIST_QUERY, {
         variables: {
           first: FETCH_BATCH_SIZE,
@@ -1569,7 +1569,6 @@ export default function ProductsPage() {
     addTitleAsHeading,
     preserveOldDescription,
     removeImagesFromDescription,
-    selectedProducts,
     filters,
   ]);
 

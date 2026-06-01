@@ -976,23 +976,18 @@ export async function updateJobProgress(jobId, chunkItems, results, creditsPerIt
     )
     .filter(Boolean);
 
-  const job = await db.bulkJob.findUnique({
-    where: { id: jobId },
-    select: { failedItemIds: true, completedItemIds: true },
-  });
-  const existingFailed = job?.failedItemIds ? JSON.parse(job.failedItemIds) : [];
-  const existingCompleted = job?.completedItemIds ? JSON.parse(job.completedItemIds) : [];
-
-  await db.bulkJob.update({
-    where: { id: jobId },
-    data: {
-      completedItems: { increment: completed },
-      failedItems: { increment: failed },
-      creditsUsed: { increment: completed * creditsPerItem },
-      failedItemIds: JSON.stringify([...existingFailed, ...newFailedItems]),
-      completedItemIds: JSON.stringify([...existingCompleted, ...newCompletedItems]),
-    },
-  });
+  // Single atomic UPDATE avoids read-modify-write races when chunks run concurrently.
+  // JSON_MERGE_PRESERVE appends both JSON arrays without a preceding SELECT.
+  await db.$executeRaw`
+    UPDATE bulk_jobs
+    SET
+      completedItems   = completedItems + ${completed},
+      failedItems      = failedItems + ${failed},
+      creditsUsed      = creditsUsed + ${completed * creditsPerItem},
+      failedItemIds    = JSON_MERGE_PRESERVE(COALESCE(failedItemIds,    '[]'), CAST(${JSON.stringify(newFailedItems)} AS JSON)),
+      completedItemIds = JSON_MERGE_PRESERVE(COALESCE(completedItemIds, '[]'), CAST(${JSON.stringify(newCompletedItems)} AS JSON))
+    WHERE id = ${jobId}
+  `;
 }
 
 // ---------------------------------------------------------------------------

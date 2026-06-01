@@ -232,7 +232,15 @@ export const action = async ({ request }) => {
   try {
     if (intent === "generate_schema") {
       const resourceType = formData.get("resourceType");
-      const resource = JSON.parse(formData.get("resourceJson"));
+      let resource;
+      try {
+        resource = JSON.parse(formData.get("resourceJson"));
+      } catch {
+        return { ok: false, intent, error: "Invalid resource data." };
+      }
+      if (!resource || typeof resource !== "object" || !resource.id) {
+        return { ok: false, intent, error: "Invalid resource: missing id." };
+      }
       const result = await generateSchema(
         shop,
         { adminGraphQL: admin.graphql, accessToken: session.accessToken },
@@ -244,7 +252,12 @@ export const action = async ({ request }) => {
 
     if (intent === "generate_bulk_schema") {
       const resourceType = formData.get("resourceType");
-      const resources = JSON.parse(formData.get("resourcesJson") || "[]");
+      let resources;
+      try {
+        resources = JSON.parse(formData.get("resourcesJson") || "[]");
+      } catch {
+        return { ok: false, intent, error: "Invalid resource data." };
+      }
       if (!Array.isArray(resources) || resources.length === 0) {
         return { ok: false, intent, error: "Select at least one item for bulk schema generation." };
       }
@@ -300,40 +313,92 @@ export const action = async ({ request }) => {
     if (intent === "verify_theme_embed") {
       try {
         const accessToken = session.accessToken;
-        const apiBase = `https://${shop}/admin/api/2026-04`;
+        // Use the same stable API version the rest of the app uses (October 2025).
+        const apiBase = `https://${shop}/admin/api/2025-10`;
 
-        // 1. Get the main (active) theme via REST
+        // 1. Get the active (main) theme id.
         const themesResp = await fetch(`${apiBase}/themes.json?role=main`, {
           headers: { "X-Shopify-Access-Token": accessToken },
         });
+        if (!themesResp.ok) {
+          throw new Error(`Shopify returned ${themesResp.status} when fetching themes. Check that the app has the read_themes scope.`);
+        }
         const themesData = await themesResp.json();
         const themeId = themesData?.themes?.[0]?.id;
-        if (!themeId) throw new Error("No main theme found");
+        if (!themeId) throw new Error("No active (main) theme found on this store.");
 
-        // 2. Read config/settings_data.json asset
+        // 2. Read config/settings_data.json from the active theme.
         const assetResp = await fetch(
           `${apiBase}/themes/${themeId}/assets.json?asset[key]=config/settings_data.json`,
           { headers: { "X-Shopify-Access-Token": accessToken } }
         );
+        if (!assetResp.ok) {
+          throw new Error(`Shopify returned ${assetResp.status} when reading theme settings_data.json.`);
+        }
         const assetData = await assetResp.json();
-        const content = assetData?.asset?.value || "{}";
-        const settings = JSON.parse(content);
-        const blocks = settings?.current?.blocks || {};
+        const rawContent = assetData?.asset?.value || "{}";
 
-        // Shopify stores the app embed handle in either the block key or block type,
-        // depending on the theme/editor version.
-        const embedEnabled = Object.entries(blocks).some(
-          ([key, val]) =>
-            [key, val?.type, val?.name]
-              .filter(Boolean)
-              .some((entry) => String(entry).includes("ai-visibility-embed")) &&
-            val?.disabled !== true
+        let settings = {};
+        try {
+          settings = JSON.parse(rawContent);
+        } catch {
+          throw new Error("Could not parse settings_data.json. The active theme may be corrupted.");
+        }
+
+        // 3. Detect the app embed block.
+        //
+        // Shopify stores app embed blocks in settings_data.json under
+        //   settings.current.blocks
+        // keyed as:
+        //   "shopify://apps/<app-id>/blocks/<extension-handle>/<uuid>"
+        // The block type mirrors the key prefix (without the uuid).
+        //
+        // The extension handles to look for:
+        //   - "ai-visibility-embed"  (extension handle from shopify.extension.toml)
+        //   - "app-embed"            (block filename: blocks/app-embed.liquid)
+        //
+        // Fallback: scan the raw JSON string – catches any format variation.
+        const EMBED_HANDLES = ["ai-visibility-embed", "app-embed"];
+
+        function blockMatchesEmbed(key, val) {
+          const candidates = [key, val?.type, val?.name].filter(Boolean).map(String);
+          return candidates.some((s) =>
+            EMBED_HANDLES.some((h) => s.toLowerCase().includes(h))
+          );
+        }
+
+        function isBlockEnabled(val) {
+          return val?.disabled !== true;
+        }
+
+        // Primary: walk settings.current.blocks
+        const topBlocks = settings?.current?.blocks || {};
+        let embedEnabled = Object.entries(topBlocks).some(
+          ([k, v]) => blockMatchesEmbed(k, v) && isBlockEnabled(v)
         );
+
+        // Secondary fallback: raw string search (catches exotic theme formats
+        // where the block lives at a different nesting level).
+        if (!embedEnabled) {
+          const lower = rawContent.toLowerCase();
+          embedEnabled = EMBED_HANDLES.some((h) => {
+            const idx = lower.indexOf(h);
+            if (idx === -1) return false;
+            // Make sure the nearest "disabled" flag within ~150 chars is not true.
+            const nearby = lower.slice(idx, idx + 150);
+            return !nearby.includes('"disabled":true') && !nearby.includes('"disabled": true');
+          });
+        }
+
         await db.shop.update({ where: { shop }, data: { themeEmbedEnabled: embedEnabled } });
         return { ok: true, intent, themeEmbedEnabled: embedEnabled };
       } catch (err) {
         console.error("[verify_theme_embed]", err);
-        return { ok: false, intent, error: "Could not read theme settings. Make sure the app has theme access." };
+        return {
+          ok: false,
+          intent,
+          error: err?.message || "Could not read theme settings. Make sure the app has the read_themes scope.",
+        };
       }
     }
 
@@ -365,6 +430,7 @@ function ScoreBadge({ score }) {
 function ItemModal({ item, onClose, onGenerate, generatingKey, credits }) {
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   if (!item) return null;
+  // FAQ generation via AI Visibility is not yet released; kept false until the feature ships.
   const canFaq = false;
   const schemaKey = `schema_${item.id}`;
   const minimumRequiredCredits = CREDITS_SCHEMA;
@@ -663,6 +729,7 @@ export default function AiVisibilityPage() {
   const [generatingKey, setGeneratingKey] = useState(null);
   const [banner, setBanner] = useState(null);
   const [embedEnabled, setEmbedEnabled] = useState(initialEmbedEnabled);
+  const [verifyResult, setVerifyResult] = useState(null); // { ok, enabled, error } after Verify click
   const [credits, setCredits] = useState(initialCredits);
   const [selectedIdsByType, setSelectedIdsByType] = useState({ product: [], article: [], page: [] });
 
@@ -773,14 +840,10 @@ export default function AiVisibilityPage() {
         if (d.ok) {
           setEmbedEnabled(d.themeEmbedEnabled);
           if (d.intent === "verify_theme_embed") {
-            setBanner(
-              d.themeEmbedEnabled
-                ? { tone: "success", text: "App Embed is active — schema markup will be injected automatically." }
-                : { tone: "warning", text: "App Embed not found in your active theme. Open the Theme Editor and enable the 'AI Visibility' embed under App Embeds." }
-            );
+            setVerifyResult({ ok: true, enabled: d.themeEmbedEnabled });
           }
         } else if (d.intent === "verify_theme_embed") {
-          setBanner({ tone: "critical", text: d.error || "Verification failed." });
+          setVerifyResult({ ok: false, error: d.error || "Verification failed." });
         }
       }
     }
@@ -979,25 +1042,110 @@ export default function AiVisibilityPage() {
 
             {/* Schema Injection card */}
             <Card>
-              <BlockStack gap="300">
+              <BlockStack gap="400">
+
+                {/* Header row */}
                 <InlineStack align="space-between" blockAlign="center">
-                  <Text variant="headingSm" tone="subdued">Schema Injection</Text>
+                  <Text variant="headingSm" as="h3">Schema Injection</Text>
                   {embedEnabled
                     ? <Badge tone="success">Active</Badge>
                     : <Badge tone="warning">Not enabled</Badge>}
                 </InlineStack>
-                <Text tone="subdued" variant="bodySm">
-                  {embedEnabled
-                    ? "Schema markup is auto-injected into product, blog, and page templates. Google and AI crawlers can read your structured data."
-                    : "Enable the App Embed in your theme to auto-inject schema markup — required for schema to appear on your storefront."}
-                </Text>
-                <InlineStack gap="200" wrap>
+
+                {/* Status description */}
+                {embedEnabled ? (
+                  <Box
+                    background="bg-surface-success"
+                    borderRadius="200"
+                    padding="300"
+                  >
+                    <InlineStack gap="200" blockAlign="start" wrap={false}>
+                      <span style={{ color: "#008060", flexShrink: 0, marginTop: 1 }}>
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                        </svg>
+                      </span>
+                      <Text variant="bodySm" as="p">
+                        <strong>Schema &amp; FAQ are live.</strong> Structured data is automatically injected into your product, article, and page templates — visible to Google and AI crawlers.
+                      </Text>
+                    </InlineStack>
+                  </Box>
+                ) : (
+                  <Box
+                    background="bg-surface-caution"
+                    borderRadius="200"
+                    padding="300"
+                  >
+                    <InlineStack gap="200" blockAlign="start" wrap={false}>
+                      <span style={{ color: "#b98900", flexShrink: 0, marginTop: 1 }}>
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                        </svg>
+                      </span>
+                      <BlockStack gap="100">
+                        <Text variant="bodySm" as="p">
+                          <strong>Schema &amp; FAQ are generated but not visible on your storefront.</strong>
+                        </Text>
+                        <Text variant="bodySm" tone="subdued" as="p">
+                          Enable the App Embed in your theme to auto-inject schema markup and FAQ — required for them to appear on your storefront.
+                        </Text>
+                      </BlockStack>
+                    </InlineStack>
+                  </Box>
+                )}
+
+                {/* Inline verification result */}
+                {verifyResult && (
+                  <Box
+                    background={verifyResult.ok
+                      ? (verifyResult.enabled ? "bg-surface-success" : "bg-surface-caution")
+                      : "bg-surface-critical"}
+                    borderRadius="200"
+                    padding="200"
+                  >
+                    <InlineStack gap="150" blockAlign="center">
+                      <span style={{
+                        color: verifyResult.ok
+                          ? (verifyResult.enabled ? "#008060" : "#b98900")
+                          : "#d72c0d",
+                        flexShrink: 0,
+                      }}>
+                        {verifyResult.ok && verifyResult.enabled && (
+                          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                          </svg>
+                        )}
+                        {verifyResult.ok && !verifyResult.enabled && (
+                          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clipRule="evenodd"/>
+                          </svg>
+                        )}
+                        {!verifyResult.ok && (
+                          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                          </svg>
+                        )}
+                      </span>
+                      <Text variant="bodySm" as="span">
+                        {!verifyResult.ok
+                          ? verifyResult.error
+                          : verifyResult.enabled
+                            ? "Verified — App Embed is active. Schema & FAQ are live on your storefront."
+                            : "App Embed is not active in your theme. Use the \"Enable in Theme Editor\" button below, then click Verify again."}
+                      </Text>
+                    </InlineStack>
+                  </Box>
+                )}
+
+                {/* Action buttons */}
+                <InlineStack gap="200" blockAlign="center">
                   {!embedEnabled && (
                     <Button
                       url={themeEditorUrl}
                       external
-                      size="slim"
                       variant="primary"
+                      size="slim"
+                      onClick={() => setVerifyResult(null)}
                     >
                       Enable in Theme Editor
                     </Button>
@@ -1005,11 +1153,12 @@ export default function AiVisibilityPage() {
                   <Button
                     size="slim"
                     loading={embedFetcher.state !== "idle"}
-                    onClick={handleVerifyEmbed}
+                    onClick={() => { setVerifyResult(null); handleVerifyEmbed(); }}
                   >
                     Verify
                   </Button>
                 </InlineStack>
+
               </BlockStack>
             </Card>
           </div>
