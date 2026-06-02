@@ -28,7 +28,6 @@ import {
   Box,
 } from "@shopify/polaris";
 import { AppPageHeader } from "../components/AppPageHeader";
-import { autoAddFaqSectionToProductPage } from "../lib/themeUtils.server";
 import {
   ProductIcon,
   CollectionIcon,
@@ -348,7 +347,6 @@ export const loader = async ({ request }) => {
     currentPlan,
     currentPlanPrice,
     shop: session.shop,
-    appApiKey: process.env.SHOPIFY_API_KEY || "",
   };
 };
 
@@ -397,31 +395,6 @@ export const action = async ({ request }) => {
     });
 
     return { success: true, message: "Review popup dismissed." };
-  }
-
-  if (intent === "auto_add_faq_section") {
-    const { session } = await authenticate.admin(request);
-    const result = await autoAddFaqSectionToProductPage(session.shop, session.accessToken);
-    if (!result.ok) {
-      const appApiKey = process.env.SHOPIFY_API_KEY || "";
-      const fallbackUrl = appApiKey
-        ? `https://${session.shop}/admin/themes/current/editor?template=product&addAppBlockId=${encodeURIComponent(appApiKey)}/faq-section&target=newAppsSection`
-        : `https://${session.shop}/admin/themes/current/editor?template=product`;
-      return {
-        success: false,
-        intent,
-        needsManualAdd: true,
-        fallbackUrl,
-        message: result.error || "Could not auto-add the FAQ section. Open the theme editor to add it manually.",
-      };
-    }
-    return {
-      success: true,
-      intent,
-      message: result.alreadyAdded
-        ? "FAQ section is already on your product page."
-        : "FAQ section successfully added to your product page!",
-    };
   }
 
   return { success: false, message: "Unknown action." };
@@ -576,16 +549,9 @@ export default function Index() {
     currentPlan,
     currentPlanPrice,
     shop,
-    appApiKey,
   } = useLoaderData();
   const actionData = useActionData();
   const reviewFetcher = useFetcher();
-  const faqFetcher = useFetcher();
-  useEffect(() => {
-    if (faqFetcher.data?.needsManualAdd && faqFetcher.data?.fallbackUrl) {
-      window.open(faqFetcher.data.fallbackUrl, "_blank");
-    }
-  }, [faqFetcher.data]);
   const navigate = useNavigate();
   const location = useLocation();
   const formattedGeneratedWords = Number(generatedWords || 0).toLocaleString("en-US");
@@ -939,54 +905,6 @@ export default function Index() {
               </BlockStack>
             </Card>
           </div>
-
-          {/* FAQ Section on Product Page */}
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="center" gap="400" wrap>
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm" fontWeight="semibold">
-                    FAQ Section on Product Page
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Automatically adds the FAQ block to your product page template — no theme editor steps needed.
-                  </Text>
-                </BlockStack>
-                <faqFetcher.Form method="post">
-                  <input type="hidden" name="intent" value="auto_add_faq_section" />
-                  <Button
-                    size="slim"
-                    variant="primary"
-                    submit
-                    loading={faqFetcher.state !== "idle"}
-                    disabled={faqFetcher.state !== "idle"}
-                  >
-                    Add to Product Page
-                  </Button>
-                </faqFetcher.Form>
-              </InlineStack>
-
-              {faqFetcher.data && (
-                <Banner
-                  tone={faqFetcher.data.success ? "success" : "warning"}
-                  onDismiss={() => {}}
-                >
-                  <BlockStack gap="200">
-                    <p>{faqFetcher.data.message}</p>
-                    {faqFetcher.data.fallbackUrl && (
-                      <Button
-                        size="slim"
-                        url={faqFetcher.data.fallbackUrl}
-                        external
-                      >
-                        Open Theme Editor
-                      </Button>
-                    )}
-                  </BlockStack>
-                </Banner>
-              )}
-            </BlockStack>
-          </Card>
 
           <Card>
             <BlockStack gap="400">
