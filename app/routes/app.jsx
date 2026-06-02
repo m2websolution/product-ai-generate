@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useFetchers, useLoaderData, useNavigation, useRouteError } from "react-router";
+import { Outlet, redirect, useFetchers, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider as ShopifyAppProvider } from "@shopify/shopify-app-react-router/react";
 import { AppProvider as PolarisProvider, Spinner, Text } from "@shopify/polaris";
@@ -24,6 +24,54 @@ import {
 
 const CUSTOM_TEMPLATES_KEY = "custom_prompt_templates_v1";
 
+function buildEmbeddedHost(storeHandle, shop) {
+  const hostSource = storeHandle ? `admin.shopify.com/store/${storeHandle}` : `${shop}/admin`;
+  return Buffer.from(hostSource).toString("base64");
+}
+
+function getStoreHandleFromAdminUrl(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    if (url.hostname !== "admin.shopify.com") return "";
+    const [, storeKeyword, storeHandle] = url.pathname.split("/");
+    return storeKeyword === "store" ? String(storeHandle || "").trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function getStoreHandleFromHost(value) {
+  if (!value) return "";
+  try {
+    return getStoreHandleFromAdminUrl(`https://${Buffer.from(value, "base64").toString("utf8")}`);
+  } catch {
+    return "";
+  }
+}
+
+function inferShopContext(request, url) {
+  const explicitShop = String(url.searchParams.get("shop") || "").trim();
+  if (explicitShop) {
+    return {
+      shop: explicitShop,
+      host: url.searchParams.get("host") || buildEmbeddedHost("", explicitShop),
+    };
+  }
+
+  const storeHandle =
+    getStoreHandleFromHost(url.searchParams.get("host")) ||
+    getStoreHandleFromAdminUrl(request.headers.get("referer")) ||
+    getStoreHandleFromAdminUrl(request.headers.get("origin"));
+  if (!storeHandle) return null;
+
+  const shop = `${storeHandle}.myshopify.com`;
+  return {
+    shop,
+    host: url.searchParams.get("host") || buildEmbeddedHost(storeHandle, shop),
+  };
+}
+
 function normalizeGlobalSettings(value) {
   return normalizeStoredGlobalSettings(value);
 }
@@ -45,6 +93,17 @@ function normalizeCustomTemplates(value) {
 }
 
 export const loader = async ({ request }) => {
+  const url = new URL(request.url);
+  if (!url.searchParams.get("shop")) {
+    const shopContext = inferShopContext(request, url);
+    if (shopContext?.shop) {
+      url.searchParams.set("shop", shopContext.shop);
+      url.searchParams.set("host", shopContext.host);
+      url.searchParams.set("embedded", url.searchParams.get("embedded") || "1");
+      throw redirect(`${url.pathname}${url.search}`);
+    }
+  }
+
   const { admin, session } = await authenticate.admin(request);
   await refreshMonthlyPlanCredits(session.shop, admin);
   const shopData = await db.shop.findUnique({
@@ -98,9 +157,11 @@ export const loader = async ({ request }) => {
 
 export default function App() {
   const { apiKey, globalSettings, templateSelections, customTemplates } = useLoaderData();
+  const location = useLocation();
   const navigation = useNavigation();
   const fetchers = useFetchers();
   const isBusy = navigation.state !== "idle" || fetchers.some((fetcher) => fetcher.state !== "idle");
+  const appHref = (pathname) => `${pathname}${location.search || ""}`;
 
   useEffect(() => {
     const hasInsufficientCredits = fetchers.some((fetcher) => {
@@ -128,17 +189,17 @@ export default function App() {
     <PolarisProvider i18n={enTranslations}>
       <ShopifyAppProvider embedded apiKey={apiKey}>
         <s-app-nav>
-          <s-link href="/app/products">Bulk Generator</s-link>
-          <s-link href="/app/ai-visibility">AI Visibility</s-link>
-          <s-link href="/app/pages">Pages Generator</s-link>
-          <s-link href="/app/blog">Blogs Generator</s-link>
+          <s-link href={appHref("/app/products")}>Bulk Generator</s-link>
+          <s-link href={appHref("/app/ai-visibility")}>AI Visibility</s-link>
+          <s-link href={appHref("/app/pages")}>Pages Generator</s-link>
+          <s-link href={appHref("/app/blog")}>Blogs Generator</s-link>
           {/* <s-link href="/app/seo-improve">SEO Improve</s-link> */}
-          <s-link href="/app/content-management">Content Management</s-link>
-          <s-link href="/app/template">Template</s-link>
-          <s-link href="/app/analytics">Analytics</s-link>
-          <s-link href="/app/jobs">Jobs</s-link>
-          <s-link href="/app/pricing">Pricing</s-link>
-          <s-link href="/app/settings">Settings</s-link>
+          <s-link href={appHref("/app/content-management")}>Content Management</s-link>
+          <s-link href={appHref("/app/template")}>Template</s-link>
+          <s-link href={appHref("/app/analytics")}>Analytics</s-link>
+          <s-link href={appHref("/app/jobs")}>Jobs</s-link>
+          <s-link href={appHref("/app/pricing")}>Pricing</s-link>
+          <s-link href={appHref("/app/settings")}>Settings</s-link>
         </s-app-nav>
         {isBusy && (
           <div
