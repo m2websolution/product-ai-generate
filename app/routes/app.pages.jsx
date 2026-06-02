@@ -16,8 +16,6 @@ import {
 } from "../lib/pagePromptTemplateLibrary";
 import {
   buildInsufficientCreditsError,
-  creditsForBatch,
-  creditsForContentTypes,
   deductCredits,
   parseSelectedContentTypes,
   refundCredits,
@@ -422,7 +420,7 @@ export const loader = async ({ request }) => {
   // Fetch shop API keys
   const shopData = await db.shop.findUnique({
     where: { shop: session.shop },
-    select: { openaiApiKey: true, anthropicApiKey: true, geminiApiKey: true, defaultAiProvider: true, credits: true, creditsUsedTotal: true, billingPlanKey: true },
+    select: { openaiApiKey: true, anthropicApiKey: true, geminiApiKey: true, defaultAiProvider: true, credits: true, creditsUsedTotal: true },
   });
 
   return {
@@ -434,7 +432,6 @@ export const loader = async ({ request }) => {
     defaultAiProvider: shopData?.defaultAiProvider || "auto",
     credits: shopData?.credits ?? 150,
     creditsUsedTotal: shopData?.creditsUsedTotal ?? 0,
-    isFreePlan: (shopData?.billingPlanKey || "free") === "free",
   };
 };
 
@@ -496,16 +493,14 @@ export const action = async ({ request }) => {
         geminiApiKey: true,
         credits: true,
         creditsUsedTotal: true,
-        billingPlanKey: true,
         globalSettingsJson: true,
       },
     });
-    const isFreePlan = (shopData?.billingPlanKey || "free") === "free";
-    const creditsPerItem = isFreePlan ? 0 : creditsForContentTypes(selectedContentTypes);
+    const creditsPerItem = 0;
     const globalSettings = parseShopGlobalSettings(shopData);
     length = getExactWordLengthOption(globalSettings, "pageContentWords");
     const availableCredits = shopData?.credits ?? 150;
-    const requiredCredits = isFreePlan ? 0 : creditsForBatch(selectedContentTypes, bulkPages.length);
+    const requiredCredits = 0;
     if (availableCredits < requiredCredits) {
       return {
         success: false,

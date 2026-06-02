@@ -30,8 +30,6 @@ import {
   getOrCreateShopCredits,
 } from "../lib/credits.server";
 
-const BLOG_BODY_CREDIT_COST = 3;
-const BLOG_PILLAR_CREDIT_COST = 10;
 const FREE_PLAN_BLOG_LIMIT = 2;
 const BLOG_OPENAI_MODEL = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
 const BLOG_ANTHROPIC_MODEL = (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001").trim();
@@ -2178,7 +2176,7 @@ export const action = async ({ request }) => {
       }
     }
 
-    const creditCost = isFreePlan ? 0 : tabType === TAB_KEYS.PILLAR ? BLOG_PILLAR_CREDIT_COST : BLOG_BODY_CREDIT_COST;
+    const creditCost = 0;
 
     const creditBalance = creditCost > 0 ? await getOrCreateShopCredits(session.shop) : null;
     if (creditCost > 0 && (creditBalance?.credits ?? 0) < creditCost) {
@@ -2469,7 +2467,7 @@ export const action = async ({ request }) => {
       return { ok: false, intent, error: "Pillar articles are not available on the free plan." };
     }
 
-    const regenCreditCost = isFreePlan ? 0 : tabType === TAB_KEYS.PILLAR ? BLOG_PILLAR_CREDIT_COST : BLOG_BODY_CREDIT_COST;
+    const regenCreditCost = 0;
     const regenCreditBalance = regenCreditCost > 0 ? await getOrCreateShopCredits(session.shop) : null;
     if (regenCreditCost > 0 && (regenCreditBalance?.credits ?? 0) < regenCreditCost) {
       return {
@@ -2855,7 +2853,6 @@ export default function BlogPage() {
   ];
 
   const activeTabKey = tabItems[activeTab]?.id || TAB_KEYS.BUSINESS;
-  const fullBlogCreditCost = isFreePlan ? 0 : activeTabKey === TAB_KEYS.PILLAR ? BLOG_PILLAR_CREDIT_COST : BLOG_BODY_CREDIT_COST;
   const freePlanBlogLimitReached = isFreePlan && Number(generatedBlogCount || 0) >= Number(freePlanBlogLimit || FREE_PLAN_BLOG_LIMIT);
   const toneOptions = useMemo(() => POST_TONE_OPTIONS.map((value) => ({ label: value, value })), []);
   const audienceOptions = useMemo(
@@ -3118,7 +3115,7 @@ const showOfferTextField = isDiscountPromotion(promotion);
                     offerText: article.genOfferText || null,
                     holiday: article.genHoliday || null,
                     topic: article.genTopic || null,
-                    creditCost: resolvedTabType === TAB_KEYS.PILLAR ? BLOG_PILLAR_CREDIT_COST : BLOG_BODY_CREDIT_COST,
+                    creditCost: 0,
                   });
                 }}
                 disabled={fetcher.state !== "idle"}
@@ -3324,7 +3321,7 @@ const showOfferTextField = isDiscountPromotion(promotion);
                           {selectedOutlineId
                             ? isFreePlan
                               ? `${Math.max(0, Number(freePlanBlogLimit || FREE_PLAN_BLOG_LIMIT) - Number(generatedBlogCount || 0))} free blog article${Math.max(0, Number(freePlanBlogLimit || FREE_PLAN_BLOG_LIMIT) - Number(generatedBlogCount || 0)) === 1 ? "" : "s"} remaining.`
-                              : `${fullBlogCreditCost} credits will be used to generate the full article.`
+                              : "No credits will be used to generate the full article."
                             : "Click an idea card or its Select button to continue."}
                         </Text>
                       </BlockStack>
@@ -3339,9 +3336,7 @@ const showOfferTextField = isDiscountPromotion(promotion);
                       >
                         {activeTabKey === TAB_KEYS.PILLAR
                           ? "Generate Pillar Article (10 credits)"
-                          : isFreePlan
-                            ? "Generate Full Blog"
-                            : "Generate Full Blog (3 credits)"}
+                          : "Generate Full Blog"}
                       </Button>
                     </InlineStack>
                   </Box>
@@ -3488,7 +3483,7 @@ const showOfferTextField = isDiscountPromotion(promotion);
         onClose={() => setRegenerateConfirmTarget(null)}
         title="Regenerate article?"
         primaryAction={{
-          content: `Regenerate (${regenerateConfirmTarget?.creditCost ?? BLOG_BODY_CREDIT_COST} credits)`,
+          content: "Regenerate",
           onAction: submitRegenerate,
           loading: fetcher.state !== "idle" && String(fetcher.formData?.get("intent")) === "regenerate_blog",
           destructive: false,

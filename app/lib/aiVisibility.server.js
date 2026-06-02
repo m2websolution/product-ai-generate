@@ -235,9 +235,18 @@ async function getAiOptions(shop) {
   };
 }
 
+async function getAiVisibilityCreditCost(shop, defaultCost) {
+  const shopData = await db.shop.findUnique({
+    where: { shop },
+    select: { billingPlanKey: true },
+  });
+  return (shopData?.billingPlanKey || "free") === "free" ? defaultCost : 0;
+}
+
 export async function generateSchema(shop, adminContext, resourceType, resource) {
   const { adminGraphQL, accessToken } = getAdminContext(adminContext);
   const aiOptions = await getAiOptions(shop);
+  const credits = await getAiVisibilityCreditCost(shop, CREDITS_SCHEMA);
   let promptObj;
   let schemaType;
 
@@ -283,7 +292,9 @@ export async function generateSchema(shop, adminContext, resourceType, resource)
     throw new Error(`Unsupported resourceType: ${resourceType}`);
   }
 
-  await deductCredits({ shopDomain: shop, creditsUsed: CREDITS_SCHEMA });
+  if (credits > 0) {
+    await deductCredits({ shopDomain: shop, creditsUsed: credits });
+  }
   try {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     const obj = parseJsonResponse(raw);
@@ -301,18 +312,21 @@ export async function generateSchema(shop, adminContext, resourceType, resource)
 
     await db.aiVisibilitySchema.upsert({
       where: { shop_resourceType_resourceId: { shop, resourceType, resourceId: resource.id } },
-      create: { shop, resourceType, resourceId: resource.id, schemaType, schemaJson, metafieldId, creditsUsed: CREDITS_SCHEMA },
-      update: { schemaJson, metafieldId, creditsUsed: CREDITS_SCHEMA, updatedAt: new Date() },
+      create: { shop, resourceType, resourceId: resource.id, schemaType, schemaJson, metafieldId, creditsUsed: credits },
+      update: { schemaJson, metafieldId, creditsUsed: credits, updatedAt: new Date() },
     });
 
-    return { schemaJson, creditsUsed: CREDITS_SCHEMA };
+    return { schemaJson, creditsUsed: credits };
   } catch (err) {
-    await refundCredits({ shopDomain: shop, creditsRefunded: CREDITS_SCHEMA });
+    if (credits > 0) {
+      await refundCredits({ shopDomain: shop, creditsRefunded: credits });
+    }
     throw err;
   }
 }
 
-export async function generateProductSchemaForBulk(shop, accessToken, resource, aiOptions) {
+export async function generateProductSchemaForBulk(shop, accessToken, resource, aiOptions, options = {}) {
+  const credits = options.creditsUsed ?? 0;
   const variant = resource.variants?.edges?.[0]?.node;
   const promptObj = buildProductSchemaPrompt({
     title: resource.title,
@@ -339,11 +353,11 @@ export async function generateProductSchemaForBulk(shop, accessToken, resource, 
 
   await db.aiVisibilitySchema.upsert({
     where: { shop_resourceType_resourceId: { shop, resourceType: "product", resourceId: resource.id } },
-    create: { shop, resourceType: "product", resourceId: resource.id, schemaType: "Product", schemaJson, metafieldId, creditsUsed: CREDITS_SCHEMA },
-    update: { schemaJson, metafieldId, creditsUsed: CREDITS_SCHEMA, updatedAt: new Date() },
+    create: { shop, resourceType: "product", resourceId: resource.id, schemaType: "Product", schemaJson, metafieldId, creditsUsed: credits },
+    update: { schemaJson, metafieldId, creditsUsed: credits, updatedAt: new Date() },
   });
 
-  return { schemaJson, creditsUsed: CREDITS_SCHEMA };
+  return { schemaJson, creditsUsed: credits };
 }
 
 function buildFaqPageJson(items) {
@@ -400,6 +414,7 @@ async function updateProductDescriptionHtml(shop, accessToken, productId, descri
 }
 
 export async function generateBulkFaq(shop, accessToken, resourceType, resource, aiOptions, options = {}) {
+  const credits = options.creditsUsed ?? 0;
   const title = resource.title || resource.productTitle || resource.collectionTitle || "Untitled";
   const description = (
     resource.description ||
@@ -445,8 +460,8 @@ export async function generateBulkFaq(shop, accessToken, resourceType, resource,
 
   await db.aiVisibilityFaq.upsert({
     where: { shop_resourceType_resourceId: { shop, resourceType, resourceId: resource.id } },
-    create: { shop, resourceType, resourceId: resource.id, faqJson, metafieldId, creditsUsed: CREDITS_FAQ },
-    update: { faqJson, metafieldId, creditsUsed: CREDITS_FAQ, updatedAt: new Date() },
+    create: { shop, resourceType, resourceId: resource.id, faqJson, metafieldId, creditsUsed: credits },
+    update: { faqJson, metafieldId, creditsUsed: credits, updatedAt: new Date() },
   });
 
   if (resourceType === "product") {
@@ -459,27 +474,28 @@ export async function generateBulkFaq(shop, accessToken, resourceType, resource,
         descriptionHtml: resource.descriptionHtml || null,
         faqHtml,
         faqJson,
-        creditsUsed: CREDITS_FAQ,
+        creditsUsed: credits,
         appliedToProduct: true,
       },
       update: {
         productTitle: title || null,
         faqHtml,
         faqJson,
-        creditsUsed: CREDITS_FAQ,
+        creditsUsed: credits,
         appliedToProduct: true,
         updatedAt: new Date(),
       },
     });
   }
 
-  return { faqJson, faqHtml, creditsUsed: CREDITS_FAQ };
+  return { faqJson, faqHtml, creditsUsed: credits };
 }
 
 export async function generateFaq(shop, adminContext, resourceType, resource) {
   const { adminGraphQL, accessToken } = getAdminContext(adminContext);
   if (resourceType === "page") throw new Error("FAQ is not supported for pages.");
   const aiOptions = await getAiOptions(shop);
+  const credits = await getAiVisibilityCreditCost(shop, CREDITS_FAQ);
   let promptObj;
 
   if (resourceType === "product") {
@@ -496,7 +512,9 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
     throw new Error(`Unsupported resourceType for FAQ: ${resourceType}`);
   }
 
-  await deductCredits({ shopDomain: shop, creditsUsed: CREDITS_FAQ });
+  if (credits > 0) {
+    await deductCredits({ shopDomain: shop, creditsUsed: credits });
+  }
   try {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     const arr = parseJsonResponse(raw);
@@ -526,8 +544,8 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
 
     await db.aiVisibilityFaq.upsert({
       where: { shop_resourceType_resourceId: { shop, resourceType, resourceId: resource.id } },
-      create: { shop, resourceType, resourceId: resource.id, faqJson: faqPageJson, metafieldId, creditsUsed: CREDITS_FAQ },
-      update: { faqJson: faqPageJson, metafieldId, creditsUsed: CREDITS_FAQ, updatedAt: new Date() },
+      create: { shop, resourceType, resourceId: resource.id, faqJson: faqPageJson, metafieldId, creditsUsed: credits },
+      update: { faqJson: faqPageJson, metafieldId, creditsUsed: credits, updatedAt: new Date() },
     });
 
     if (resourceType === "product") {
@@ -540,23 +558,25 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
           descriptionHtml: resource.descriptionHtml || resource.description || null,
           faqHtml,
           faqJson: faqPageJson,
-          creditsUsed: CREDITS_FAQ,
+          creditsUsed: credits,
           appliedToProduct: true,
         },
         update: {
           productTitle: resource.title || null,
           faqHtml,
           faqJson: faqPageJson,
-          creditsUsed: CREDITS_FAQ,
+          creditsUsed: credits,
           appliedToProduct: true,
           updatedAt: new Date(),
         },
       });
     }
 
-    return { faqJson: faqPageJson, faqHtml, creditsUsed: CREDITS_FAQ };
+    return { faqJson: faqPageJson, faqHtml, creditsUsed: credits };
   } catch (err) {
-    await refundCredits({ shopDomain: shop, creditsRefunded: CREDITS_FAQ });
+    if (credits > 0) {
+      await refundCredits({ shopDomain: shop, creditsRefunded: credits });
+    }
     throw err;
   }
 }
@@ -564,6 +584,7 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
 export async function generateCombined(shop, adminContext, resource) {
   const { adminGraphQL, accessToken } = getAdminContext(adminContext);
   const aiOptions = await getAiOptions(shop);
+  const credits = await getAiVisibilityCreditCost(shop, CREDITS_COMBINED);
   const variant = resource.variants?.edges?.[0]?.node;
   const promptObj = buildCombinedProductPrompt({
     title: resource.title,
@@ -576,7 +597,9 @@ export async function generateCombined(shop, adminContext, resource) {
     url: `https://${shop}/products/${resource.handle}`,
   });
 
-  await deductCredits({ shopDomain: shop, creditsUsed: CREDITS_COMBINED });
+  if (credits > 0) {
+    await deductCredits({ shopDomain: shop, creditsUsed: credits });
+  }
   try {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     const parsed = parseJsonResponse(raw);
@@ -634,9 +657,9 @@ export async function generateCombined(shop, adminContext, resource) {
         schemaType: "Product",
         schemaJson,
         metafieldId: schemaMetafieldId,
-        creditsUsed: CREDITS_COMBINED,
+        creditsUsed: credits,
       },
-      update: { schemaJson, metafieldId: schemaMetafieldId, creditsUsed: CREDITS_COMBINED, updatedAt: new Date() },
+      update: { schemaJson, metafieldId: schemaMetafieldId, creditsUsed: credits, updatedAt: new Date() },
     });
     await db.aiVisibilityFaq.upsert({
       where: { shop_resourceType_resourceId: { shop, resourceType: "product", resourceId: resource.id } },
@@ -659,22 +682,24 @@ export async function generateCombined(shop, adminContext, resource) {
         descriptionHtml: resource.descriptionHtml || resource.description || null,
         faqHtml,
         faqJson: faqPageJson,
-        creditsUsed: CREDITS_COMBINED,
+        creditsUsed: credits,
         appliedToProduct: true,
       },
       update: {
         productTitle: resource.title || null,
         faqHtml,
         faqJson: faqPageJson,
-        creditsUsed: CREDITS_COMBINED,
+        creditsUsed: credits,
         appliedToProduct: true,
         updatedAt: new Date(),
       },
     });
 
-    return { schemaJson, faqJson: faqPageJson, faqHtml, creditsUsed: CREDITS_COMBINED };
+    return { schemaJson, faqJson: faqPageJson, faqHtml, creditsUsed: credits };
   } catch (err) {
-    await refundCredits({ shopDomain: shop, creditsRefunded: CREDITS_COMBINED });
+    if (credits > 0) {
+      await refundCredits({ shopDomain: shop, creditsRefunded: credits });
+    }
     throw err;
   }
 }
