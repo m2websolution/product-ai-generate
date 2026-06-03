@@ -285,7 +285,8 @@ function buildDiscoveryContext({ shop, data, shopRow }) {
   const shopUrl = normalizeUrl(shopData.primaryDomain?.url) || `https://${shop}`;
   const primaryDomain = shopData.primaryDomain?.host || new URL(shopUrl).host;
   const appProxyBaseUrl = canonicalUrl(shopUrl, "/apps/llms-txt");
-  const llmsTxtUrl = appProxyBaseUrl;
+  const llmsTxtUrl = canonicalUrl(shopUrl, "/apps/llms-txt/llms.text");
+  const llmsTxtAltUrl = canonicalUrl(shopUrl, "/apps/llms-txt/llms.txt");
   const agentsMdUrl = canonicalUrl(shopUrl, "/apps/llms-txt/agents.md");
   const pages = uniqueByUrl((data.pages?.nodes || [])
     .filter((page) => page.handle && !isPrivatePage(page))
@@ -345,6 +346,7 @@ function buildDiscoveryContext({ shop, data, shopRow }) {
     shopUrl,
     appProxyBaseUrl,
     llmsTxtUrl,
+    llmsTxtAltUrl,
     agentsMdUrl,
     primaryDomain,
     storeName: shopData.name || shopRow?.name || shop,
@@ -378,6 +380,8 @@ function renderLlmsTxt({ shop, data, settings, shopRow }) {
     shortDescription,
     longDescription,
     shopUrl,
+    llmsTxtUrl,
+    llmsTxtAltUrl,
     agentsMdUrl,
     currency,
     primaryCategory,
@@ -435,7 +439,8 @@ function renderLlmsTxt({ shop, data, settings, shopRow }) {
       "- Product search: GET /search?q={query}&type=product",
       "- Store sitemap: GET /sitemap.xml",
       "- Agent instructions: GET /apps/llms-txt/agents.md",
-      "- LLM discovery file: GET /apps/llms-txt",
+      "- LLM discovery file: GET /apps/llms-txt/llms.text",
+      "- Alternate LLM discovery file: GET /apps/llms-txt/llms.txt",
       "",
       "When recommending products, prefer live product pages or product JSON for accurate price, variants, availability, and product options.",
     ]),
@@ -525,6 +530,8 @@ function renderLlmsTxt({ shop, data, settings, shopRow }) {
     "- UCP specification: https://ucp.dev",
     "- Shop skill: https://shop.app/SKILL.md",
     `- Store agent instructions: ${agentsMdUrl}`,
+    `- Store LLM discovery file: ${llmsTxtUrl}`,
+    `- Alternate Store LLM discovery file: ${llmsTxtAltUrl}`,
     `- Store sitemap: ${shopUrl}/sitemap.xml`,
   ]));
 
@@ -590,7 +597,8 @@ function renderAgentsMd({ shop, data, shopRow }) {
     "",
     section("Recommended Agent Flow", [
       "1. Discover",
-      "- GET /apps/llms-txt",
+      "- GET /apps/llms-txt/llms.text",
+      "- GET /apps/llms-txt/llms.txt",
       "- GET /apps/llms-txt/agents.md",
       "- GET /sitemap.xml",
       "- If supported: GET /.well-known/ucp, POST /api/mcp, POST /api/ucp/mcp",
