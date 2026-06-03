@@ -19,7 +19,6 @@ const DEFAULT_SUBSCRIPTION_PLANS = [
       "Generate collection product content",
       "Generate page content and SEO metadata",
       "Generate up to 2 blog articles",
-      "Generate JSON schema and FAQ content with credits",
       "Basic prompt templates",
     ],
   },

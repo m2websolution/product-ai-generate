@@ -266,6 +266,26 @@ export const action = async ({ request }) => {
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
+  const schemaAndFaqIntents = new Set([
+    "generate_schema",
+    "generate_faq",
+    "generate_combined",
+    "generate_bulk_schema",
+  ]);
+
+  if (schemaAndFaqIntents.has(String(intent || ""))) {
+    const shopData = await db.shop.findUnique({
+      where: { shop },
+      select: { billingPlanKey: true },
+    });
+    if ((shopData?.billingPlanKey || "free") === "free") {
+      return {
+        ok: false,
+        intent,
+        error: "JSON schema and FAQ generation are not available on the free plan.",
+      };
+    }
+  }
 
   try {
     if (intent === "generate_schema") {
@@ -602,14 +622,14 @@ function ScoreBadge({ score }) {
 // Item Drawer
 // ---------------------------------------------------------------------------
 
-function ItemModal({ item, onClose, onGenerate, generatingKey, credits, hasUnlimitedVisibility }) {
+function ItemModal({ item, onClose, onGenerate, generatingKey, credits, hasUnlimitedVisibility, isFreePlan }) {
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   if (!item) return null;
   // FAQ generation via AI Visibility is not yet released; kept false until the feature ships.
   const canFaq = false;
   const schemaKey = `schema_${item.id}`;
   const minimumRequiredCredits = hasUnlimitedVisibility ? 0 : CREDITS_SCHEMA;
-  const hasAffordableAction = hasUnlimitedVisibility || credits >= CREDITS_SCHEMA;
+  const hasAffordableAction = !isFreePlan && (hasUnlimitedVisibility || credits >= CREDITS_SCHEMA);
   const showCombinedAction = false;
   const showSchemaAction = true;
   const faqKey = "";
@@ -657,7 +677,7 @@ function ItemModal({ item, onClose, onGenerate, generatingKey, credits, hasUnlim
             {showSchemaAction && (
               <Button
                 loading={generatingKey === schemaKey}
-                disabled={!hasUnlimitedVisibility && credits < CREDITS_SCHEMA}
+                disabled={isFreePlan || (!hasUnlimitedVisibility && credits < CREDITS_SCHEMA)}
                 onClick={() => onGenerate("generate_schema", item)}
               >
                 {item.hasSchema
@@ -668,7 +688,7 @@ function ItemModal({ item, onClose, onGenerate, generatingKey, credits, hasUnlim
             {canFaq && (
               <Button
                 loading={generatingKey === faqKey}
-                disabled={!hasUnlimitedVisibility && credits < CREDITS_FAQ}
+                disabled={isFreePlan || (!hasUnlimitedVisibility && credits < CREDITS_FAQ)}
                 onClick={() => onGenerate("generate_faq", item)}
               >
                 {item.hasFaq
@@ -678,7 +698,18 @@ function ItemModal({ item, onClose, onGenerate, generatingKey, credits, hasUnlim
             )}
           </InlineStack>
 
-          {!hasAffordableAction && Number.isFinite(minimumRequiredCredits) && (
+          {isFreePlan && (
+            <Banner tone="info">
+              <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
+                <Text as="p">JSON schema and FAQ generation are not available on the free plan.</Text>
+                <Button size="slim" url={PRICING_PATH}>
+                  Upgrade plan
+                </Button>
+              </InlineStack>
+            </Banner>
+          )}
+
+          {!isFreePlan && !hasAffordableAction && Number.isFinite(minimumRequiredCredits) && (
             <Banner tone="warning">
               <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
                 <Text as="p">
@@ -1080,6 +1111,15 @@ export default function AiVisibilityPage() {
 
   const handleGenerate = useCallback(
     (intent, item) => {
+      if (isFreePlan && ["generate_schema", "generate_faq", "generate_combined"].includes(intent)) {
+        setBanner({
+          tone: "info",
+          text: "JSON schema and FAQ generation are not available on the free plan.",
+          actionLabel: "Upgrade plan",
+          actionUrl: PRICING_PATH,
+        });
+        return;
+      }
       const requiredCredits = creditsForIntent(intent);
       if (!hasUnlimitedVisibility && requiredCredits > credits) {
         setBanner(buildInsufficientCreditsBanner(requiredCredits, credits));
@@ -1101,7 +1141,7 @@ export default function AiVisibilityPage() {
       }
       fetcher.submit(fd, { method: "post" });
     },
-    [credits, fetcher, hasUnlimitedVisibility],
+    [credits, fetcher, hasUnlimitedVisibility, isFreePlan],
   );
 
   const handleGenerateLlmsTxt = useCallback(() => {
@@ -1171,6 +1211,15 @@ export default function AiVisibilityPage() {
       setBanner({ tone: "warning", text: "Select at least one item for bulk schema generation." });
       return;
     }
+    if (isFreePlan) {
+      setBanner({
+        tone: "info",
+        text: "JSON schema and FAQ generation are not available on the free plan.",
+        actionLabel: "Upgrade plan",
+        actionUrl: PRICING_PATH,
+      });
+      return;
+    }
     if (!hasUnlimitedVisibility && bulkSchemaCredits > credits) {
       setBanner(buildInsufficientCreditsBanner(bulkSchemaCredits, credits));
       return;
@@ -1182,7 +1231,7 @@ export default function AiVisibilityPage() {
     fd.append("resourceType", activeResourceType);
     fd.append("resourcesJson", JSON.stringify(selectedItems));
     fetcher.submit(fd, { method: "post" });
-  }, [activeResourceType, bulkSchemaCredits, credits, fetcher, hasUnlimitedVisibility, selectedItems]);
+  }, [activeResourceType, bulkSchemaCredits, credits, fetcher, hasUnlimitedVisibility, isFreePlan, selectedItems]);
 
   return (
     <Page fullWidth>
@@ -1364,18 +1413,19 @@ export default function AiVisibilityPage() {
             <Box padding="400" borderColor="border" borderBlockEndWidth="025">
               <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
                 <BlockStack gap="100">
-                  <Text as="p" variant="bodySm" tone={!hasUnlimitedVisibility && bulkSchemaCredits > credits ? "critical" : "subdued"}>
-                    Credits used: {bulkSchemaCredits}{hasUnlimitedVisibility ? "" : ` (${selectedItems.length} items x ${CREDITS_SCHEMA} credits)`}
-                    {!hasUnlimitedVisibility && bulkSchemaCredits > credits ? ` - not enough credits (${credits} available)` : ""}
+                  <Text as="p" variant="bodySm" tone={isFreePlan || (!hasUnlimitedVisibility && bulkSchemaCredits > credits) ? "critical" : "subdued"}>
+                    {isFreePlan
+                      ? "JSON schema and FAQ generation are not available on the free plan."
+                      : `Credits used: ${bulkSchemaCredits}${hasUnlimitedVisibility ? "" : ` (${selectedItems.length} items x ${CREDITS_SCHEMA} credits)`}${!hasUnlimitedVisibility && bulkSchemaCredits > credits ? ` - not enough credits (${credits} available)` : ""}`}
                   </Text>
                 </BlockStack>
                 <Button
                   variant="primary"
-                  disabled={selectedItems.length === 0 || (!hasUnlimitedVisibility && bulkSchemaCredits > credits)}
+                  disabled={isFreePlan || selectedItems.length === 0 || (!hasUnlimitedVisibility && bulkSchemaCredits > credits)}
                   loading={isSubmitting && generatingKey === "bulk_schema"}
                   onClick={handleGenerateBulkSchema}
                 >
-                  {hasUnlimitedVisibility ? "Generate Schema" : `Generate Schema (${bulkSchemaCredits} credits)`}
+                  {isFreePlan ? "Upgrade to generate schema" : hasUnlimitedVisibility ? "Generate Schema" : `Generate Schema (${bulkSchemaCredits} credits)`}
                 </Button>
               </InlineStack>
             </Box>
@@ -1405,6 +1455,7 @@ export default function AiVisibilityPage() {
           generatingKey={generatingKey}
           credits={credits}
           hasUnlimitedVisibility={hasUnlimitedVisibility}
+          isFreePlan={isFreePlan}
         />
       )}
       </BlockStack>
