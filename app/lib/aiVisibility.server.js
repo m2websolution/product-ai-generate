@@ -252,15 +252,20 @@ export async function generateSchema(shop, adminContext, resourceType, resource)
 
   if (resourceType === "product") {
     const variant = resource.variants?.edges?.[0]?.node;
+    const productUrl = `https://${shop}/products/${resource.handle}`;
+    const productImage = resource.featuredImage?.url || resource.image?.url || "";
+    const price = variant?.price || resource.priceRangeV2?.minVariantPrice?.amount;
+    const currencyCode = resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD";
     promptObj = buildProductSchemaPrompt({
       title: resource.title,
       description: (resource.description || "").substring(0, 500),
       vendor: resource.vendor,
       productType: resource.productType,
-      price: variant?.price || resource.priceRangeV2?.minVariantPrice?.amount,
-      currencyCode: resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD",
+      price,
+      currencyCode,
       available: resource.status === "ACTIVE",
-      url: `https://${shop}/products/${resource.handle}`,
+      url: productUrl,
+      image: productImage,
     });
     schemaType = "Product";
   } else if (resourceType === "article") {
@@ -302,6 +307,20 @@ export async function generateSchema(shop, adminContext, resourceType, resource)
   try {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     let obj = parseJsonResponse(raw);
+    if (resourceType === "product") {
+      const variant = resource.variants?.edges?.[0]?.node;
+      const productUrl = `https://${shop}/products/${resource.handle}`;
+      obj = normalizeProductSchema(obj, {
+        title: resource.title,
+        description: resource.description || "",
+        url: productUrl,
+        image: resource.featuredImage?.url || resource.image?.url || "",
+        vendor: resource.vendor,
+        price: variant?.price || resource.priceRangeV2?.minVariantPrice?.amount,
+        currencyCode: resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD",
+        available: resource.status === "ACTIVE",
+      });
+    }
     if (resourceType === "collection") {
       const collectionProducts = normalizeCollectionProductsForSchema(shop, resource);
       const collectionImage = resource.image?.url || collectionProducts.find((product) => product.image)?.image || "";
@@ -354,6 +373,32 @@ function normalizeCollectionProductsForSchema(shop, collection) {
     }));
 }
 
+function normalizeProductSchema(schema, { title, description, url, image, vendor, price, currencyCode, available }) {
+  const cleanDescription = String(description || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const normalized = {
+    ...(schema && typeof schema === "object" && !Array.isArray(schema) ? schema : {}),
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: schema?.name || title,
+    description: schema?.description || cleanDescription || title,
+    url: schema?.url || url,
+    brand: schema?.brand || { "@type": "Organization", name: vendor || "" },
+    offers: {
+      ...(schema?.offers && typeof schema.offers === "object" && !Array.isArray(schema.offers) ? schema.offers : {}),
+      "@type": "Offer",
+      price: schema?.offers?.price || price || "",
+      priceCurrency: schema?.offers?.priceCurrency || currencyCode || "USD",
+      availability: schema?.offers?.availability || `https://schema.org/${available ? "InStock" : "OutOfStock"}`,
+      url: schema?.offers?.url || url,
+    },
+  };
+  if (image) normalized.image = image;
+  return normalized;
+}
+
 function normalizeCollectionPageSchema(schema, { title, description, url, image, products }) {
   const cleanDescription = String(description || "")
     .replace(/<[^>]+>/g, " ")
@@ -404,19 +449,33 @@ function normalizeCollectionPageSchema(schema, { title, description, url, image,
 export async function generateProductSchemaForBulk(shop, accessToken, resource, aiOptions, options = {}) {
   const credits = options.creditsUsed ?? 0;
   const variant = resource.variants?.edges?.[0]?.node;
+  const productUrl = `https://${shop}/products/${resource.handle || ""}`;
+  const productImage = resource.featuredImage?.url || resource.image?.url || "";
+  const price = variant?.price || resource.priceRangeV2?.minVariantPrice?.amount;
+  const currencyCode = resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD";
   const promptObj = buildProductSchemaPrompt({
     title: resource.title,
     description: (resource.description || resource.descriptionHtml || "").substring(0, 500),
     vendor: resource.vendor,
     productType: resource.productType,
-    price: variant?.price || resource.priceRangeV2?.minVariantPrice?.amount,
-    currencyCode: resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD",
+    price,
+    currencyCode,
     available: resource.status === "ACTIVE",
-    url: `https://${shop}/products/${resource.handle || ""}`,
+    url: productUrl,
+    image: productImage,
   });
 
   const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
-  const obj = parseJsonResponse(raw);
+  const obj = normalizeProductSchema(parseJsonResponse(raw), {
+    title: resource.title,
+    description: resource.description || resource.descriptionHtml || "",
+    url: productUrl,
+    image: productImage,
+    vendor: resource.vendor,
+    price,
+    currencyCode,
+    available: resource.status === "ACTIVE",
+  });
   const schemaJson = JSON.stringify(obj);
   const metafieldId = await writeResourceMetafield({
     shop,
@@ -437,10 +496,11 @@ export async function generateProductSchemaForBulk(shop, accessToken, resource, 
 }
 
 function buildFaqPageJson(items) {
+  const normalizedItems = items.filter((qa) => qa?.question && qa?.answer).slice(0, 2);
   return JSON.stringify({
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    mainEntity: items.map((qa) => ({
+    mainEntity: normalizedItems.map((qa) => ({
       "@type": "Question",
       name: qa.question,
       acceptedAnswer: { "@type": "Answer", text: qa.answer },
@@ -458,11 +518,12 @@ function escapeHtml(value) {
 }
 
 function buildFaqHtml(items) {
-  if (!items.length) return "";
+  const normalizedItems = items.filter((qa) => qa?.question && qa?.answer).slice(0, 2);
+  if (!normalizedItems.length) return "";
   return [
     '<section data-content-ai-faq="true">',
     "<h2>Frequently Asked Questions</h2>",
-    ...items.map((qa) => (
+    ...normalizedItems.map((qa) => (
       `<h3>${escapeHtml(qa.question)}</h3><p>${escapeHtml(qa.answer)}</p>`
     )),
     "</section>",
@@ -662,15 +723,20 @@ export async function generateCombined(shop, adminContext, resource) {
   const aiOptions = await getAiOptions(shop);
   const credits = await getAiVisibilityCreditCost(shop, CREDITS_COMBINED);
   const variant = resource.variants?.edges?.[0]?.node;
+  const productUrl = `https://${shop}/products/${resource.handle}`;
+  const productImage = resource.featuredImage?.url || resource.image?.url || "";
+  const price = variant?.price || resource.priceRangeV2?.minVariantPrice?.amount;
+  const currencyCode = resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD";
   const promptObj = buildCombinedProductPrompt({
     title: resource.title,
     description: (resource.description || "").substring(0, 500),
     vendor: resource.vendor,
     productType: resource.productType,
-    price: variant?.price || resource.priceRangeV2?.minVariantPrice?.amount,
-    currencyCode: resource.priceRangeV2?.minVariantPrice?.currencyCode || "USD",
+    price,
+    currencyCode,
     available: resource.status === "ACTIVE",
-    url: `https://${shop}/products/${resource.handle}`,
+    url: productUrl,
+    image: productImage,
   });
 
   if (credits > 0) {
@@ -679,8 +745,17 @@ export async function generateCombined(shop, adminContext, resource) {
   try {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     const parsed = parseJsonResponse(raw);
-    const schemaJson = JSON.stringify(parsed.schema);
-    const faqArr = Array.isArray(parsed.faqs) ? parsed.faqs : [];
+    const schemaJson = JSON.stringify(normalizeProductSchema(parsed.schema, {
+      title: resource.title,
+      description: resource.description || resource.descriptionHtml || "",
+      url: productUrl,
+      image: productImage,
+      vendor: resource.vendor,
+      price,
+      currencyCode,
+      available: resource.status === "ACTIVE",
+    }));
+    const faqArr = (Array.isArray(parsed.faqs) ? parsed.faqs : []).filter((qa) => qa?.question && qa?.answer).slice(0, 2);
     const faqPageSchema = {
       "@context": "https://schema.org",
       "@type": "FAQPage",

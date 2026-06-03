@@ -25,7 +25,7 @@ const DEFAULT_SUBSCRIPTION_PLANS = [
   },
   {
     key: "starter",
-    name: "Starter",
+    name: "Basic",
     price: 9.99,
     credits: 1500,
     description: "For small stores keeping product SEO updated.",
@@ -44,7 +44,7 @@ const DEFAULT_SUBSCRIPTION_PLANS = [
   },
   {
     key: "growth",
-    name: "Growth",
+    name: "Pro",
     price: 14.99,
     credits: 5000,
     description: "For active stores using bulk generation regularly.",

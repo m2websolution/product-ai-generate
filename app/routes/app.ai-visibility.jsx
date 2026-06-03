@@ -87,6 +87,7 @@ const PRODUCTS_QUERY = `#graphql
         node {
           id title handle description vendor productType status
           seo { title description }
+          featuredImage { url altText }
           priceRangeV2 { minVariantPrice { amount currencyCode } }
           variants(first: 1) { edges { node { price } } }
         }
@@ -1267,9 +1268,27 @@ export default function AiVisibilityPage() {
         </Box>
       )}
 
+      <style>{`
+        .ai-visibility-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px;
+          align-items: stretch;
+        }
+        .ai-visibility-summary-grid > *:nth-child(2) {
+          grid-column: 1 / -1;
+          order: -1;
+        }
+        @media (max-width: 760px) {
+          .ai-visibility-summary-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
       <Layout>
         <Layout.Section>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", alignItems: "stretch" }}>
+          <div className="ai-visibility-summary-grid">
             {/* Score card */}
             <Card>
               <BlockStack gap="300">

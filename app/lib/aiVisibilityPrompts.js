@@ -1,4 +1,4 @@
-export function buildProductSchemaPrompt({ title, description, vendor, productType, price, currencyCode, available, url }) {
+export function buildProductSchemaPrompt({ title, description, vendor, productType, price, currencyCode, available, url, image }) {
   return {
     systemPrompt: "You generate valid Schema.org JSON-LD for Shopify products. Return ONLY raw JSON — no markdown fences, no explanation.",
     prompt: `Generate a complete Schema.org Product JSON-LD object for this product:
@@ -9,8 +9,9 @@ export function buildProductSchemaPrompt({ title, description, vendor, productTy
 - Price: ${price || "N/A"} ${currencyCode || "USD"}
 - Availability: ${available ? "InStock" : "OutOfStock"}
 - URL: ${url}
+- Image URL: ${image || "N/A"}
 
-Return a single JSON object with @context ("https://schema.org"), @type ("Product"), name, description, brand (Organization with name = vendor), offers (Offer with @type, price, priceCurrency, availability as full schema.org URL, url). Include all provided fields.`,
+Return a single JSON object with @context ("https://schema.org"), @type ("Product"), name, description, image, brand (Organization with name = vendor), offers (Offer with @type, price, priceCurrency, availability as full schema.org URL, url). Include all provided fields. Use the exact Image URL as the image value when provided.`,
   };
 }
 
@@ -93,7 +94,7 @@ Use every provided product as one ListItem. Omit image only when no image is pro
 export function buildProductFaqPrompt({ title, description, language = "English" }) {
   return {
     systemPrompt: "You generate FAQ pairs for Shopify products. Return ONLY a raw JSON array — no markdown fences, no explanation.",
-    prompt: `Generate 4 to 6 FAQ question-and-answer pairs for this product.
+    prompt: `Generate exactly 2 FAQ question-and-answer pairs for this product.
 Focus on: purchase intent, sizing or compatibility, usage instructions, materials or ingredients, shipping, and common concerns.
 Write every question and answer in ${language}.
 
@@ -120,12 +121,12 @@ Return a JSON array in this exact format:
   };
 }
 
-export function buildCombinedProductPrompt({ title, description, vendor, productType, price, currencyCode, available, url }) {
+export function buildCombinedProductPrompt({ title, description, vendor, productType, price, currencyCode, available, url, image }) {
   return {
     systemPrompt: "You generate Schema.org JSON-LD and FAQ pairs for Shopify products. Return ONLY raw JSON in the exact structure specified — no markdown fences, no explanation.",
     prompt: `For this Shopify product, generate both:
 1. A Schema.org Product JSON-LD object
-2. 4 to 6 FAQ question-answer pairs
+2. Exactly 2 FAQ question-answer pairs
 
 Product:
 - Title: ${title}
@@ -135,6 +136,7 @@ Product:
 - Price: ${price || "N/A"} ${currencyCode || "USD"}
 - Availability: ${available ? "InStock" : "OutOfStock"}
 - URL: ${url}
+- Image URL: ${image || "N/A"}
 
 Return ONLY this exact JSON structure (no other text):
 {
@@ -143,6 +145,7 @@ Return ONLY this exact JSON structure (no other text):
     "@type": "Product",
     "name": "...",
     "description": "...",
+    "image": "...",
     "brand": {"@type": "Organization", "name": "..."},
     "offers": {"@type": "Offer", "price": "...", "priceCurrency": "...", "availability": "https://schema.org/InStock", "url": "..."}
   },
