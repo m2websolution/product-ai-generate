@@ -11,13 +11,18 @@ import {
   generateSchema,
   generateFaq,
   generateCombined,
-  generateLlmsTxt,
   calculateScore,
   scoreBreakdown,
   calcLlmsTxtCredits,
 } from "../lib/aiVisibility.server";
 import { getOrCreateShopCredits } from "../lib/credits.server";
 import { autoAddFaqSectionToProductPage } from "../lib/themeUtils.server";
+import {
+  generateAndStoreDynamicLlmsTxt,
+  invalidateLlmsTxtCache,
+  readLlmsTxtSettings,
+  writeLlmsTxtSettings,
+} from "../lib/llmsTxt.server";
 
 // Credit costs — defined here (not imported from server module) so they are available client-side
 const CREDITS_SCHEMA = 2;
@@ -209,7 +214,7 @@ export const loader = async ({ request }) => {
     db.aiVisibilitySchema.findMany({ where: { shop, resourceId: { in: allResourceIds } } }),
     db.aiVisibilityFaq.findMany({ where: { shop, resourceId: { in: allResourceIds } } }),
     db.aiVisibilityLlmsTxt.findUnique({ where: { shop } }),
-    db.shop.findUnique({ where: { shop }, select: { themeEmbedEnabled: true, billingPlanKey: true } }),
+    db.shop.findUnique({ where: { shop }, select: { themeEmbedEnabled: true, billingPlanKey: true, globalSettingsJson: true } }),
     getOrCreateShopCredits(shop),
   ]);
 
@@ -253,6 +258,7 @@ export const loader = async ({ request }) => {
     credits: creditSnapshot.credits,
     isFreePlan: (shopData?.billingPlanKey || "free") === "free",
     themeEmbedEnabled: shopData?.themeEmbedEnabled ?? false,
+    llmsTxtSettings: readLlmsTxtSettings(shopData?.globalSettingsJson),
     llmsTxtCredits: calcLlmsTxtCredits(products.length + collections.length + articles.length + pages.length),
   };
 };
@@ -266,6 +272,26 @@ export const action = async ({ request }) => {
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
+  if (intent === "save_llms_settings") {
+    let settings = {};
+    try {
+      settings = JSON.parse(String(formData.get("settingsJson") || "{}"));
+    } catch {
+      return { ok: false, intent, error: "Invalid LLMs.txt settings." };
+    }
+    const current = await db.shop.findUnique({
+      where: { shop },
+      select: { globalSettingsJson: true },
+    });
+    const nextGlobalSettingsJson = writeLlmsTxtSettings(current?.globalSettingsJson, settings);
+    await db.shop.update({
+      where: { shop },
+      data: { globalSettingsJson: nextGlobalSettingsJson },
+    });
+    invalidateLlmsTxtCache(shop);
+    return { ok: true, intent, settings: readLlmsTxtSettings(nextGlobalSettingsJson) };
+  }
+
   const schemaAndFaqIntents = new Set([
     "generate_schema",
     "generate_faq",
@@ -381,31 +407,7 @@ export const action = async ({ request }) => {
     }
 
     if (intent === "generate_llmstxt") {
-      const shopDataRes = await admin.graphql(SHOP_QUERY);
-      const shopDataJson = await shopDataRes.json();
-      const shopName = shopDataJson?.data?.shop?.name || shop;
-      const shopDomain = shopDataJson?.data?.shop?.primaryDomain?.host || shop;
-
-      const [pRes, cRes, aRes, pgRes] = await Promise.all([
-        admin.graphql(PRODUCTS_QUERY, { variables: { first: 200 } }),
-        admin.graphql(COLLECTIONS_QUERY, { variables: { first: 100 } }),
-        admin.graphql(ARTICLES_QUERY, { variables: { first: 100 } }),
-        admin.graphql(PAGES_QUERY, { variables: { first: 50 } }),
-      ]);
-      const [pj, cj, aj, pgj] = await Promise.all([pRes.json(), cRes.json(), aRes.json(), pgRes.json()]);
-      const llmsProducts = (pj?.data?.products?.edges || []).map((e) => e.node).slice(0, 150);
-      const llmsCollections = (cj?.data?.collections?.edges || []).map((e) => e.node).slice(0, 50);
-      const llmsArticles = (aj?.data?.articles?.edges || []).map((e) => e.node).slice(0, 30);
-      const llmsPages = (pgj?.data?.pages?.edges || []).map((e) => e.node).slice(0, 20);
-
-      const result = await generateLlmsTxt(shop, {
-        products: llmsProducts,
-        collections: llmsCollections,
-        articles: llmsArticles,
-        pages: llmsPages,
-        shopName,
-        shopDomain,
-      });
+      const result = await generateAndStoreDynamicLlmsTxt(shop);
       return { ok: true, intent, ...result };
     }
 
@@ -929,11 +931,13 @@ export default function AiVisibilityPage() {
     llmsTxtCredits,
     credits: initialCredits,
     isFreePlan,
+    llmsTxtSettings: initialLlmsTxtSettings,
   } = useLoaderData();
   const hasUnlimitedVisibility = !isFreePlan;
   const fetcher = useFetcher();
   const embedFetcher = useFetcher();
   const autoEnableFetcher = useFetcher();
+  const llmsSettingsFetcher = useFetcher();
   const [products, setProducts] = useState(initialProducts);
   const [collections, setCollections] = useState(initialCollections);
   const [articles, setArticles] = useState(initialArticles);
@@ -947,6 +951,7 @@ export default function AiVisibilityPage() {
   const [verifyResult, setVerifyResult] = useState(null); // { ok, enabled, error } after Verify click
   const [credits, setCredits] = useState(initialCredits);
   const [selectedIdsByType, setSelectedIdsByType] = useState({ product: [], collection: [], article: [], page: [] });
+  const [llmsTxtSettings, setLlmsTxtSettings] = useState(initialLlmsTxtSettings);
 
   // Derive selectedItem from live list state so modal updates instantly after generation
   const selectedItem = useMemo(() => {
@@ -1156,6 +1161,15 @@ export default function AiVisibilityPage() {
     fetcher.submit(fd, { method: "post" });
   }, [credits, fetcher, isFreePlan, llmsTxtCredits]);
 
+  const handleLlmsSettingChange = useCallback((key, value) => {
+    const nextSettings = { ...llmsTxtSettings, [key]: value };
+    setLlmsTxtSettings(nextSettings);
+    const fd = new FormData();
+    fd.append("intent", "save_llms_settings");
+    fd.append("settingsJson", JSON.stringify(nextSettings));
+    llmsSettingsFetcher.submit(fd, { method: "post" });
+  }, [llmsSettingsFetcher, llmsTxtSettings]);
+
   const tabs = [
     { id: "products", content: `Products (${products.length})` },
     { id: "collections", content: `Collections (${collections.length})` },
@@ -1185,6 +1199,17 @@ export default function AiVisibilityPage() {
     : `https://${shop}/admin/themes/current/editor?template=product`;
 
   const progressTone = totalScore >= 80 ? "success" : "highlight";
+  const llmsSettingOptions = [
+    ["products", "Enable Products"],
+    ["collections", "Enable Collections"],
+    ["pages", "Enable Pages"],
+    ["blogs", "Enable Blogs"],
+    ["policies", "Enable Policies"],
+    ["faq", "Enable FAQ"],
+    ["sitemap", "Enable Sitemap"],
+    ["aiInstructions", "Enable AI Instructions"],
+    ["restrictions", "Enable AI Restrictions"],
+  ];
 
   const handleToggleBulkItem = useCallback((resourceType, itemId, checked) => {
     setSelectedIdsByType((current) => {
@@ -1314,6 +1339,24 @@ export default function AiVisibilityPage() {
                     </Button>
                   )}
                 </InlineStack>
+                <Box borderColor="border" borderBlockStartWidth="025" paddingBlockStart="300">
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text variant="headingSm" as="h3">LLMs.txt Settings</Text>
+                      {llmsSettingsFetcher.state !== "idle" ? <Badge tone="info">Saving</Badge> : null}
+                    </InlineStack>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px 14px" }}>
+                      {llmsSettingOptions.map(([key, label]) => (
+                        <Checkbox
+                          key={key}
+                          label={label}
+                          checked={Boolean(llmsTxtSettings?.[key])}
+                          onChange={(value) => handleLlmsSettingChange(key, value)}
+                        />
+                      ))}
+                    </div>
+                  </BlockStack>
+                </Box>
               </BlockStack>
             </Card>
 
