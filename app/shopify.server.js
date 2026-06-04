@@ -7,6 +7,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { fetchShopInfo, sendInstallEmails } from "./lib/email.server.js";
+import { ensureRedirectsOnInstall } from "./lib/llmsTxt.server";
 
 if (!process.env.SHOPIFY_API_SECRET) {
   throw new Error("SHOPIFY_API_SECRET environment variable is required but not set.");
@@ -67,6 +68,12 @@ const shopify = shopifyApp({
           ownerEmail: shopInfo?.email,
         }).catch((err) =>
           console.error(`[email] Install email failed for ${session.shop}:`, err)
+        );
+
+        // Automatically set up /llms.txt → /apps/llms-txt/llms.txt redirect
+        // on every install / re-authentication (non-blocking).
+        ensureRedirectsOnInstall(session.shop, session.accessToken).catch((err) =>
+          console.error(`[llms-redirect] afterAuth setup failed for ${session.shop}:`, err)
         );
       } catch (error) {
         console.error(

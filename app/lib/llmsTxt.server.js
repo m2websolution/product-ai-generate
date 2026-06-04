@@ -465,24 +465,33 @@ async function resolveOneRedirectWithSession(adminGraphQL, path, target) {
     return { action: "unchanged", path, target };
   }
 
-  // Step 5: conflict detected — another app owns this redirect.
+  // Step 5: wrong target — DELETE old redirect then CREATE ours fresh.
+  // (DELETE + CREATE instead of UPDATE so the state is always clean.)
   const conflicting = !isOurRedirect(primary.target);
-  if (conflicting) {
-    console.warn(
-      `[llms-redirect] CONFLICT DETECTED: ${path} currently points to "${primary.target}" (another app). ` +
-      `Overriding with "${target}".`
-    );
+  console.warn(
+    `[llms-redirect] ${conflicting ? "CONFLICT" : "STALE"}: ` +
+    `${path} → "${primary.target}" — deleting old redirect and creating ours.`,
+  );
+
+  // DELETE the old redirect
+  const delRes = await adminGraphQL(URL_REDIRECT_DELETE_MUTATION, { variables: { id: primary.id } });
+  const delJson = await delRes.json();
+  const delErrs = delJson?.data?.urlRedirectDelete?.userErrors || [];
+  if (delErrs.length) {
+    console.warn(`[llms-redirect] DELETE failed for ${primary.id}:`, delErrs.map((e) => e.message).join(", "));
   } else {
-    console.log(`[llms-redirect] UPDATE ${path} → ${target} (was: ${primary.target})`);
+    console.log(`[llms-redirect] DELETED ${path} (was → "${primary.target}")`);
   }
 
-  const updateRes = await adminGraphQL(URL_REDIRECT_UPDATE_MUTATION, {
-    variables: { id: primary.id, urlRedirect: { path, target } },
+  // CREATE ours fresh
+  const createRes2 = await adminGraphQL(URL_REDIRECT_CREATE_MUTATION, {
+    variables: { urlRedirect: { path, target } },
   });
-  const updateJson = await updateRes.json();
-  const errs = updateJson?.data?.urlRedirectUpdate?.userErrors || [];
-  if (errs.length) throw new Error(errs.map((e) => e.message).join(", "));
-  return { action: conflicting ? "conflict_resolved" : "updated", path, target };
+  const createJson2 = await createRes2.json();
+  const createErrs2 = createJson2?.data?.urlRedirectCreate?.userErrors || [];
+  if (createErrs2.length) throw new Error(createErrs2.map((e) => e.message).join(", "));
+  console.log(`[llms-redirect] CREATED ${path} → "${target}"`);
+  return { action: conflicting ? "conflict_resolved" : "recreated", path, target };
 }
 
 // ─── REST fallback (stored access token) ─────────────────────────────────────
@@ -595,8 +604,38 @@ export function reAssertRedirectsInBackground(shop, adminGraphQL) {
 }
 
 // Exported for direct call (no throttle) — used on generate/regenerate.
+// Direct call (no throttle) — used on generate/regenerate and fix action.
 export async function ensureLlmsTxtRedirects(shop, adminGraphQL) {
   return publishRootDiscoveryRedirects(shop, adminGraphQL);
+}
+
+// Called from afterAuth (app install / re-authentication).
+// Builds a GraphQL client from the raw access token so the full admin
+// session client is not required.
+export async function ensureRedirectsOnInstall(shop, accessToken) {
+  if (!shop || !accessToken) return;
+  const API_VER = process.env.SHOPIFY_API_VERSION || "2026-04";
+
+  // Build a lightweight admin.graphql-compatible client from the access token.
+  const adminGraphQL = async (query, options = {}) => {
+    const res = await fetch(`https://${shop}/admin/api/${API_VER}/graphql.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": accessToken,
+      },
+      body: JSON.stringify({ query, variables: options.variables || {} }),
+    });
+    return res; // matches Remix admin.graphql return type (Response object)
+  };
+
+  console.log(`[llms-redirect] afterAuth: setting up redirects for ${shop}`);
+  try {
+    const results = await publishRootDiscoveryRedirects(shop, adminGraphQL);
+    console.log(`[llms-redirect] afterAuth results:`, JSON.stringify(results));
+  } catch (err) {
+    console.error(`[llms-redirect] afterAuth: failed for ${shop}:`, err?.message);
+  }
 }
 
 function buildDiscoveryContext({ shop, data, shopRow }) {
