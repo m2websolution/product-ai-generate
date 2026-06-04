@@ -1206,6 +1206,80 @@ export function invalidateLlmsTxtCache(shop) {
   responseCache.delete(`agents:${shop}`);
 }
 
+// ─── Server-side verification ─────────────────────────────────────────────────
+// After generation, make real HTTP requests from the server to confirm:
+//   1. /llms.txt resolves to our proxy (X-Content-Source header check)
+//   2. The content at /llms.txt matches our newly generated content
+// This catches browser-cached 301 redirects, CDN conflicts, and proxy conflicts.
+
+async function verifyLlmsTxtContent(shop, expectedContent) {
+  const shopDomain = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
+  const proxyUrl    = `https://${shopDomain}/apps/llms-txt/llms.txt`;
+  const redirectUrl = `https://${shopDomain}/llms.txt`;
+
+  const result = {
+    proxyUrl,
+    redirectUrl,
+    match: false,
+    redirectSource: null,  // X-Content-Source from /llms.txt response
+    proxySource: null,     // X-Content-Source from proxy response
+    redirectFinalUrl: null,
+    cacheControl: null,
+    error: null,
+  };
+
+  try {
+    // Verify proxy URL directly (/apps/llms-txt/llms.txt)
+    const proxyRes = await fetch(proxyUrl, {
+      headers: { "User-Agent": "ShopifyApp-LLMSVerifier/1.0", "Cache-Control": "no-cache" },
+      redirect: "follow",
+    });
+    const proxyText = await proxyRes.text();
+    result.proxySource = proxyRes.headers.get("x-content-source");
+    console.log(`[llms-verify] proxy ${proxyUrl} → status=${proxyRes.status} source=${result.proxySource || "none"}`);
+
+    // Verify redirect URL (/llms.txt)
+    const redirectRes = await fetch(redirectUrl, {
+      headers: { "User-Agent": "ShopifyApp-LLMSVerifier/1.0", "Cache-Control": "no-cache" },
+      redirect: "follow",
+    });
+    const redirectText = await redirectRes.text();
+    result.redirectSource = redirectRes.headers.get("x-content-source");
+    result.redirectFinalUrl = redirectRes.url;
+    result.cacheControl = redirectRes.headers.get("cache-control");
+    console.log(
+      `[llms-verify] redirect ${redirectUrl} → ${result.redirectFinalUrl} ` +
+      `status=${redirectRes.status} source=${result.redirectSource || "none"} cache=${result.cacheControl || "none"}`,
+    );
+
+    // Compare source identity (most reliable check — doesn't depend on content trimming)
+    if (result.redirectSource === "gen-ai-seo-product-description") {
+      result.match = true;
+      console.log(`[llms-verify] ✓ X-Content-Source header confirms our app is serving /llms.txt`);
+    } else if (result.redirectSource) {
+      console.warn(`[llms-verify] ✗ /llms.txt is served by "${result.redirectSource}" (not our app)`);
+    } else {
+      // Fallback: compare first 300 chars of content
+      const trim = (s) => String(s || "").trim().substring(0, 300);
+      result.match = trim(redirectText) === trim(expectedContent);
+      if (!result.match) {
+        console.warn(
+          `[llms-verify] ✗ Content mismatch — /llms.txt does NOT match our generated content.\n` +
+          `  /llms.txt begins:   "${trim(redirectText).substring(0, 80)}..."\n` +
+          `  Expected begins:    "${trim(expectedContent).substring(0, 80)}..."\n` +
+          `  Likely cause: browser or CDN has cached an old 301 redirect from a previous app.\n` +
+          `  Resolution: open /llms.txt in an incognito window (bypasses browser 301 cache).`,
+        );
+      }
+    }
+  } catch (err) {
+    result.error = err?.message;
+    console.warn(`[llms-verify] HTTP verification request failed: ${err?.message}`);
+  }
+
+  return result;
+}
+
 export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGraphQL) {
   const credits = LLMS_GENERATION_CREDITS;
 
@@ -1243,12 +1317,28 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
       );
     }
 
+    // ── Server-side content verification ─────────────────────────────────
+    // Makes a real HTTP request from the server to verify content equality.
+    const verification = await verifyLlmsTxtContent(shop, content);
+    if (verification.match) {
+      console.log(`[llms-verify] [${shop}] ✓ /llms.txt content matches proxy — redirect working correctly`);
+    } else if (verification.error) {
+      console.warn(`[llms-verify] [${shop}] ✗ Verification could not complete: ${verification.error}`);
+    } else {
+      console.warn(
+        `[llms-verify] [${shop}] ✗ CONTENT MISMATCH — ` +
+        `/llms.txt returned content from source: "${verification.redirectSource || "unknown"}" ` +
+        `instead of our proxy. Browser/CDN may have a cached redirect from a previous app. ` +
+        `Test in incognito mode or clear browser cache for /llms.txt.`,
+      );
+    }
+
     // Determine if any conflict was found and resolved (for toast message in UI).
     const redirectFixed = redirects.some((r) =>
       ["conflict_resolved", "recreated", "created", "rest_created", "rest_race_updated"].includes(r.action),
     );
 
-    return { content, creditsUsed: credits, redirects, redirectFixed };
+    return { content, creditsUsed: credits, redirects, redirectFixed, verification };
   } catch (error) {
     await refundCredits({ shopDomain: shop, creditsRefunded: credits });
     throw error;
