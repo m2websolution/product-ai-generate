@@ -934,7 +934,7 @@ export default function AiVisibilityPage() {
     isFreePlan,
     llmsTxtSettings: initialLlmsTxtSettings,
   } = useLoaderData();
-  const hasUnlimitedVisibility = !isFreePlan;
+  const hasUnlimitedVisibility = false;
   const fetcher = useFetcher();
   const embedFetcher = useFetcher();
   const autoEnableFetcher = useFetcher();
@@ -1043,7 +1043,9 @@ export default function AiVisibilityPage() {
         }
 
         if (data.creditsUsed) setCredits((c) => Math.max(0, c - data.creditsUsed));
-        setBanner({ tone: "success", text: `Generated successfully (${data.creditsUsed} credits used).` });
+        if (typeof window !== "undefined" && window.shopify?.toast) {
+          window.shopify.toast.show(`Generated successfully (${data.creditsUsed ?? 0} credits used).`);
+        }
       } else {
         setBanner(
           isInsufficientCreditsMessage(data.error)
