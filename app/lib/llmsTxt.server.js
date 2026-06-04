@@ -305,6 +305,171 @@ async function shopifyRest(shop, accessToken, path, options = {}) {
   return json;
 }
 
+// ============================================================================
+// SHOPIFY FILES (CDN) — upload llms.txt so it is served from Shopify's CDN,
+// then redirect /llms.txt → CDN URL.  This is more reliable than the app
+// proxy approach because:
+//   • File lives on Shopify's global CDN (fast, no app dependency)
+//   • Redirect target is unique per shop — other apps cannot overwrite it
+//   • AI bots follow 301 redirects and read plain-text from CDN correctly
+// ============================================================================
+
+const STAGED_UPLOADS_CREATE = `#graphql
+  mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+    stagedUploadsCreate(input: $input) {
+      stagedTargets {
+        url
+        resourceUrl
+        parameters { name value }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+const FILE_CREATE = `#graphql
+  mutation FileCreate($files: [FileCreateInput!]!) {
+    fileCreate(files: $files) {
+      files {
+        ... on GenericFile {
+          id
+          url
+          fileStatus
+        }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+const FILE_DELETE = `#graphql
+  mutation FileDelete($fileIds: [ID!]!) {
+    fileDelete(fileIds: $fileIds) {
+      deletedFileIds
+      userErrors { field message }
+    }
+  }
+`;
+
+const FILES_QUERY = `#graphql
+  query FilesQuery($query: String!) {
+    files(first: 20, query: $query, sortKey: CREATED_AT) {
+      nodes {
+        ... on GenericFile {
+          id
+          url
+          fileStatus
+        }
+      }
+    }
+  }
+`;
+
+const FILE_STATUS_QUERY = `#graphql
+  query FileStatus($id: ID!) {
+    node(id: $id) {
+      ... on GenericFile {
+        id
+        url
+        fileStatus
+      }
+    }
+  }
+`;
+
+// Upload a text file to Shopify Content → Files and return the CDN URL.
+// Flow: stagedUploadsCreate → PUT to presigned URL → fileCreate → poll for URL.
+async function uploadToShopifyFiles(adminGraphQL, filename, content, mimeType = "text/plain") {
+  const byteLen = Buffer.byteLength(content, "utf-8");
+  console.log(`[llms-cdn] Uploading ${filename} (${byteLen} bytes) to Shopify Files...`);
+
+  // Step 1 — delete any existing files with the same name to avoid accumulation.
+  try {
+    const listRes = await adminGraphQL(FILES_QUERY, { variables: { query: `filename:${filename}` } });
+    const listJson = await listRes.json();
+    // Match by URL path since GenericFile has no filename field in GQL schema.
+    const existing = (listJson?.data?.files?.nodes || []).filter(
+      (f) => String(f.url || "").includes(`/${filename}`),
+    );
+    if (existing.length > 0) {
+      const ids = existing.map((f) => f.id);
+      console.log(`[llms-cdn] Deleting ${ids.length} existing ${filename} file(s): ${ids.join(", ")}`);
+      await adminGraphQL(FILE_DELETE, { variables: { fileIds: ids } });
+    }
+  } catch (delErr) {
+    console.warn(`[llms-cdn] Could not delete old ${filename}: ${delErr?.message}`);
+  }
+
+  // Step 2 — create staged upload (presigned URL).
+  const stageRes = await adminGraphQL(STAGED_UPLOADS_CREATE, {
+    variables: {
+      input: [{
+        filename,
+        mimeType,
+        httpMethod: "POST",
+        resource: "FILE",
+        fileSize: String(byteLen),
+      }],
+    },
+  });
+  const stageJson = await stageRes.json();
+  const stageErrs = stageJson?.data?.stagedUploadsCreate?.userErrors || [];
+  if (stageErrs.length) throw new Error(`stagedUploadsCreate: ${stageErrs.map((e) => e.message).join(", ")}`);
+  const target = stageJson?.data?.stagedUploadsCreate?.stagedTargets?.[0];
+  if (!target?.url) throw new Error(`No staged upload target returned for ${filename}`);
+
+  // Step 3 — upload file content to presigned URL.
+  const form = new FormData();
+  for (const { name, value } of (target.parameters || [])) {
+    form.append(name, value);
+  }
+  form.append("file", new Blob([content], { type: mimeType }), filename);
+  const uploadRes = await fetch(target.url, { method: "POST", body: form });
+  if (!uploadRes.ok) {
+    const body = await uploadRes.text().catch(() => "");
+    throw new Error(`Presigned upload HTTP ${uploadRes.status}: ${body.substring(0, 200)}`);
+  }
+  console.log(`[llms-cdn] Presigned upload for ${filename} succeeded`);
+
+  // Step 4 — register file in Shopify Files.
+  const fileRes = await adminGraphQL(FILE_CREATE, {
+    variables: {
+      files: [{
+        alt: `${filename} — AI discovery`,
+        contentType: "FILE",
+        originalSource: target.resourceUrl,
+      }],
+    },
+  });
+  const fileJson = await fileRes.json();
+  const fileErrs = fileJson?.data?.fileCreate?.userErrors || [];
+  if (fileErrs.length) throw new Error(`fileCreate: ${fileErrs.map((e) => e.message).join(", ")}`);
+
+  const file = fileJson?.data?.fileCreate?.files?.[0];
+  if (file?.url) {
+    console.log(`[llms-cdn] ${filename} → ${file.url} (immediate)`);
+    return file.url;
+  }
+
+  // Step 5 — poll until file status = READY (Shopify processes asynchronously).
+  const fileId = file?.id;
+  if (fileId) {
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const pollRes = await adminGraphQL(FILE_STATUS_QUERY, { variables: { id: fileId } });
+      const pollJson = await pollRes.json();
+      const ready = pollJson?.data?.node;
+      if (ready?.url) {
+        console.log(`[llms-cdn] ${filename} READY → ${ready.url} (poll attempt ${attempt})`);
+        return ready.url;
+      }
+      console.log(`[llms-cdn] ${filename} status=${ready?.fileStatus || "PENDING"} (attempt ${attempt}/6)`);
+    }
+  }
+
+  throw new Error(`${filename} upload timed out — CDN URL not available after 12 s`);
+}
+
 const URL_REDIRECTS_BY_PATH_QUERY = `#graphql
   query UrlRedirectsByPath($query: String!) {
     urlRedirects(first: 50, query: $query) {
@@ -1302,43 +1467,81 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
       update: { content, agentContent, itemCount, creditsUsed: credits, updatedAt: new Date() },
     });
 
-    // ── Post-generation: automatically repair/verify redirect ─────────────
-    // Redirect repair never deducts credits — it runs free after every generation.
-    const redirects = await publishRootDiscoveryRedirects(shop, adminGraphQL);
+    // ── Upload to Shopify Files (CDN) → redirect to CDN URL ──────────────
+    // Strategy: upload llms.txt and agents.md to Content → Files so they are
+    // served from Shopify's own CDN, then point /llms.txt to the CDN URL.
+    // This is more reliable than the app proxy approach because the CDN URL
+    // is unique per shop and cannot be overwritten by another app's redirect.
+    // Falls back to app proxy redirect if CDN upload fails.
+    let cdnTargets = {};
 
-    // ── Post-generation log ───────────────────────────────────────────────
+    if (adminGraphQL) {
+      try {
+        console.log(`[llms-cdn] [${shop}] Uploading llms.txt and agents.md to Shopify Files...`);
+        const [llmsCdnUrl, agentsCdnUrl] = await Promise.all([
+          uploadToShopifyFiles(adminGraphQL, "llms.txt", content),
+          uploadToShopifyFiles(adminGraphQL, "agents.md", agentContent, "text/markdown"),
+        ]);
+        if (llmsCdnUrl)   cdnTargets.llmsTxt  = llmsCdnUrl;
+        if (agentsCdnUrl) cdnTargets.agentsMd = agentsCdnUrl;
+        console.log(`[llms-cdn] [${shop}] CDN upload complete:`, JSON.stringify(cdnTargets));
+      } catch (cdnErr) {
+        console.warn(`[llms-cdn] [${shop}] CDN upload failed (will use app proxy fallback): ${cdnErr?.message}`);
+      }
+    }
+
+    // ── Create/update redirects pointing to CDN URL (or app proxy fallback) ─
+    const redirectTargets = {
+      llmsTxt:  cdnTargets.llmsTxt  || "/apps/llms-txt/llms.txt",
+      agentsMd: cdnTargets.agentsMd || "/apps/llms-txt/agents.md",
+    };
+
+    const REDIRECT_MAP = [
+      { path: "/llms.txt",  target: redirectTargets.llmsTxt  },
+      { path: "/agents.md", target: redirectTargets.agentsMd },
+      { path: "/agent.md",  target: redirectTargets.agentsMd },
+    ];
+
+    const redirectResults = await Promise.allSettled(
+      REDIRECT_MAP.map(({ path, target }) =>
+        adminGraphQL
+          ? resolveOneRedirectWithSession(adminGraphQL, path, target)
+              .then((r) => ({ ...r, target }))
+          : resolveOneRedirectWithRest(shop, (await db.shop.findUnique({ where: { shop }, select: { accessToken: true } }))?.accessToken || "", path, target)
+              .then((r) => ({ ...r, target })),
+      ),
+    );
+
+    const redirects = redirectResults.map((r, i) =>
+      r.status === "fulfilled"
+        ? r.value
+        : { path: REDIRECT_MAP[i].path, error: r.reason?.message || "redirect failed" },
+    );
+
+    // Log final state
     const llmsTxtResult = redirects.find((r) => r.path === "/llms.txt");
+    const usedCdn = Boolean(cdnTargets.llmsTxt);
     if (llmsTxtResult?.error) {
-      console.error(`[llms-redirect] [${shop}] POST-GENERATE: /llms.txt redirect FAILED — ${llmsTxtResult.error}`);
+      console.error(`[llms-redirect] [${shop}] /llms.txt redirect FAILED — ${llmsTxtResult.error}`);
     } else {
       console.log(
-        `[llms-redirect] [${shop}] POST-GENERATE: /llms.txt → /apps/llms-txt/llms.txt` +
-        ` (action=${llmsTxtResult?.action || "unknown"})`,
+        `[llms-redirect] [${shop}] /llms.txt → ${redirectTargets.llmsTxt}` +
+        ` (${usedCdn ? "CDN" : "app proxy"}, action=${llmsTxtResult?.action || "unknown"})`,
       );
     }
 
-    // ── Server-side content verification ─────────────────────────────────
-    // Makes a real HTTP request from the server to verify content equality.
-    const verification = await verifyLlmsTxtContent(shop, content);
-    if (verification.match) {
-      console.log(`[llms-verify] [${shop}] ✓ /llms.txt content matches proxy — redirect working correctly`);
-    } else if (verification.error) {
-      console.warn(`[llms-verify] [${shop}] ✗ Verification could not complete: ${verification.error}`);
-    } else {
-      console.warn(
-        `[llms-verify] [${shop}] ✗ CONTENT MISMATCH — ` +
-        `/llms.txt returned content from source: "${verification.redirectSource || "unknown"}" ` +
-        `instead of our proxy. Browser/CDN may have a cached redirect from a previous app. ` +
-        `Test in incognito mode or clear browser cache for /llms.txt.`,
-      );
-    }
-
-    // Determine if any conflict was found and resolved (for toast message in UI).
     const redirectFixed = redirects.some((r) =>
       ["conflict_resolved", "recreated", "created", "rest_created", "rest_race_updated"].includes(r.action),
     );
 
-    return { content, creditsUsed: credits, redirects, redirectFixed, verification };
+    return {
+      content,
+      creditsUsed: credits,
+      redirects,
+      redirectFixed,
+      usedCdn,
+      cdnTargets,
+    };
   } catch (error) {
     await refundCredits({ shopDomain: shop, creditsRefunded: credits });
     throw error;
