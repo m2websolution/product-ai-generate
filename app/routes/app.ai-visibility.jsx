@@ -21,6 +21,7 @@ import {
   generateAndStoreDynamicLlmsTxt,
   invalidateLlmsTxtCache,
   reAssertRedirectsInBackground,
+  syncCdnRedirects,
   readLlmsTxtSettings,
   writeLlmsTxtSettings,
 } from "../lib/llmsTxt.server";
@@ -245,11 +246,18 @@ export const loader = async ({ request }) => {
     };
   }
 
-  // Re-assert /llms.txt and /agents.md redirects every time the page loads (non-blocking).
-  // Uses the live session admin.graphql so it can override any app's redirect.
-  // Throttled to at most once every 10 minutes per shop to avoid rate-limit.
+  // On every page load, non-blockingly sync /llms.txt → CDN URL (uploaded Shopify File).
+  // syncCdnRedirects queries Shopify Files for the READY llms.txt CDN URL and
+  // updates the redirect to it — so the redirect never reverts to the app proxy.
+  // Falls back to reAssertRedirectsInBackground (app proxy) only if no CDN file found.
   if (llmsTxt) {
-    reAssertRedirectsInBackground(shop, admin.graphql);
+    syncCdnRedirects(shop, admin.graphql).then((result) => {
+      if (result?.skipped) {
+        reAssertRedirectsInBackground(shop, admin.graphql);
+      }
+    }).catch(() => {
+      reAssertRedirectsInBackground(shop, admin.graphql);
+    });
   }
 
   return {

@@ -641,6 +641,20 @@ async function resolveOneRedirectWithSession(adminGraphQL, path, target) {
     return { action: "unchanged", path, target };
   }
 
+  // Step 4b — CRITICAL: if the existing redirect already points to a Shopify CDN file
+  // and the new target is just an app proxy path, PRESERVE the CDN redirect.
+  // This prevents the 10-min background re-assertion from reverting CDN redirects back
+  // to the app proxy every time the AI Visibility page is loaded.
+  const existingIsCdnFile = String(primary.target).includes("cdn.shopify.com");
+  const newTargetIsProxy  = String(target).startsWith("/apps/");
+  if (existingIsCdnFile && newTargetIsProxy) {
+    console.log(
+      `${LOG} PRESERVE CDN: ${path} → "${primary.target}" ` +
+      `(keeping CDN URL, not reverting to app proxy)`,
+    );
+    return { action: "unchanged_cdn", path, target: primary.target };
+  }
+
   // Step 5 — wrong target: use UPDATE (atomic — works even if another app owns it).
   const wasConflict = !isOurRedirect(primary.target);
   console.warn(
@@ -821,9 +835,83 @@ export function reAssertRedirectsInBackground(shop, adminGraphQL) {
 }
 
 // Exported for direct call (no throttle) — used on generate/regenerate.
-// Direct call (no throttle) — used on generate/regenerate and fix action.
 export async function ensureLlmsTxtRedirects(shop, adminGraphQL) {
   return publishRootDiscoveryRedirects(shop, adminGraphQL);
+}
+
+// ─── CDN-aware redirect sync ──────────────────────────────────────────────────
+// Queries Shopify Files for the uploaded llms.txt / agents.md and sets redirects
+// to the actual CDN URLs (https://cdn.shopify.com/...).
+// This is the CORRECT fix — CDN URL is unique per upload, other apps cannot
+// serve content at that URL, so the redirect is stable.
+
+async function getCdnUrlsFromShopifyFiles(adminGraphQL) {
+  const [llmsRes, agentsRes] = await Promise.all([
+    adminGraphQL(FILES_QUERY, { variables: { query: "llms.txt" } }),
+    adminGraphQL(FILES_QUERY, { variables: { query: "agents.md" } }),
+  ]);
+  const llmsJson   = await llmsRes.json();
+  const agentsJson = await agentsRes.json();
+
+  const pickUrl = (nodes, keyword) =>
+    (nodes || [])
+      .filter((f) => f.fileStatus === "READY" && String(f.url || "").includes(keyword))
+      .map((f) => f.url)
+      .find(Boolean) || null;
+
+  const llmsTxtCdnUrl  = pickUrl(llmsJson?.data?.files?.nodes,   "llms.txt");
+  const agentsMdCdnUrl = pickUrl(agentsJson?.data?.files?.nodes, "agents.md");
+
+  console.log(`[llms-cdn] Files query — llms.txt: ${llmsTxtCdnUrl || "NOT FOUND"}`);
+  console.log(`[llms-cdn] Files query — agents.md: ${agentsMdCdnUrl || "NOT FOUND"}`);
+  return { llmsTxtCdnUrl, agentsMdCdnUrl };
+}
+
+export async function syncCdnRedirects(shop, adminGraphQL) {
+  if (!adminGraphQL) {
+    console.warn("[llms-cdn] syncCdnRedirects requires adminGraphQL — skipping");
+    return { skipped: true };
+  }
+
+  console.log(`[llms-cdn] [${shop}] Querying Shopify Files for CDN URLs...`);
+  const { llmsTxtCdnUrl, agentsMdCdnUrl } = await getCdnUrlsFromShopifyFiles(adminGraphQL);
+
+  if (!llmsTxtCdnUrl && !agentsMdCdnUrl) {
+    console.warn(`[llms-cdn] [${shop}] No READY CDN files found — redirects unchanged`);
+    return { skipped: true, reason: "no CDN files found in Shopify Files" };
+  }
+
+  const REDIRECT_MAP = [
+    llmsTxtCdnUrl  && { path: "/llms.txt",  target: llmsTxtCdnUrl  },
+    agentsMdCdnUrl && { path: "/agents.md", target: agentsMdCdnUrl },
+    agentsMdCdnUrl && { path: "/agent.md",  target: agentsMdCdnUrl },
+  ].filter(Boolean);
+
+  console.log(
+    `[llms-cdn] [${shop}] Setting CDN redirects:\n` +
+    REDIRECT_MAP.map((m) => `  ${m.path} → ${m.target}`).join("\n"),
+  );
+
+  const results = await Promise.allSettled(
+    REDIRECT_MAP.map(({ path, target }) =>
+      resolveOneRedirectWithSession(adminGraphQL, path, target),
+    ),
+  );
+
+  const output = results.map((r, i) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { path: REDIRECT_MAP[i].path, error: r.reason?.message || "failed" },
+  );
+
+  const verified = await verifyRedirects(
+    adminGraphQL,
+    REDIRECT_MAP.map(({ path, target }) => ({ path, expectedTarget: target })),
+  );
+
+  const success = verified.every((v) => v.verified);
+  console.log(`[llms-cdn] [${shop}] syncCdnRedirects: ${success ? "✓ all redirects verified" : "✗ some failed"}`);
+  return { output, verified, success };
 }
 
 // Called from afterAuth (app install / re-authentication).
