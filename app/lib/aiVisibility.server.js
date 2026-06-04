@@ -415,10 +415,10 @@ function normalizeProductSchema(schema, { title, description, url, image, vendor
   return normalized;
 }
 
-function normalizeFaqItems(items) {
+function normalizeFaqItems(items, maxItems = 5) {
   return (Array.isArray(items) ? items : [])
     .filter((qa) => qa?.question && qa?.answer)
-    .slice(0, 5)
+    .slice(0, maxItems)
     .map((qa) => ({
       question: String(qa.question || "").trim(),
       answer: String(qa.answer || "").trim(),
@@ -426,8 +426,8 @@ function normalizeFaqItems(items) {
     .filter((qa) => qa.question && qa.answer);
 }
 
-function buildFaqPageSchema(items) {
-  const normalizedItems = normalizeFaqItems(items);
+function buildFaqPageSchema(items, maxItems = 5) {
+  const normalizedItems = normalizeFaqItems(items, maxItems);
   if (!normalizedItems.length) return null;
   return {
     "@type": "FAQPage",
@@ -559,8 +559,8 @@ export async function generateProductSchemaForBulk(shop, accessToken, resource, 
   return { schemaJson, creditsUsed: credits };
 }
 
-function buildFaqPageJson(items) {
-  const faqPageSchema = buildFaqPageSchema(items) || { "@type": "FAQPage", mainEntity: [] };
+function buildFaqPageJson(items, maxItems = 5) {
+  const faqPageSchema = buildFaqPageSchema(items, maxItems) || { "@type": "FAQPage", mainEntity: [] };
   return JSON.stringify({
     "@context": "https://schema.org",
     ...faqPageSchema,
@@ -576,8 +576,8 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-function buildFaqHtml(items) {
-  const normalizedItems = normalizeFaqItems(items);
+function buildFaqHtml(items, maxItems = 5) {
+  const normalizedItems = normalizeFaqItems(items, maxItems);
   if (!normalizedItems.length) return "";
   return [
     '<section data-content-ai-faq="true">',
@@ -727,10 +727,14 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
   const credits = await getAiVisibilityCreditCost(shop, CREDITS_FAQ);
   let promptObj;
 
+  // AI Visibility page: product FAQ uses 2 items (schema-embedded FAQs)
+  const AI_VISIBILITY_FAQ_COUNT = 2;
+
   if (resourceType === "product") {
     promptObj = buildProductFaqPrompt({
       title: resource.title,
       description: (resource.description || "").substring(0, 500),
+      count: AI_VISIBILITY_FAQ_COUNT,
     });
   } else if (resourceType === "article") {
     promptObj = buildArticleFaqPrompt({
@@ -748,8 +752,8 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     const arr = parseJsonResponse(raw);
     if (!Array.isArray(arr)) throw new Error("AI returned non-array for FAQ.");
-    const faqPageJson = buildFaqPageJson(arr);
-    const faqHtml = buildFaqHtml(arr);
+    const faqPageJson = buildFaqPageJson(arr, AI_VISIBILITY_FAQ_COUNT);
+    const faqHtml = buildFaqHtml(arr, AI_VISIBILITY_FAQ_COUNT);
 
     const metafieldId = await writeResourceMetafield({
       shop,
