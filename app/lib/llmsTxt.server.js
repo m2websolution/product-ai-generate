@@ -353,7 +353,7 @@ const FILE_DELETE = `#graphql
 
 const FILES_QUERY = `#graphql
   query FilesQuery($query: String!) {
-    files(first: 20, query: $query, sortKey: CREATED_AT) {
+    files(first: 50, query: $query, sortKey: CREATED_AT) {
       nodes {
         ... on GenericFile {
           id
@@ -846,32 +846,46 @@ export async function ensureLlmsTxtRedirects(shop, adminGraphQL) {
 // serve content at that URL, so the redirect is stable.
 
 async function getCdnUrlsFromShopifyFiles(adminGraphQL) {
+  // Use broad search — Shopify Files query is fuzzy on filename.
+  // We fetch up to 50 files per type and filter/pick the most recent READY one.
   const [llmsRes, agentsRes] = await Promise.all([
-    adminGraphQL(FILES_QUERY, { variables: { query: "llms.txt" } }),
-    adminGraphQL(FILES_QUERY, { variables: { query: "agents.md" } }),
+    adminGraphQL(FILES_QUERY, { variables: { query: "llms" } }),
+    adminGraphQL(FILES_QUERY, { variables: { query: "agents" } }),
   ]);
   const llmsJson   = await llmsRes.json();
   const agentsJson = await agentsRes.json();
 
-  const pickUrl = (nodes, keyword) =>
-    (nodes || [])
-      .filter((f) => f.fileStatus === "READY" && String(f.url || "").includes(keyword))
-      .map((f) => f.url)
-      .find(Boolean) || null;
+  // Pick the LAST matching READY file — sortKey: CREATED_AT returns oldest-first,
+  // so the last item in the list is the most recently uploaded file.
+  const pickLatestUrl = (nodes, keyword) => {
+    const matches = (nodes || [])
+      .filter((f) => f.fileStatus === "READY" && String(f.url || "").includes(keyword));
+    return matches.length > 0 ? matches[matches.length - 1].url : null;
+  };
 
-  const llmsTxtCdnUrl  = pickUrl(llmsJson?.data?.files?.nodes,   "llms.txt");
-  const agentsMdCdnUrl = pickUrl(agentsJson?.data?.files?.nodes, "agents.md");
+  const llmsTxtCdnUrl  = pickLatestUrl(llmsJson?.data?.files?.nodes,   "llms.txt");
+  const agentsMdCdnUrl = pickLatestUrl(agentsJson?.data?.files?.nodes, "agents.md");
 
-  console.log(`[llms-cdn] Files query — llms.txt: ${llmsTxtCdnUrl || "NOT FOUND"}`);
-  console.log(`[llms-cdn] Files query — agents.md: ${agentsMdCdnUrl || "NOT FOUND"}`);
+  console.log(`[llms-cdn] Files query — llms.txt:  ${llmsTxtCdnUrl  || "NOT FOUND (not yet uploaded)"}`);
+  console.log(`[llms-cdn] Files query — agents.md: ${agentsMdCdnUrl || "NOT FOUND (not yet uploaded)"}`);
   return { llmsTxtCdnUrl, agentsMdCdnUrl };
 }
+
+const cdnSyncThrottle = new Map();
+const CDN_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function syncCdnRedirects(shop, adminGraphQL) {
   if (!adminGraphQL) {
     console.warn("[llms-cdn] syncCdnRedirects requires adminGraphQL — skipping");
     return { skipped: true };
   }
+
+  // Throttle: run at most once every 5 min per shop (avoids slow page loads on every visit).
+  const last = cdnSyncThrottle.get(shop);
+  if (last && Date.now() - last < CDN_SYNC_INTERVAL_MS) {
+    return { skipped: true, reason: "throttled" };
+  }
+  cdnSyncThrottle.set(shop, Date.now());
 
   console.log(`[llms-cdn] [${shop}] Querying Shopify Files for CDN URLs...`);
   const { llmsTxtCdnUrl, agentsMdCdnUrl } = await getCdnUrlsFromShopifyFiles(adminGraphQL);

@@ -246,18 +246,19 @@ export const loader = async ({ request }) => {
     };
   }
 
-  // On every page load, non-blockingly sync /llms.txt → CDN URL (uploaded Shopify File).
-  // syncCdnRedirects queries Shopify Files for the READY llms.txt CDN URL and
-  // updates the redirect to it — so the redirect never reverts to the app proxy.
-  // Falls back to reAssertRedirectsInBackground (app proxy) only if no CDN file found.
+  // Sync /llms.txt → Shopify Files CDN URL on every page load.
+  // Run synchronously (await) so it actually completes in serverless environments
+  // before the function returns. Throttled to once per 5 min per shop.
   if (llmsTxt) {
-    syncCdnRedirects(shop, admin.graphql).then((result) => {
-      if (result?.skipped) {
+    try {
+      const cdnResult = await syncCdnRedirects(shop, admin.graphql);
+      if (cdnResult?.skipped) {
+        // No CDN file found — fall back to app proxy redirect assertion.
         reAssertRedirectsInBackground(shop, admin.graphql);
       }
-    }).catch(() => {
+    } catch {
       reAssertRedirectsInBackground(shop, admin.graphql);
-    });
+    }
   }
 
   return {
