@@ -638,15 +638,15 @@ function ScoreBadge({ score }) {
 function ItemModal({ item, onClose, onGenerate, generatingKey, credits, hasUnlimitedVisibility, isFreePlan }) {
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   if (!item) return null;
-  // FAQ generation via AI Visibility is not yet released; kept false until the feature ships.
-  const canFaq = false;
+  // FAQ is supported for products and articles — not for pages.
+  const canFaq = item.resourceType !== "page";
   const schemaKey = `schema_${item.id}`;
+  const faqKey = `faq_${item.id}`;
+  const combinedKey = `combined_${item.id}`;
   const minimumRequiredCredits = hasUnlimitedVisibility ? 0 : CREDITS_SCHEMA;
   const hasAffordableAction = !isFreePlan && (hasUnlimitedVisibility || credits >= CREDITS_SCHEMA);
   const showCombinedAction = false;
   const showSchemaAction = true;
-  const faqKey = "";
-  const combinedKey = "";
 
   return (
     <Modal
