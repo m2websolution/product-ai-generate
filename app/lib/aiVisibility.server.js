@@ -400,6 +400,54 @@ function normalizeProductSchema(schema, { title, description, url, image, vendor
   return normalized;
 }
 
+function normalizeFaqItems(items) {
+  return (Array.isArray(items) ? items : [])
+    .filter((qa) => qa?.question && qa?.answer)
+    .slice(0, 2)
+    .map((qa) => ({
+      question: String(qa.question || "").trim(),
+      answer: String(qa.answer || "").trim(),
+    }))
+    .filter((qa) => qa.question && qa.answer);
+}
+
+function buildFaqPageSchema(items) {
+  const normalizedItems = normalizeFaqItems(items);
+  if (!normalizedItems.length) return null;
+  return {
+    "@type": "FAQPage",
+    mainEntity: normalizedItems.map((qa) => ({
+      "@type": "Question",
+      name: qa.question,
+      acceptedAnswer: { "@type": "Answer", text: qa.answer },
+    })),
+  };
+}
+
+function removeContext(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const { "@context": _context, ...rest } = value;
+  return rest;
+}
+
+function composeProductSchemaWithFaq(productSchema, faqItems) {
+  const faqPageSchema = buildFaqPageSchema(faqItems);
+  if (!faqPageSchema) return productSchema;
+
+  const productGraphItems =
+    productSchema?.["@graph"] && Array.isArray(productSchema["@graph"])
+      ? productSchema["@graph"].filter((item) => item?.["@type"] !== "FAQPage")
+      : [productSchema];
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      ...productGraphItems.map(removeContext),
+      faqPageSchema,
+    ],
+  };
+}
+
 function normalizeCollectionPageSchema(schema, { title, description, url, image, products }) {
   const cleanDescription = String(description || "")
     .replace(/<[^>]+>/g, " ")
@@ -497,15 +545,10 @@ export async function generateProductSchemaForBulk(shop, accessToken, resource, 
 }
 
 function buildFaqPageJson(items) {
-  const normalizedItems = items.filter((qa) => qa?.question && qa?.answer).slice(0, 2);
+  const faqPageSchema = buildFaqPageSchema(items) || { "@type": "FAQPage", mainEntity: [] };
   return JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: normalizedItems.map((qa) => ({
-      "@type": "Question",
-      name: qa.question,
-      acceptedAnswer: { "@type": "Answer", text: qa.answer },
-    })),
+    ...faqPageSchema,
   });
 }
 
@@ -519,7 +562,7 @@ function escapeHtml(value) {
 }
 
 function buildFaqHtml(items) {
-  const normalizedItems = items.filter((qa) => qa?.question && qa?.answer).slice(0, 2);
+  const normalizedItems = normalizeFaqItems(items);
   if (!normalizedItems.length) return "";
   return [
     '<section data-content-ai-faq="true">',
@@ -529,6 +572,39 @@ function buildFaqHtml(items) {
     )),
     "</section>",
   ].join("");
+}
+
+async function addFaqToStoredProductSchema({ shop, adminGraphQL, accessToken, resource, faqItems }) {
+  const storedSchema = await db.aiVisibilitySchema.findUnique({
+    where: { shop_resourceType_resourceId: { shop, resourceType: "product", resourceId: resource.id } },
+    select: { schemaJson: true, creditsUsed: true },
+  });
+  if (!storedSchema?.schemaJson) return null;
+
+  let productSchema;
+  try {
+    productSchema = JSON.parse(storedSchema.schemaJson);
+  } catch {
+    return null;
+  }
+
+  const schemaJson = JSON.stringify(composeProductSchemaWithFaq(productSchema, faqItems));
+  const metafieldId = await writeResourceMetafield({
+    shop,
+    adminGraphQL,
+    accessToken,
+    resourceType: "product",
+    resource,
+    key: "schema_json",
+    jsonValue: schemaJson,
+  });
+
+  await db.aiVisibilitySchema.update({
+    where: { shop_resourceType_resourceId: { shop, resourceType: "product", resourceId: resource.id } },
+    data: { schemaJson, metafieldId, updatedAt: new Date() },
+  });
+
+  return schemaJson;
 }
 
 function appendFaqHtmlToDescription(descriptionHtml, faqHtml) {
@@ -687,6 +763,14 @@ export async function generateFaq(shop, adminContext, resourceType, resource) {
     });
 
     if (resourceType === "product") {
+      await addFaqToStoredProductSchema({
+        shop,
+        adminGraphQL,
+        accessToken,
+        resource,
+        faqItems: arr,
+      });
+
       await db.productGeneratedContent.upsert({
         where: { shop_productId: { shop, productId: resource.id } },
         create: {
@@ -746,7 +830,8 @@ export async function generateCombined(shop, adminContext, resource) {
   try {
     const raw = await callAIRaw(promptObj.prompt, promptObj.systemPrompt, aiOptions);
     const parsed = parseJsonResponse(raw);
-    const schemaJson = JSON.stringify(normalizeProductSchema(parsed.schema, {
+    const faqArr = normalizeFaqItems(parsed.faqs);
+    const productSchema = normalizeProductSchema(parsed.schema, {
       title: resource.title,
       description: resource.description || resource.descriptionHtml || "",
       url: productUrl,
@@ -755,16 +840,11 @@ export async function generateCombined(shop, adminContext, resource) {
       price,
       currencyCode,
       available: resource.status === "ACTIVE",
-    }));
-    const faqArr = (Array.isArray(parsed.faqs) ? parsed.faqs : []).filter((qa) => qa?.question && qa?.answer).slice(0, 2);
+    });
+    const schemaJson = JSON.stringify(composeProductSchemaWithFaq(productSchema, faqArr));
     const faqPageSchema = {
       "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: faqArr.map((qa) => ({
-        "@type": "Question",
-        name: qa.question,
-        acceptedAnswer: { "@type": "Answer", text: qa.answer },
-      })),
+      ...(buildFaqPageSchema(faqArr) || { "@type": "FAQPage", mainEntity: [] }),
     };
     const faqPageJson = JSON.stringify(faqPageSchema);
     const faqHtml = buildFaqHtml(faqArr);
