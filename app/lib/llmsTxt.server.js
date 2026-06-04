@@ -1142,7 +1142,7 @@ export function invalidateLlmsTxtCache(shop) {
   responseCache.delete(`agents:${shop}`);
 }
 
-export async function generateAndStoreDynamicLlmsTxt(shop, options = {}) {
+export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGraphQL) {
   const credits = LLMS_GENERATION_CREDITS;
   await deductCredits({ shopDomain: shop, creditsUsed: credits });
 
@@ -1158,7 +1158,8 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}) {
       create: { shop, content, agentContent, itemCount, creditsUsed: credits },
       update: { content, agentContent, itemCount, creditsUsed: credits, updatedAt: new Date() },
     });
-    return { content, creditsUsed: credits };
+    const redirects = await publishRootDiscoveryRedirects(shop, adminGraphQL);
+    return { content, creditsUsed: credits, redirects };
   } catch (error) {
     await refundCredits({ shopDomain: shop, creditsRefunded: credits });
     throw error;
