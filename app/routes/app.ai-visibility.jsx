@@ -1333,42 +1333,26 @@ export default function AiVisibilityPage() {
                 </Text>
                 {llmsTxt && (
                   <BlockStack gap="100">
-                    <InlineStack gap="100" blockAlign="center" wrap={false}>
+                    <InlineStack gap="200" blockAlign="center">
                       <Text variant="bodySm" tone="subdued" as="span">llms.txt:</Text>
-                      <Button
-                        variant="plain"
-                        size="slim"
-                        url={llmsTxtUrl}
-                        external
-                      >
-                        {llmsTxtUrl}
-                      </Button>
                       <Button
                         size="slim"
                         onClick={() => {
                           if (typeof navigator !== "undefined") navigator.clipboard.writeText(llmsTxtUrl);
                         }}
                       >
-                        Copy
+                        Copy URL
                       </Button>
                     </InlineStack>
-                    <InlineStack gap="100" blockAlign="center" wrap={false}>
+                    <InlineStack gap="200" blockAlign="center">
                       <Text variant="bodySm" tone="subdued" as="span">agents.md:</Text>
-                      <Button
-                        variant="plain"
-                        size="slim"
-                        url={agentsMdUrl}
-                        external
-                      >
-                        {agentsMdUrl}
-                      </Button>
                       <Button
                         size="slim"
                         onClick={() => {
                           if (typeof navigator !== "undefined") navigator.clipboard.writeText(agentsMdUrl);
                         }}
                       >
-                        Copy
+                        Copy URL
                       </Button>
                     </InlineStack>
                   </BlockStack>
