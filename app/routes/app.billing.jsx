@@ -6,7 +6,7 @@ import {
   activateSubscription,
 } from "../lib/billing.server";
 
-const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE || "content-ai-seo-generator";
+const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE || "gen-ai-seo-product-description";
 
 function buildBillingRedirect(sourceUrl, result) {
   const shop = sourceUrl.searchParams.get("shop") || "";
