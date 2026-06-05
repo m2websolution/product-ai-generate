@@ -576,7 +576,7 @@ async function deleteStorefrontRedirectWithGraphql(shop, accessToken, redirectId
 
 // ============================================================================
 // LLMS.TXT REDIRECT MANAGER
-// Ensures /llms.txt, /agents.md, /agent.md always point to our app proxy,
+// Ensures /llms.txt, /agents.md always point to our app proxy,
 // regardless of what other apps have configured.
 // ============================================================================
 
@@ -586,7 +586,6 @@ const OUR_PROXY_PREFIX = "/apps/llms-txt/";
 const LLMS_REDIRECTS = [
   { path: "/llms.txt",  target: "/apps/llms-txt/llms.txt"  },
   { path: "/agents.md", target: "/apps/llms-txt/agents.md" },
-  { path: "/agent.md",  target: "/apps/llms-txt/agent.md"  },
 ];
 
 function isOurRedirect(target) {
@@ -923,7 +922,6 @@ export async function syncCdnRedirects(shop, adminGraphQL) {
   const REDIRECT_MAP = [
     llmsTxtCdnUrl  && { path: "/llms.txt",  target: llmsTxtCdnUrl  },
     agentsMdCdnUrl && { path: "/agents.md", target: agentsMdCdnUrl },
-    agentsMdCdnUrl && { path: "/agent.md",  target: agentsMdCdnUrl },
   ].filter(Boolean);
 
   console.log(
@@ -1901,7 +1899,6 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
     const REDIRECT_MAP = [
       { path: "/llms.txt",        target: redirectTargets.llmsTxt  },
       { path: "/agents.md",       target: redirectTargets.agentsMd },
-      { path: "/agent.md",        target: redirectTargets.agentsMd },
       { path: "/apps/llms.txt",   target: redirectTargets.llmsTxt  },
       { path: "/apps/agents.txt", target: redirectTargets.agentsMd },
     ];
@@ -1971,9 +1968,10 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
     if (failedRedirects.length > 0 && adminGraphQL) {
       console.warn(`[llms-redirect] [${shop}] ${failedRedirects.length} redirect(s) failed — retrying with proxy URLs`);
       const proxyFallbackMap = [
-        { path: "/llms.txt",  target: "/apps/llms-txt/llms.txt"  },
-        { path: "/agents.md", target: "/apps/llms-txt/agents.md" },
-        { path: "/agent.md",  target: "/apps/llms-txt/agent.md"  },
+        { path: "/llms.txt",        target: "/apps/llms-txt/llms.txt"  },
+        { path: "/agents.md",       target: "/apps/llms-txt/agents.md" },
+        { path: "/apps/llms.txt",   target: "/apps/llms-txt/llms.txt"  },
+        { path: "/apps/agents.txt", target: "/apps/llms-txt/agents.md" },
       ];
       await Promise.allSettled(
         failedRedirects.map(async (failed) => {
@@ -2027,7 +2025,6 @@ export async function repairLlmsTxtRedirect(shop, adminGraphQL) {
   const MAP = [
     { path: "/llms.txt",        target: targets.llmsTxt  },
     { path: "/agents.md",       target: targets.agentsMd },
-    { path: "/agent.md",        target: targets.agentsMd },
     { path: "/apps/llms.txt",   target: targets.llmsTxt  },
     { path: "/apps/agents.txt", target: targets.agentsMd },
   ];
