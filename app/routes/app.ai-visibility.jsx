@@ -333,7 +333,7 @@ export const action = async ({ request }) => {
         resourceType,
         resource,
       );
-      return { ok: true, intent, resourceType, resourceId: resource.id, ...result };
+      return { ok: true, intent, resourceType, resourceId: resource.id, resourceTitle: resource.title || "", ...result };
     }
 
     if (intent === "generate_faq") {
@@ -1049,11 +1049,11 @@ export default function AiVisibilityPage() {
         if (typeof window !== "undefined" && window.shopify?.toast) {
           let msg;
           if (data.intent === "generate_llmstxt") {
-            msg = "AI Index (llms.txt) generated — your store is now discoverable by AI assistants.";
+            msg = "LLMs.txt file successfully generated.";
           } else if (data.intent === "generate_combined") {
             msg = `SEO content generated — schema markup and FAQ added (${data.creditsUsed ?? 0} cr).`;
           } else if (data.intent === "generate_schema") {
-            msg = `Schema markup generated — search engines can now better understand this content (${data.creditsUsed ?? 0} cr).`;
+            msg = `${data.resourceTitle ? `${data.resourceTitle} ` : ""}JSON Schema Generated Successfully.`;
           } else if (data.intent === "generate_faq") {
             msg = `FAQ schema generated — boosts visibility in Google's People Also Ask (${data.creditsUsed ?? 0} cr).`;
           } else if (data.intent === "generate_bulk_schema") {
@@ -1352,7 +1352,7 @@ export default function AiVisibilityPage() {
                           if (typeof navigator !== "undefined") navigator.clipboard.writeText(llmsTxtUrl);
                         }}
                       >
-                        Copy URL
+                        View
                       </Button>
                       <Button
                         size="slim"
