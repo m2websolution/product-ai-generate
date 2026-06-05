@@ -1414,6 +1414,24 @@ export default function AiVisibilityPage() {
                     </Button>
                   )}
                 </InlineStack>
+                {llmsTxt && (
+                  <Box background="bg-surface-secondary" borderRadius="200" padding="200">
+                    <InlineStack gap="200" blockAlign="center" wrap={false}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Text variant="bodySm" tone="subdued" truncate>
+                          <a
+                            href={llmsTxtCdnUrl || llmsTxtUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ wordBreak: "break-all", color: "inherit" }}
+                          >
+                            {llmsTxtCdnUrl || llmsTxtUrl}
+                          </a>
+                        </Text>
+                      </div>
+                    </InlineStack>
+                  </Box>
+                )}
                 {repairFetcher.data && (
                   <Banner
                     tone={repairFetcher.data.ok && repairFetcher.data.live ? "success" : "warning"}
