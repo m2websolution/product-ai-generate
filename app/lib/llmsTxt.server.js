@@ -1852,8 +1852,16 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
     let cdnTargets = {};
 
     // ── Upload to Shopify Files (CDN) ─────────────────────────────────────
+    let llmsOldIds = [];
+    let agentsOldIds = [];
     if (adminGraphQL) {
       try {
+        // Collect existing file IDs BEFORE uploading so we have them ready for cleanup.
+        [llmsOldIds, agentsOldIds] = await Promise.all([
+          collectOldShopifyFileIds(adminGraphQL, "llms.txt",  null),
+          collectOldShopifyFileIds(adminGraphQL, "agents.md", null),
+        ]);
+
         console.log(`[llms-cdn] [${shop}] Uploading llms.txt → Shopify Files...`);
         const [llmsCdnUrl, agentsCdnUrl] = await Promise.all([
           uploadToShopifyFiles(adminGraphQL, "llms.txt", content),
@@ -1918,20 +1926,16 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
         : { path: REDIRECT_MAP[i].path, target: REDIRECT_MAP[i].target, error: r.reason?.message || "redirect failed" },
     );
 
-    // ── Non-blocking cleanup of old CDN files (runs after redirect is confirmed) ───
-    // Deletion is intentionally deferred to here so old files are still accessible
-    // via any browser-cached 301 redirects until the new redirect is in place.
-    if (adminGraphQL && (cdnTargets.llmsTxt || cdnTargets.agentsMd)) {
-      Promise.all([
-        cdnTargets.llmsTxt  ? collectOldShopifyFileIds(adminGraphQL, "llms.txt",  cdnTargets.llmsTxt)  : [],
-        cdnTargets.agentsMd ? collectOldShopifyFileIds(adminGraphQL, "agents.md", cdnTargets.agentsMd) : [],
-      ]).then(([llmsOld, agentsOld]) => {
-        const toDelete = [...llmsOld, ...agentsOld];
-        if (toDelete.length > 0) {
-          console.log(`[llms-cdn] [${shop}] Background cleanup: deleting ${toDelete.length} old CDN file(s)`);
-          return adminGraphQL(FILE_DELETE, { variables: { fileIds: toDelete } });
-        }
-      }).catch((e) => console.warn(`[llms-cdn] [${shop}] Background CDN cleanup failed: ${e?.message}`));
+    // ── Delete old CDN files now that the redirect points to the new file ───
+    if (adminGraphQL && llmsOldIds && (llmsOldIds.length > 0 || agentsOldIds.length > 0)) {
+      const toDelete = [...llmsOldIds, ...agentsOldIds];
+      try {
+        console.log(`[llms-cdn] [${shop}] Deleting ${toDelete.length} old CDN file(s)...`);
+        await adminGraphQL(FILE_DELETE, { variables: { fileIds: toDelete } });
+        console.log(`[llms-cdn] [${shop}] ✓ Old CDN files deleted.`);
+      } catch (e) {
+        console.warn(`[llms-cdn] [${shop}] Old CDN file deletion failed: ${e?.message}`);
+      }
     }
 
     // ── Verify redirects after creation ───────────────────────────────────
