@@ -945,6 +945,7 @@ const INTENT_LABEL = {
   generate_seo_description: "SEO Description",
   generate_all: "Full Content",
   product_bulk_generate: "Product Bulk Generate",
+  product_faq_bulk_generate: "Product FAQ Bulk Generate",
   collection_bulk_generate: "Collection Bulk Generate",
   collection_product_bulk_generate: "Collection Product Bulk Generate",
   page_bulk_generate: "Page Bulk Generate",

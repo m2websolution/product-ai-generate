@@ -654,7 +654,7 @@ export async function generateProductItem(item, settings, apiKeys) {
       shop: settings.shop,
       productId: item.id,
       productTitle: item.title || null,
-      intent: "product_bulk_generate",
+      intent: shouldGenerateFaq ? "product_faq_bulk_generate" : "product_bulk_generate",
       resourceType: "product",
       language: settings.language || null,
       tone: settings.tone || null,
