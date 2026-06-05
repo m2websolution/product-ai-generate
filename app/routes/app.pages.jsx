@@ -1126,7 +1126,7 @@ export default function PagesPage() {
           ? ` ${data.creditsUsed} credits used${typeof data.newCredits === "number" ? `. Remaining: ${data.newCredits}` : ""}.`
           : "";
       if (typeof data.newCredits === "number") setLocalCredits(data.newCredits);
-      shopify.toast.show(`Generated ${data.succeeded}/${data.total} pages. Review before saving.${creditsMessage}`);
+      shopify.toast.show(`SEO content generated for ${data.succeeded}/${data.total} pages — review and save.${creditsMessage}`);
     } else {
       generatedRegenerateRef.current = false;
       setBulkValidationMessage(data.error || "Bulk generation failed.");
@@ -1174,7 +1174,7 @@ export default function PagesPage() {
         ),
       );
       setEditingPage(null);
-      shopify.toast.show(data.message || "Page updated successfully!");
+      shopify.toast.show(data.message || "Page SEO content updated successfully.");
       return;
     }
     shopify.toast.show(data.error || "Failed to update page");
@@ -1238,7 +1238,7 @@ export default function PagesPage() {
         ),
       );
       handleCancelGeneratedReview();
-      shopify.toast.show(data.message || "Generated page saved successfully!");
+      shopify.toast.show(data.message || "SEO content saved to page.");
       window.setTimeout(() => navigateInApp("/app/content-management", "?tab=pages&filter=all"), 600);
       return;
     }

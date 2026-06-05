@@ -2078,14 +2078,14 @@ export default function CollectionsPage() {
       setQueueStatusById({});
       if (queueIntervalRef.current) { clearInterval(queueIntervalRef.current); queueIntervalRef.current = null; }
       if (response.queued) {
-        shopify.toast.show(`Generating ${response.total} items in the background.`);
+        shopify.toast.show(`Generating SEO content for ${response.total} collections in the background.`);
         window.setTimeout(() => navigateInApp("/app/jobs", ""), 600);
       } else {
         const creditsMessage =
           typeof response.creditsUsed === "number"
             ? ` ${response.creditsUsed} credits used${typeof response.newCredits === "number" ? `. Remaining: ${response.newCredits}` : ""}.`
             : "";
-        shopify.toast.show(`Bulk generate complete: ${response.succeeded}/${response.total} updated.${creditsMessage}`);
+        shopify.toast.show(`SEO content updated for ${response.succeeded}/${response.total} collections.${creditsMessage}`);
         revalidator.revalidate();
       }
       return;

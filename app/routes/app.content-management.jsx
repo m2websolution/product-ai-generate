@@ -2774,7 +2774,7 @@ export default function ContentManagementPage() {
         `Content generated. ${data.creditsUsed || 0} credit${data.creditsUsed === 1 ? "" : "s"} used. Remaining: ${data.newCredits}.`,
       );
       setTimeout(() => setSuccessMessage(null), 5000);
-      shopify.toast.show("Content generated successfully!");
+      shopify.toast.show("AI content generated — review before publishing.");
     } else {
       setErrorMessage(data.error || "Generation failed.");
       setGenerationProgress(0);
@@ -2827,7 +2827,7 @@ export default function ContentManagementPage() {
         setPendingGenerateItem(null);
         setGeneratedPreviewText("");
       }
-      shopify.toast.show("Content saved successfully!");
+      shopify.toast.show("SEO content saved and published.");
     } else {
       setErrorMessage(data.error || "Save failed.");
     }

@@ -1782,7 +1782,7 @@ export default function TemplatePage() {
           customTemplates,
         );
         showConfigSavedMessage();
-        shopify.toast.show(`${template.name} applied to products.`);
+        shopify.toast.show(`SEO template "${template.name}" applied to products.`);
         return;
       }
 
@@ -1809,7 +1809,7 @@ export default function TemplatePage() {
           customTemplates,
         );
         showConfigSavedMessage();
-        shopify.toast.show(`${template.name} applied to collections.`);
+        shopify.toast.show(`SEO template "${template.name}" applied to collections.`);
         return;
       }
 
@@ -1836,7 +1836,7 @@ export default function TemplatePage() {
           customTemplates,
         );
         showConfigSavedMessage();
-        shopify.toast.show(`${template.name} applied to pages.`);
+        shopify.toast.show(`SEO template "${template.name}" applied to pages.`);
         return;
       }
     } catch (error) {
@@ -1853,7 +1853,7 @@ export default function TemplatePage() {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(value);
       }
-      shopify.toast.show(`${label} copied.`);
+      shopify.toast.show(`${label} copied to clipboard.`);
     } catch {
       shopify.toast.show(`Failed to copy.`);
     }
@@ -1928,7 +1928,7 @@ export default function TemplatePage() {
           normalized,
         );
         showConfigSavedMessage();
-        shopify.toast.show("Custom template updated.");
+        shopify.toast.show("SEO template updated.");
       } else {
         const newEntry = {
           id: `custom-${Date.now()}`,
@@ -1947,7 +1947,7 @@ export default function TemplatePage() {
           normalized,
         );
         showConfigSavedMessage();
-        shopify.toast.show("Custom template created.");
+        shopify.toast.show("SEO template created.");
       }
       setShowFormModal(false);
     } catch (error) {
@@ -1974,7 +1974,7 @@ export default function TemplatePage() {
       );
       showConfigSavedMessage();
       setDeleteTargetId(null);
-      shopify.toast.show("Custom template deleted.");
+      shopify.toast.show("SEO template deleted.");
     } catch (error) {
       showConfigErrorMessage(error?.message || "Failed to save configuration.");
       shopify.toast.show(error?.message || "Failed to delete custom template.");

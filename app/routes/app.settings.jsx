@@ -153,7 +153,7 @@ export default function SettingsPage() {
       writeGlobalSettings(normalized);
       setSaved(true);
       setSaveMessage({ tone: "success", text: "Configuration saved successfully." });
-      shopify.toast.show("Settings saved successfully.");
+      shopify.toast.show("SEO settings saved — changes apply to new generations.");
       setTimeout(() => setSaved(false), 3000);
       setTimeout(() => setSaveMessage(null), 3000);
       return;

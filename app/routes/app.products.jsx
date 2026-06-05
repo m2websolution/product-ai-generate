@@ -1611,14 +1611,14 @@ export default function ProductsPage() {
       setQueueStatusById({});
       if (queueIntervalRef.current) { clearInterval(queueIntervalRef.current); queueIntervalRef.current = null; }
       if (response.queued) {
-        shopify.toast.show(`Generating ${response.total} products in the background.`);
+        shopify.toast.show(`Generating SEO content for ${response.total} products in the background.`);
         window.setTimeout(() => navigateInApp("/app/jobs", ""), 600);
       } else {
         const creditsMessage =
           typeof response.creditsUsed === "number"
             ? ` ${response.creditsUsed} credits used${typeof response.newCredits === "number" ? `. Remaining: ${response.newCredits}` : ""}.`
             : "";
-        shopify.toast.show(`Bulk generate complete: ${response.succeeded}/${response.total} updated.${creditsMessage}`);
+        shopify.toast.show(`SEO content updated for ${response.succeeded}/${response.total} products.${creditsMessage}`);
         window.setTimeout(() => navigateInApp("/app/content-management", "?tab=products&filter=all"), 600);
         revalidator.revalidate();
       }

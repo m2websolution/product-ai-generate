@@ -1049,9 +1049,17 @@ export default function AiVisibilityPage() {
         if (typeof window !== "undefined" && window.shopify?.toast) {
           let msg;
           if (data.intent === "generate_llmstxt") {
-            msg = "llms.txt generated successfully.";
+            msg = "AI Index (llms.txt) generated — your store is now discoverable by AI assistants.";
+          } else if (data.intent === "generate_combined") {
+            msg = `SEO content generated — schema markup and FAQ added (${data.creditsUsed ?? 0} cr).`;
+          } else if (data.intent === "generate_schema") {
+            msg = `Schema markup generated — search engines can now better understand this content (${data.creditsUsed ?? 0} cr).`;
+          } else if (data.intent === "generate_faq") {
+            msg = `FAQ schema generated — boosts visibility in Google's People Also Ask (${data.creditsUsed ?? 0} cr).`;
+          } else if (data.intent === "generate_bulk_schema") {
+            msg = `Bulk schema generated — ${data.creditsUsed ?? 0} credits used.`;
           } else {
-            msg = `Generated successfully (${data.creditsUsed ?? 0} credits used).`;
+            msg = `SEO content generated (${data.creditsUsed ?? 0} credits used).`;
           }
           window.shopify.toast.show(msg);
         }
