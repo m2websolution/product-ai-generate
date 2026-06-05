@@ -379,28 +379,29 @@ const FILE_STATUS_QUERY = `#graphql
 
 // Upload a text file to Shopify Content → Files and return the CDN URL.
 // Flow: stagedUploadsCreate → PUT to presigned URL → fileCreate → poll for URL.
+// Collect IDs of existing CDN files matching a filename — used for post-redirect cleanup.
+// Does NOT delete them (safe to call before the new upload).
+async function collectOldShopifyFileIds(adminGraphQL, filename, excludeUrl) {
+  try {
+    const listRes = await adminGraphQL(FILES_QUERY, { variables: { query: `filename:${filename}` } });
+    const listJson = await listRes.json();
+    return (listJson?.data?.files?.nodes || [])
+      .filter((f) => String(f.url || "").includes(`/${filename}`) && f.url !== excludeUrl)
+      .map((f) => f.id);
+  } catch {
+    return [];
+  }
+}
+
 async function uploadToShopifyFiles(adminGraphQL, filename, content, mimeType = "text/plain") {
   const byteLen = Buffer.byteLength(content, "utf-8");
   console.log(`[llms-cdn] Uploading ${filename} (${byteLen} bytes) to Shopify Files...`);
 
-  // Step 1 — delete any existing files with the same name to avoid accumulation.
-  try {
-    const listRes = await adminGraphQL(FILES_QUERY, { variables: { query: `filename:${filename}` } });
-    const listJson = await listRes.json();
-    // Match by URL path since GenericFile has no filename field in GQL schema.
-    const existing = (listJson?.data?.files?.nodes || []).filter(
-      (f) => String(f.url || "").includes(`/${filename}`),
-    );
-    if (existing.length > 0) {
-      const ids = existing.map((f) => f.id);
-      console.log(`[llms-cdn] Deleting ${ids.length} existing ${filename} file(s): ${ids.join(", ")}`);
-      await adminGraphQL(FILE_DELETE, { variables: { fileIds: ids } });
-    }
-  } catch (delErr) {
-    console.warn(`[llms-cdn] Could not delete old ${filename}: ${delErr?.message}`);
-  }
+  // Deletion of old files is intentionally NOT done here.
+  // Old files are cleaned up AFTER the redirect is confirmed pointing to the new URL.
+  // This avoids a window where the redirect points to a deleted (404) CDN URL.
 
-  // Step 2 — create staged upload (presigned URL).
+  // Step 1 — create staged upload (presigned URL).
   const stageRes = await adminGraphQL(STAGED_UPLOADS_CREATE, {
     variables: {
       input: [{
@@ -454,7 +455,7 @@ async function uploadToShopifyFiles(adminGraphQL, filename, content, mimeType = 
   // Step 5 — poll until file status = READY (Shopify processes asynchronously).
   const fileId = file?.id;
   if (fileId) {
-    for (let attempt = 1; attempt <= 6; attempt++) {
+    for (let attempt = 1; attempt <= 10; attempt++) {
       await new Promise((r) => setTimeout(r, 2000));
       const pollRes = await adminGraphQL(FILE_STATUS_QUERY, { variables: { id: fileId } });
       const pollJson = await pollRes.json();
@@ -463,11 +464,11 @@ async function uploadToShopifyFiles(adminGraphQL, filename, content, mimeType = 
         console.log(`[llms-cdn] ${filename} READY → ${ready.url} (poll attempt ${attempt})`);
         return ready.url;
       }
-      console.log(`[llms-cdn] ${filename} status=${ready?.fileStatus || "PENDING"} (attempt ${attempt}/6)`);
+      console.log(`[llms-cdn] ${filename} status=${ready?.fileStatus || "PENDING"} (attempt ${attempt}/10)`);
     }
   }
 
-  throw new Error(`${filename} upload timed out — CDN URL not available after 12 s`);
+  throw new Error(`${filename} upload timed out — CDN URL not available after 20 s`);
 }
 
 const URL_REDIRECTS_BY_PATH_QUERY = `#graphql
@@ -595,7 +596,7 @@ function isOurRedirect(target) {
 // Falls back to DELETE+CREATE only when UPDATE itself reports userErrors.
 // Always verifies the redirect after the operation.
 
-async function resolveOneRedirectWithSession(adminGraphQL, path, target) {
+async function resolveOneRedirectWithSession(adminGraphQL, path, target, options = {}) {
   const LOG = `[llms-redirect]`;
 
   // Step 1 — query current state of this path.
@@ -645,9 +646,12 @@ async function resolveOneRedirectWithSession(adminGraphQL, path, target) {
   // and the new target is just an app proxy path, PRESERVE the CDN redirect.
   // This prevents the 10-min background re-assertion from reverting CDN redirects back
   // to the app proxy every time the AI Visibility page is loaded.
+  // Exception: forceUpdate=true (used in the active generate flow) always overwrites,
+  // so that when CDN upload fails and we fall back to proxy, the redirect is updated
+  // instead of left pointing to a now-deleted CDN file.
   const existingIsCdnFile = String(primary.target).includes("cdn.shopify.com");
   const newTargetIsProxy  = String(target).startsWith("/apps/");
-  if (existingIsCdnFile && newTargetIsProxy) {
+  if (existingIsCdnFile && newTargetIsProxy && !options.forceUpdate) {
     console.log(
       `${LOG} PRESERVE CDN: ${path} → "${primary.target}" ` +
       `(keeping CDN URL, not reverting to app proxy)`,
@@ -1901,7 +1905,9 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
     const redirectResults = await Promise.allSettled(
       REDIRECT_MAP.map(({ path, target }) =>
         adminGraphQL
-          ? resolveOneRedirectWithSession(adminGraphQL, path, target)
+          // forceUpdate: always overwrite regardless of existing target type.
+          // Prevents stale CDN redirect from being preserved when CDN upload fails.
+          ? resolveOneRedirectWithSession(adminGraphQL, path, target, { forceUpdate: true })
           : resolveOneRedirectWithRest(shop, fallbackAccessToken, path, target),
       ),
     );
@@ -1911,6 +1917,22 @@ export async function generateAndStoreDynamicLlmsTxt(shop, options = {}, adminGr
         ? r.value
         : { path: REDIRECT_MAP[i].path, target: REDIRECT_MAP[i].target, error: r.reason?.message || "redirect failed" },
     );
+
+    // ── Non-blocking cleanup of old CDN files (runs after redirect is confirmed) ───
+    // Deletion is intentionally deferred to here so old files are still accessible
+    // via any browser-cached 301 redirects until the new redirect is in place.
+    if (adminGraphQL && (cdnTargets.llmsTxt || cdnTargets.agentsMd)) {
+      Promise.all([
+        cdnTargets.llmsTxt  ? collectOldShopifyFileIds(adminGraphQL, "llms.txt",  cdnTargets.llmsTxt)  : [],
+        cdnTargets.agentsMd ? collectOldShopifyFileIds(adminGraphQL, "agents.md", cdnTargets.agentsMd) : [],
+      ]).then(([llmsOld, agentsOld]) => {
+        const toDelete = [...llmsOld, ...agentsOld];
+        if (toDelete.length > 0) {
+          console.log(`[llms-cdn] [${shop}] Background cleanup: deleting ${toDelete.length} old CDN file(s)`);
+          return adminGraphQL(FILE_DELETE, { variables: { fileIds: toDelete } });
+        }
+      }).catch((e) => console.warn(`[llms-cdn] [${shop}] Background CDN cleanup failed: ${e?.message}`));
+    }
 
     // ── Verify redirects after creation ───────────────────────────────────
     const verification = adminGraphQL

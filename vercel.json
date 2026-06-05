@@ -3,6 +3,11 @@
   "outputDirectory": "build/client",
   "installCommand": "npm install",
   "framework": null,
+  "functions": {
+    "api/server.js": {
+      "maxDuration": 60
+    }
+  },
   "routes": [
     {
       "handle": "filesystem"
