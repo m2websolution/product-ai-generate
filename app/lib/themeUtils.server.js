@@ -7,8 +7,7 @@
  */
 export async function autoAddFaqSectionToProductPage(shop, accessToken) {
   try {
-    const _h = (process.env.SHOPIFY_APP_HANDLE || "").trim();
-    const appHandle = (_h && _h !== "nex-ai-seo-product-description") ? _h : "nex-ai-seo-product-description";
+    const appHandle = "nex-ai-seo-product-description";
     const extensionUid =
       process.env.SHOPIFY_AI_VISIBILITY_EMBED_ID ||
       process.env.SHOPIFY_THEME_EXTENSION_ID ||
