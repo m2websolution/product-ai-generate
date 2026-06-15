@@ -1,4 +1,5 @@
 import {
+  useActionData,
   useLoaderData,
   useNavigate,
   useLocation,
@@ -477,6 +478,7 @@ function SeoDonut({ score }) {
 }
 
 export default function Index() {
+  const actionData = useActionData();
   const {
     shopOwnerName,
     generationStats,
